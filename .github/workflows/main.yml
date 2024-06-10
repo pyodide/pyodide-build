@@ -58,7 +58,7 @@ jobs:
                   pytest -v \
                     --junitxml=test-results/junit.xml \
                     --cov=pyodide-build \
-                    pyodide-build
+                    pyodide_build
 
             - uses: codecov/codecov-action@v4
               with:
