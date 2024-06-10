@@ -1,10 +1,6 @@
-# This file contains tests that ensure build environment is properly initialized in
-# both in-tree and out-of-tree builds.
-
 import os
 
 import pytest
-from conftest import ROOT_PATH
 
 from pyodide_build import build_env, common
 from pyodide_build.config import BUILD_KEY_TO_VAR
@@ -12,37 +8,6 @@ from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
 class TestInTree:
-    def test_init_environment(self, reset_env_vars, reset_cache):
-        assert "PYODIDE_ROOT" not in os.environ
-
-        build_env.init_environment()
-
-        assert "PYODIDE_ROOT" in os.environ
-        assert os.environ["PYODIDE_ROOT"] == str(ROOT_PATH)
-
-    def test_init_environment_pyodide_root_already_set(
-        self, reset_env_vars, reset_cache
-    ):
-        assert "PYODIDE_ROOT" not in os.environ
-        os.environ["PYODIDE_ROOT"] = "/set_by_user"
-
-        build_env.init_environment()
-
-        assert os.environ["PYODIDE_ROOT"] == "/set_by_user"
-
-    def test_get_pyodide_root(self, reset_env_vars, reset_cache):
-        assert "PYODIDE_ROOT" not in os.environ
-
-        assert build_env.get_pyodide_root() == ROOT_PATH
-
-    def test_get_pyodide_root_pyodide_root_already_set(
-        self, reset_env_vars, reset_cache
-    ):
-        assert "PYODIDE_ROOT" not in os.environ
-        os.environ["PYODIDE_ROOT"] = "/set_by_user"
-
-        assert str(build_env.get_pyodide_root()) == "/set_by_user"
-
     def test_search_pyodide_root(self, tmp_path, reset_env_vars, reset_cache):
         pyproject_file = tmp_path / "pyproject.toml"
         pyproject_file.write_text("[tool._pyodide]")
@@ -52,66 +17,6 @@ class TestInTree:
 
         pyproject_file.unlink()
         assert build_env.search_pyodide_root(tmp_path) is None
-
-    def test_in_xbuildenv(self, reset_env_vars, reset_cache):
-        assert not build_env.in_xbuildenv()
-
-    def test_get_build_environment_vars(self, reset_env_vars, reset_cache):
-        build_vars = build_env.get_build_environment_vars(ROOT_PATH)
-
-        # extra variables that does not come from config files.
-        extra_vars = set(["PYODIDE", "PYODIDE_PACKAGE_ABI", "PYTHONPATH"])
-        all_keys = set(BUILD_KEY_TO_VAR.values()) | extra_vars
-        for var in build_vars:
-            assert var in all_keys, f"Unknown {var}"
-
-        # Additionally we set these variables
-        for var in extra_vars:
-            assert var in build_vars, f"Missing {var}"
-
-    def test_get_build_flag(self, reset_env_vars, reset_cache):
-        for key, val in build_env.get_build_environment_vars(
-            pyodide_root=ROOT_PATH
-        ).items():
-            assert build_env.get_build_flag(key) == val
-
-        with pytest.raises(ValueError):
-            build_env.get_build_flag("UNKNOWN_VAR")
-
-    def test_get_build_environment_vars_host_env(
-        self, monkeypatch, reset_env_vars, reset_cache
-    ):
-        # host environment variables should have precedence over
-        # variables defined in Makefile.envs
-
-        import os
-
-        e = build_env.get_build_environment_vars(ROOT_PATH)
-        assert e["PYODIDE"] == "1"
-
-        monkeypatch.setenv("HOME", "/home/user")
-        monkeypatch.setenv("PATH", "/usr/bin:/bin")
-        # We now inject PKG_CONFIG_LIBDIR inside buildpkg.py
-        # monkeypatch.setenv("PKG_CONFIG_LIBDIR", "/x/y/z:/c/d/e")
-
-        build_env.get_build_environment_vars.cache_clear()
-
-        e_host = build_env.get_build_environment_vars(ROOT_PATH)
-        assert e_host.get("HOME") == os.environ.get("HOME")
-        assert e_host.get("PATH") == os.environ.get("PATH")
-
-        assert e_host.get("HOME") != e.get("HOME")
-        assert e_host.get("PATH") != e.get("PATH")
-
-        build_env.get_build_environment_vars.cache_clear()
-
-        monkeypatch.delenv("HOME")
-        monkeypatch.setenv("RANDOM_ENV", "1234")
-
-        build_env.get_build_environment_vars.cache_clear()
-        e = build_env.get_build_environment_vars(ROOT_PATH)
-        assert "HOME" not in e
-        assert "RANDOM_ENV" not in e
 
 
 class TestOutOfTree(TestInTree):
@@ -126,12 +31,30 @@ class TestOutOfTree(TestInTree):
         assert "PYODIDE_ROOT" in os.environ
         assert os.environ["PYODIDE_ROOT"] == str(manager.pyodide_root)
 
+    def test_init_environment_pyodide_root_already_set(
+        self, reset_env_vars, reset_cache
+    ):
+        assert "PYODIDE_ROOT" not in os.environ
+        os.environ["PYODIDE_ROOT"] = "/set_by_user"
+
+        build_env.init_environment()
+
+        assert os.environ["PYODIDE_ROOT"] == "/set_by_user"
+
     def test_get_pyodide_root(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         assert "PYODIDE_ROOT" not in os.environ
 
         pyodide_root = build_env.get_pyodide_root()
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
         assert pyodide_root == manager.pyodide_root
+
+    def test_get_pyodide_root_pyodide_root_already_set(
+        self, reset_env_vars, reset_cache
+    ):
+        assert "PYODIDE_ROOT" not in os.environ
+        os.environ["PYODIDE_ROOT"] = "/set_by_user"
+
+        assert str(build_env.get_pyodide_root()) == "/set_by_user"
 
     def test_in_xbuildenv(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         assert build_env.in_xbuildenv()
