@@ -1,17 +1,14 @@
-# flake8: noqa
 # This file contains tests that ensure build environment is properly initialized in
 # both in-tree and out-of-tree builds.
 
 import os
 
 import pytest
-
 from conftest import ROOT_PATH
-from pyodide_build import build_env, common
-from pyodide_build.xbuildenv import CrossBuildEnvManager
-from pyodide_build.config import BUILD_KEY_TO_VAR
 
-from .fixture import reset_cache, reset_env_vars, dummy_xbuildenv, dummy_xbuildenv_url
+from pyodide_build import build_env, common
+from pyodide_build.config import BUILD_KEY_TO_VAR
+from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
 class TestInTree:

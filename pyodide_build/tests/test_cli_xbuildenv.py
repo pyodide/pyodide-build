@@ -1,5 +1,3 @@
-# flake8: noqa
-
 import os
 import shutil
 from pathlib import Path
@@ -13,12 +11,6 @@ from pyodide_build.cli import (
 )
 from pyodide_build.common import chdir
 from pyodide_build.xbuildenv_releases import CROSS_BUILD_ENV_METADATA_URL_ENV_VAR
-
-from .fixture import (
-    dummy_xbuildenv_url,
-    fake_xbuildenv_releases_compatible,
-    fake_xbuildenv_releases_incompatible,
-)
 
 
 def mock_pyodide_lock() -> PyodideLockSpec:
