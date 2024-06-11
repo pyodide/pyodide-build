@@ -25,6 +25,6 @@ emsdk/emsdk
 geckodriver.log
 node_modules
 dist/
-pyodide-build/**/build.log
+pyodide_build/**/build.log
 xbuildenv/
 .pyodide-xbuildenv*

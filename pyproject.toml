@@ -73,3 +73,105 @@ version.path = "pyodide_build/__init__.py"
 exclude = [
     "/pyodide_build/tests",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = ["src/py", "pyodide-build"]
+show_error_codes = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+plugins = ["pydantic.mypy"]
+
+# Strict checks
+warn_unused_configs = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_subclassing_any = false
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = false
+no_implicit_reexport = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+  "_pyodide_core",
+  "docutils.parsers.rst",
+  "js",
+  "loky",
+  "matplotlib.*",
+  "PIL.*",
+  "pyodide_js",
+  "pyodide_js._api",
+  "pytest_pyodide",
+  "pytest_pyodide.runner",
+  "pytest_pyodide.utils",
+  "ruamel.yaml",
+  "termcolor",
+  "test",
+  "tomli",
+  "tomllib",
+  "typer",
+  "virtualenv",
+  "auditwheel_emscripten.*"
+]
+ignore_missing_imports = true
+
+
+[tool.ruff]
+lint.select = [
+  "B0",     # bugbear (all B0* checks enabled by default)
+  "B904",   # bugbear (Within an except clause, raise exceptions with raise ... from err)
+  "B905",   # bugbear (zip() without an explicit strict= parameter set.)
+  "C9",     # mccabe complexity
+  "E",      # pycodestyles
+  "W",      # pycodestyles
+  "F",      # pyflakes
+  "I",      # isort
+  "PGH",    # pygrep-hooks
+  "PLC",    # pylint conventions
+  "PLE",    # pylint errors
+  "UP",     # pyupgrade
+]
+lint.ignore = ["E402", "E501", "E731", "E741", "UP038"]
+# line-length = 219  # E501: Recommended goal is 88 to match black
+target-version = "py311"
+
+[tool.ruff.lint.per-file-ignores]
+"src/py/_pyodide/_base.py" = [
+  "PGH001",  # No builtin `eval()` allowed
+]
+"src/tests/test_jsproxy.py" = [
+  "PGH001",  # No builtin `eval()` allowed
+]
+"src/tests/test_typeconversions.py" = [
+  "PGH001",  # No builtin `eval()` allowed
+]
+"tools/*" = [
+  "B008",  # Do not perform function call `typer.Optional` in argument defaults
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Argument", "typer.Option"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "pyodide",
+  "pyodide_js",
+  "micropip",
+  "pyodide_build",
+  "_pyodide",
+  "js",
+]
+known-third-party = [
+  "build",
+  "pyodide_lock",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 31  # C901: Recommended goal is 10

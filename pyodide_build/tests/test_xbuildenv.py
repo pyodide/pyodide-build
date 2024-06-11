@@ -1,14 +1,6 @@
-# flake8: noqa
-
 import pytest
 
 from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
-
-from .fixture import (
-    dummy_xbuildenv_url,
-    fake_xbuildenv_releases_compatible,
-    fake_xbuildenv_releases_incompatible,
-)
 
 
 @pytest.fixture()

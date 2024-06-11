@@ -1,33 +1,21 @@
-# flake8: noqa
-
 import shutil
+import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
-import zipfile
 import typer
 from typer.testing import CliRunner
-from typing import Any
+
 import pyodide_build
-from pyodide_build import common, build_env, cli
+from pyodide_build import build_env, cli, common
 from pyodide_build.cli import (
     build,
     build_recipes,
     config,
     create_zipfile,
-    skeleton,
-    xbuildenv,
     py_compile,
-)
-
-from .fixture import (
-    temp_python_lib,
-    temp_python_lib2,
-    dummy_xbuildenv,
-    mock_emscripten,
-    dummy_xbuildenv_url,
-    reset_env_vars,
-    reset_cache,
+    skeleton,
 )
 
 only_node = pytest.mark.xfail_browsers(
@@ -419,7 +407,7 @@ def test_build2_replace_so_abi_tags(
     outdir = tmp_path / "out"
     app = typer.Typer()
     app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
-    result = runner.invoke(app, [str(srcdir), "--outdir", str(outdir)])
+    runner.invoke(app, [str(srcdir), "--outdir", str(outdir)])
     wheel_file = next(outdir.glob("*.whl"))
     print(zipfile.ZipFile(wheel_file).namelist())
     so_file = next(
