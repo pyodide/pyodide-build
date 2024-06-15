@@ -18,11 +18,6 @@ from pyodide_build.cli import (
     skeleton,
 )
 
-only_node = pytest.mark.xfail_browsers(
-    chrome="node only", firefox="node only", safari="node only"
-)
-
-
 runner = CliRunner()
 
 

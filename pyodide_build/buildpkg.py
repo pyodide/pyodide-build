@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import warnings
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -348,7 +349,12 @@ class RecipeBuilder:
             shutil.copy(tarballpath, self.src_dist_dir)
             return
 
-        shutil.unpack_archive(tarballpath, self.build_dir)
+        with warnings.catch_warnings():
+            # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
+            # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
+            # https://github.com/python/cpython/issues/112760
+            warnings.simplefilter("ignore")
+            shutil.unpack_archive(tarballpath, self.build_dir)
 
         extract_dir_name = self.source_metadata.extract_dir
         if extract_dir_name is None:

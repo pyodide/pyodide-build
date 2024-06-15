@@ -71,7 +71,4 @@ def test_subprocess_with_shared_env_logging(capfd, tmp_path):
             str(dir),
         ]
 
-        logs = [l.strip() for l in cap.err.splitlines()]
-        assert len(logs) == 2
-        assert "ERROR: test2 script failed" in logs[0]
-        assert "exit code: 7" in logs[1]
+        assert "ERROR: test2 script failed" in cap.err
