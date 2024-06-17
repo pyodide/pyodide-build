@@ -1,7 +1,6 @@
 import os
 from functools import cache
 
-import pydantic
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
@@ -23,9 +22,7 @@ class CrossBuildEnvReleaseSpec(BaseModel):
     # Minimum and maximum pyodide-build versions that is compatible with this release
     min_pyodide_build_version: str | None = None
     max_pyodide_build_version: str | None = None
-    model_config = ConfigDict(
-        extra=pydantic.Extra.forbid, title="CrossBuildEnvReleasesSpec"
-    )
+    model_config = ConfigDict(extra="forbid", title="CrossBuildEnvReleasesSpec")
 
     @property
     def python_version_tuple(self) -> tuple[int, int, int]:
@@ -95,7 +92,7 @@ class CrossBuildEnvMetaSpec(BaseModel):
 
     releases: dict[str, CrossBuildEnvReleaseSpec]
     model_config = ConfigDict(
-        extra=pydantic.Extra.forbid,
+        extra="forbid",
         title="CrossBuildEnvMetaSpec",
     )
 
@@ -224,6 +221,8 @@ def load_cross_build_env_metadata(url_or_filename: str) -> CrossBuildEnvMetaSpec
         response = requests.get(url_or_filename)
         response.raise_for_status()
         data = response.json()
-        return CrossBuildEnvMetaSpec.parse_obj(data)
+        return CrossBuildEnvMetaSpec.model_validate(data)
 
-    return CrossBuildEnvMetaSpec.parse_file(url_or_filename)
+    with open(url_or_filename) as f:
+        data = f.read()
+        return CrossBuildEnvMetaSpec.model_validate_json(data)
