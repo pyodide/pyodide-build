@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -66,8 +66,8 @@ test = [
     "packaging",
 ]
 
-[tool.hatch]
-version.path = "pyodide_build/__init__.py"
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.sdist]
 exclude = [
