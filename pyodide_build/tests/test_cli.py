@@ -233,7 +233,7 @@ def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripte
     assert f"{pkg}-{version}-py3-none-any.whl" in result.stdout
 
 
-def test_config_list():
+def test_config_list(dummy_xbuildenv):
     result = runner.invoke(
         config.app,
         [
@@ -249,7 +249,7 @@ def test_config_list():
 
 
 @pytest.mark.parametrize("cfg_name,env_var", config.PYODIDE_CONFIGS.items())
-def test_config_get(cfg_name, env_var):
+def test_config_get(cfg_name, env_var, dummy_xbuildenv):
     result = runner.invoke(
         config.app,
         [
@@ -411,7 +411,7 @@ def test_build2_replace_so_abi_tags(
     assert so_file.endswith(".cpython-311-wasm32-emscripten.so")
 
 
-def test_build_exports(monkeypatch):
+def test_build_exports(monkeypatch, dummy_xbuildenv):
     def download_url_shim(url, tmppath):
         (tmppath / "build").mkdir()
         return "blah"
@@ -469,7 +469,7 @@ def test_build_exports(monkeypatch):
     )
 
 
-def test_build_config_settings(monkeypatch):
+def test_build_config_settings(monkeypatch, dummy_xbuildenv):
     app = typer.Typer()
 
     app.command(

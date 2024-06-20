@@ -179,7 +179,7 @@ clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b895
         build_env.check_emscripten_version()
 
 
-def test_wheel_paths():
+def test_wheel_paths(dummy_xbuildenv):
     from pathlib import Path
 
     old_version = "cp38"

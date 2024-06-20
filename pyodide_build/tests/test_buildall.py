@@ -48,7 +48,7 @@ def test_generate_dependency_graph_disabled():
     assert set(pkg_map.keys()) == set()
 
 
-def test_generate_lockfile(tmp_path):
+def test_generate_lockfile(tmp_path, dummy_xbuildenv):
     pkg_map = buildall.generate_dependency_graph(
         RECIPE_DIR, {"pkg_1", "pkg_2", "libtest", "libtest_shared"}
     )
