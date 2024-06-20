@@ -7,8 +7,8 @@ from typing import Self
 import pydantic
 import pytest
 
-from pyodide_build import build_env, buildpkg, common
-from pyodide_build.build_env import BuildArgs, get_pyodide_root
+from pyodide_build import buildpkg, common
+from pyodide_build.build_env import BuildArgs
 from pyodide_build.buildpkg import RecipeBuilder
 from pyodide_build.io import _SourceSpec
 

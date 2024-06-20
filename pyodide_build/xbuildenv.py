@@ -1,6 +1,7 @@
 import json
 import shutil
 import subprocess
+import warnings
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.request import urlopen
@@ -273,7 +274,12 @@ class CrossBuildEnvManager:
         with NamedTemporaryFile(suffix=".tar") as f:
             f_path = Path(f.name)
             f_path.write_bytes(data)
-            shutil.unpack_archive(str(f_path), path)
+            with warnings.catch_warnings():
+                # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
+                # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
+                # https://github.com/python/cpython/issues/112760
+                warnings.simplefilter("ignore")
+                shutil.unpack_archive(str(f_path), path)
 
     def _install_cross_build_packages(
         self, xbuildenv_root: Path, xbuildenv_pyodide_root: Path
