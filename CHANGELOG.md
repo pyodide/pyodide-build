@@ -7,4 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.27.0] - 2024/06/18
+
 - pyodide-build is now developed under https://github.com/pyodide/pyodide-build.
