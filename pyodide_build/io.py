@@ -162,10 +162,11 @@ class MetaConfig(BaseModel):
         path
             path to the meta.yaml file
         """
-        import yaml
+        from ruamel.yaml import YAML
 
-        stream = path.read_bytes()
-        config_raw = yaml.safe_load(stream)
+        yaml = YAML(typ="safe")
+
+        config_raw = yaml.load(path.read_bytes())
 
         config = cls(**config_raw)
         if config.source.path:

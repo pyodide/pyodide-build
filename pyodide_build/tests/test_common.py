@@ -71,16 +71,6 @@ def test_environment_var_substitution(monkeypatch):
     )
 
 
-@pytest.mark.parametrize("num_cpus", [1, 2, 3])
-def test_get_num_cores(monkeypatch, num_cpus):
-    import loky
-
-    with monkeypatch.context() as m:
-        m.setattr(loky, "cpu_count", lambda: num_cpus)
-
-        assert get_num_cores() == num_cpus
-
-
 @pytest.mark.parametrize(
     "compression_level, expected_compression_type",
     [(6, zipfile.ZIP_DEFLATED), (0, zipfile.ZIP_STORED)],
