@@ -169,6 +169,9 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "home": "HOME",
     "path": "PATH",
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
+    # maintainer only
+    "_pywasmcross_wrapper": "_PYWASMCROSS_WRAPPER",
+    "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
 
 BUILD_VAR_TO_KEY = {v: k for k, v in BUILD_KEY_TO_VAR.items()}
@@ -197,6 +200,9 @@ DEFAULT_CONFIG: dict[str, str] = {
     "rust_toolchain": "nightly-2024-01-29",
     # Other configuration
     "pyodide_jobs": "1",
+    # maintainer only
+    "_pywasmcross_wrapper": "",
+    "_f2c_fixes_wrapper": "",
 }
 
 # Default configs that are computed from other values (often from Makefile.envs)

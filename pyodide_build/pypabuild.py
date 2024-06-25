@@ -15,7 +15,7 @@ from build import BuildBackendException, ConfigSettingsType
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 
-from . import common, pywasmcross
+from . import _f2c_fixes, common, pywasmcross
 from .build_env import (
     get_build_flag,
     get_hostsitepackages,
@@ -214,9 +214,19 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     The dictionary of compiler environment variables that points to the symlinks.
     """
 
+    # For maintainers:
+    # - you can set "_pywasmcross_wrapper" and "_f2c_fixes_wrapper" variable in pyproject.toml
+    # in order to change the script to use when cross-compiling
+    # this is only for maintainers and *should* not be used by others
+
     pywasmcross_exe = symlink_dir / "pywasmcross.py"
-    shutil.copy2(pywasmcross.__file__, pywasmcross_exe)
+    pywasmcross_origin = get_build_flag("_PYWASMCROSS_WRAPPER") or pywasmcross.__file__
+    shutil.copy2(pywasmcross_origin, pywasmcross_exe)
     pywasmcross_exe.chmod(0o755)
+
+    f2c_fixes_exe = symlink_dir / "_f2c_fixes.py"
+    f2c_fixes_origin = get_build_flag("_F2C_FIXES_WRAPPER") or _f2c_fixes.__file__
+    shutil.copy2(f2c_fixes_origin, f2c_fixes_exe)
 
     env = {}
     for symlink in pywasmcross.SYMLINKS:

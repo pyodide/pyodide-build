@@ -591,7 +591,7 @@ def handle_command(
     """
 
     if line[0] == "gfortran":
-        from pyodide_build._f2c_fixes import replay_f2c
+        from _f2c_fixes import replay_f2c
 
         tmp = replay_f2c(line)
         if tmp is None:
@@ -604,7 +604,7 @@ def handle_command(
     new_args = handle_command_generate_args(line, build_args)
 
     if build_args.pkgname == "scipy":
-        from pyodide_build._f2c_fixes import scipy_fixes
+        from _f2c_fixes import scipy_fixes
 
         scipy_fixes(new_args)
 
