@@ -181,7 +181,9 @@ class MetaConfig(BaseModel):
         path
             path to the meta.yaml file
         """
-        import yaml
+        from ruamel.yaml import YAML
+
+        yaml = YAML(typ="safe")
 
         with open(path, "w") as f:
             yaml.dump(self.model_dump(by_alias=True, exclude_unset=True), f)
