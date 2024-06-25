@@ -166,7 +166,7 @@ class MetaConfig(BaseModel):
 
         yaml = YAML(typ="safe")
 
-        config_raw = yaml.load(path.read_bytes())
+        config_raw = yaml.load(path)
 
         config = cls(**config_raw)
         if config.source.path:
@@ -183,7 +183,8 @@ class MetaConfig(BaseModel):
         """
         from ruamel.yaml import YAML
 
-        yaml = YAML(typ="safe")
+        yaml = YAML()
+        yaml.representer.ignore_aliases = lambda *_: True
 
         with open(path, "w") as f:
             yaml.dump(self.model_dump(by_alias=True, exclude_unset=True), f)
