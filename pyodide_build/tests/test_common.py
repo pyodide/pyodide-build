@@ -7,7 +7,6 @@ from pyodide_build.common import (
     environment_substitute_args,
     extract_wheel_metadata_file,
     find_missing_executables,
-    get_num_cores,
     make_zip_archive,
     parse_top_level_import_name,
     repack_zip_archive,

@@ -11,14 +11,13 @@
 #    used with multiprocessing.set_start_method
 #  * Implement a CFS-aware amd physical-core aware cpu_count function.
 #
-import os
-import sys
 import math
+import os
 import subprocess
+import sys
 import traceback
 import warnings
 from concurrent.futures.process import _MAX_WINDOWS_WORKERS
-
 
 # Cache for the number of physical cores to avoid repeating subprocess calls.
 # It should not change during the lifetime of the program.
@@ -183,9 +182,7 @@ def _count_physical_cores():
             )
             cpu_info = cpu_info.stdout.splitlines()
             cpu_info = [
-                l.split(",")[1]
-                for l in cpu_info
-                if (l and l != "Node,NumberOfCores")
+                l.split(",")[1] for l in cpu_info if (l and l != "Node,NumberOfCores")
             ]
             cpu_count_physical = sum(map(int, cpu_info))
         elif sys.platform == "darwin":
