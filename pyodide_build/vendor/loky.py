@@ -82,7 +82,8 @@ def cpu_count(only_physical_cores=False):
             f"following reason:\n{exception}\n"
             "Returning the number of logical cores instead. You can "
             "silence this warning by setting LOKY_MAX_CPU_COUNT to "
-            "the number of cores you want to use."
+            "the number of cores you want to use.",
+            stacklevel=2,
         )
         traceback.print_tb(exception.__traceback__)
 
@@ -121,7 +122,7 @@ def _cpu_count_cgroup(os_cpu_count):
             return math.ceil(cpu_quota_us / cpu_period_us)
         else:  # pragma: no cover
             # Setting a negative cpu_quota_us value is a valid way to disable
-            # cgroup CPU bandwith limits
+            # cgroup CPU bandwidth limits
             return os_cpu_count
 
 
