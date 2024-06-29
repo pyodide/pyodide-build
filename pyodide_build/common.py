@@ -204,9 +204,9 @@ def get_num_cores() -> int:
     Return the number of CPUs the current process can use.
     If the number of CPUs cannot be determined, return 1.
     """
-    import loky
+    from .vendor.loky import cpu_count
 
-    return loky.cpu_count()
+    return cpu_count()
 
 
 def make_zip_archive(

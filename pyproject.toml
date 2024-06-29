@@ -14,24 +14,22 @@ classifiers = [
 license = {text = "MPL-2.0"}
 requires-python = ">=3.12"
 dependencies = [
-    "pyyaml",
+    "build~=1.2.0",
+    "pyodide-cli~=0.2.1",
+    "pyodide-lock==0.1.0a6",
+    "auditwheel-emscripten~=0.0.9",
+    "pydantic>=2,<3",
+    "cmake>=3.24",
+    "wheel",
     "ruamel.yaml",
     "packaging",
-    "wheel",
-    "build~=1.2.0",
     "virtualenv",
-    "pydantic>=2,<3",
-    "pyodide-cli~=0.2.1",
-    "cmake>=3.24",
-    "unearth~=0.6",
     "requests",
-    "types-requests",
     "typer",
-    "auditwheel-emscripten~=0.0.9",
-    "pyodide-lock==0.1.0a6",
-    "resolvelib",
     "rich",
-    "loky",
+    # TODO: make this a extra dependency
+    "resolvelib",
+    "unearth~=0.6",
 ]
 dynamic = ["version"]
 
@@ -63,7 +61,7 @@ test = [
     "pytest",
     "pytest-httpserver",
     "pytest-cov",
-    "packaging",
+    "types-requests",
 ]
 
 [tool.hatch.version]
@@ -76,7 +74,7 @@ exclude = [
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = ["src/py", "pyodide-build"]
+mypy_path = ["pyodide_build"]
 show_error_codes = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
@@ -100,17 +98,7 @@ strict_equality = true
 
 [[tool.mypy.overrides]]
 module = [
-  "_pyodide_core",
-  "docutils.parsers.rst",
-  "js",
   "loky",
-  "matplotlib.*",
-  "PIL.*",
-  "pyodide_js",
-  "pyodide_js._api",
-  "pytest_pyodide",
-  "pytest_pyodide.runner",
-  "pytest_pyodide.utils",
   "ruamel.yaml",
   "termcolor",
   "test",
@@ -161,12 +149,7 @@ extend-immutable-calls = ["typer.Argument", "typer.Option"]
 
 [tool.ruff.lint.isort]
 known-first-party = [
-  "pyodide",
-  "pyodide_js",
-  "micropip",
   "pyodide_build",
-  "_pyodide",
-  "js",
 ]
 known-third-party = [
   "build",
