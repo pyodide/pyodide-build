@@ -170,7 +170,6 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "path": "PATH",
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
     # maintainer only
-    "_pywasmcross_wrapper": "_PYWASMCROSS_WRAPPER",
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
 

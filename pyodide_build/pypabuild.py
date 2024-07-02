@@ -215,12 +215,12 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     """
 
     # For maintainers:
-    # - you can set "_pywasmcross_wrapper" and "_f2c_fixes_wrapper" variable in pyproject.toml
+    # - you can set "_f2c_fixes_wrapper" variable in pyproject.toml
     # in order to change the script to use when cross-compiling
     # this is only for maintainers and *should* not be used by others
 
     pywasmcross_exe = symlink_dir / "pywasmcross.py"
-    pywasmcross_origin = get_build_flag("_PYWASMCROSS_WRAPPER") or pywasmcross.__file__
+    pywasmcross_origin = pywasmcross.__file__
     shutil.copy2(pywasmcross_origin, pywasmcross_exe)
     pywasmcross_exe.chmod(0o755)
 
