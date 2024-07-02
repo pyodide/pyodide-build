@@ -50,7 +50,9 @@ def test_make_command_wrapper_symlinks(tmp_path):
         assert key in pypabuild.SYMLINK_ENV_VARS.values()
 
 
-def test_make_command_wrapper_symlinks_f2c_wrapper(tmp_path, reset_env_vars, reset_cache):
+def test_make_command_wrapper_symlinks_f2c_wrapper(
+    tmp_path, reset_env_vars, reset_cache
+):
     import os
 
     dummy_f2c_wrapper = tmp_path / "_dummy_f2c_fixes.py"
