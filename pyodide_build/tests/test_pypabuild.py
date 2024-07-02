@@ -50,6 +50,22 @@ def test_make_command_wrapper_symlinks(tmp_path):
         assert key in pypabuild.SYMLINK_ENV_VARS.values()
 
 
+def test_make_command_wrapper_symlinks_f2c_wrapper(tmp_path, reset_env_vars, reset_cache):
+    import os
+
+    dummy_f2c_wrapper = tmp_path / "_dummy_f2c_fixes.py"
+    dummy_f2c_wrapper.write_text("print('Hello, world!')")
+
+    os.environ["_F2C_FIXES_WRAPPER"] = str(dummy_f2c_wrapper)
+
+    symlink_dir = tmp_path
+    pypabuild.make_command_wrapper_symlinks(symlink_dir)
+
+    wrapper = symlink_dir / "_f2c_fixes.py"
+    assert wrapper.exists()
+    assert wrapper.read_text() == dummy_f2c_wrapper.read_text()
+
+
 def test_get_build_env(tmp_path):
     build_env_ctx = pypabuild.get_build_env(
         env={"PATH": ""},

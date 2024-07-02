@@ -200,7 +200,6 @@ DEFAULT_CONFIG: dict[str, str] = {
     # Other configuration
     "pyodide_jobs": "1",
     # maintainer only
-    "_pywasmcross_wrapper": "",
     "_f2c_fixes_wrapper": "",
 }
 
