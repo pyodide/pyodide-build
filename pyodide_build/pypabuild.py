@@ -276,7 +276,7 @@ def get_build_env(
         env.update(make_command_wrapper_symlinks(symlink_dir))
 
         sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
-        args["PYTHONPATH"] = sys.path + [str(sysconfig_dir)]
+        args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
         args["orig__name__"] = __name__
         args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
         args["PATH"] = env["PATH"]
