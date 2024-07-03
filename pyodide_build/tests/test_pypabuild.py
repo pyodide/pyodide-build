@@ -51,7 +51,7 @@ def test_make_command_wrapper_symlinks(tmp_path):
 
 
 def test_make_command_wrapper_symlinks_f2c_wrapper(
-    tmp_path, reset_env_vars, reset_cache
+    tmp_path, dummy_xbuildenv, reset_env_vars, reset_cache
 ):
     import os
 
@@ -68,7 +68,7 @@ def test_make_command_wrapper_symlinks_f2c_wrapper(
     assert wrapper.read_text() == dummy_f2c_wrapper.read_text()
 
 
-def test_get_build_env(tmp_path):
+def test_get_build_env(tmp_path, dummy_xbuildenv):
     build_env_ctx = pypabuild.get_build_env(
         env={"PATH": ""},
         pkgname="",
