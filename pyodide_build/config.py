@@ -183,6 +183,8 @@ OVERRIDABLE_BUILD_KEYS = {
     "ldflags",
     "rust_toolchain",
     "meson_cross_file",
+    # maintainer only
+    "_f2c_fixes_wrapper",
 }
 
 # Default configuration values.
