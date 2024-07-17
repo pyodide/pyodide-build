@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.27.3] - 2024/07/17
+
+- It is now possible to override `_f2c_fixes.py` file, with `_f2c_fixes_wrapper` variable.
+  [#8](https://github.com/pyodide/pyodide-build/pull/8)
+  
+
 ## [0.27.2] - 2024/07/11
 
 ## Changed
