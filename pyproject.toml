@@ -38,8 +38,8 @@ file = "README.md"
 content-type = "text/markdown"
 
 [project.urls]
-Homepage = "https://github.com/pyodide/pyodide"
-"Bug Tracker" = "https://github.com/pyodide/pyodide/issues"
+Homepage = "https://github.com/pyodide/pyodide-build"
+"Bug Tracker" = "https://github.com/pyodide/pyodide-build/issues"
 Documentation = "https://pyodide.org/en/stable/"
 
 [project.entry-points."pipx.run"]
