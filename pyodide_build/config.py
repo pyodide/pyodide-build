@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sysconfig
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -29,7 +30,14 @@ class ConfigManager:
             **self._load_makefile_envs(),
             **self._load_config_file(Path.cwd(), os.environ),
             **self._load_config_from_env(os.environ),
+            **self._load_sysconfig_paths(),
         }
+
+    def _load_sysconfig_paths(self) -> Mapping[str, str]:
+        # Load the values of sysconfig.get_paths() with a
+        # "pyodide_sysconfig_" prefix to differentiate them
+        # from other configuration variables
+        return {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
 
     def _load_default_config(self) -> Mapping[str, str]:
         return {
@@ -173,6 +181,10 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
 
+BUILD_KEY_TO_VAR.update(
+    {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
+)
+
 BUILD_VAR_TO_KEY = {v: k for k, v in BUILD_KEY_TO_VAR.items()}
 
 # Configuration keys that can be overridden by the user.
@@ -204,6 +216,10 @@ DEFAULT_CONFIG: dict[str, str] = {
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }
+
+DEFAULT_CONFIG.update(
+    {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
+)
 
 # Default configs that are computed from other values (often from Makefile.envs)
 # TODO: Remove dependency on Makefile.envs
