@@ -173,6 +173,13 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
 
+BUILD_KEY_TO_VAR.update(
+    {
+            f"pyodide_sysconfig_{k}": v
+            for k, v in sysconfig.get_paths().items()
+    }
+    )
+
 BUILD_VAR_TO_KEY = {v: k for k, v in BUILD_KEY_TO_VAR.items()}
 
 # Configuration keys that can be overridden by the user.
@@ -204,6 +211,13 @@ DEFAULT_CONFIG: dict[str, str] = {
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }
+
+DEFAULT_CONFIG.update(
+    {
+            f"pyodide_sysconfig_{k}": v
+            for k, v in sysconfig.get_paths().items()
+    }
+    )
 
 # Default configs that are computed from other values (often from Makefile.envs)
 # TODO: Remove dependency on Makefile.envs
