@@ -37,10 +37,7 @@ class ConfigManager:
         # Load the values of sysconfig.get_paths() with a
         # "pyodide_sysconfig_" prefix to differentiate them
         # from other configuration variables
-        return {
-            f"pyodide_sysconfig_{k}": v
-            for k, v in sysconfig.get_paths().items()
-        }
+        return {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
 
     def _load_default_config(self) -> Mapping[str, str]:
         return {
@@ -185,11 +182,8 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
 }
 
 BUILD_KEY_TO_VAR.update(
-    {
-            f"pyodide_sysconfig_{k}": v
-            for k, v in sysconfig.get_paths().items()
-    }
-    )
+    {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
+)
 
 BUILD_VAR_TO_KEY = {v: k for k, v in BUILD_KEY_TO_VAR.items()}
 
@@ -224,11 +218,8 @@ DEFAULT_CONFIG: dict[str, str] = {
 }
 
 DEFAULT_CONFIG.update(
-    {
-            f"pyodide_sysconfig_{k}": v
-            for k, v in sysconfig.get_paths().items()
-    }
-    )
+    {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
+)
 
 # Default configs that are computed from other values (often from Makefile.envs)
 # TODO: Remove dependency on Makefile.envs

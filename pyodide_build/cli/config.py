@@ -25,10 +25,7 @@ PYODIDE_CONFIGS = {
 # "pyodide_sysconfig_" prefix to differentiate them
 # from other configuration variables
 PYODIDE_CONFIGS.update(
-    {
-            f"pyodide_sysconfig_{k}": v
-            for k, v in sysconfig.get_paths().items()
-    }
+    {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
 )
 
 
