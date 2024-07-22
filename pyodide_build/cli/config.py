@@ -1,3 +1,5 @@
+import sysconfig
+
 import typer
 
 from ..build_env import get_build_environment_vars, get_pyodide_root, init_environment
@@ -18,6 +20,16 @@ PYODIDE_CONFIGS = {
     "ldflags": "SIDE_MODULE_LDFLAGS",
     "meson_cross_file": "MESON_CROSS_FILE",
 }
+
+# Load the values of sysconfig.get_paths() with a
+# "pyodide_sysconfig_" prefix to differentiate them
+# from other configuration variables
+PYODIDE_CONFIGS.update(
+    {
+            f"pyodide_sysconfig_{k}": v
+            for k, v in sysconfig.get_paths().items()
+    }
+)
 
 
 @app.callback(no_args_is_help=True)
