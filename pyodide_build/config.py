@@ -29,6 +29,16 @@ class ConfigManager:
             **self._load_makefile_envs(),
             **self._load_config_file(Path.cwd(), os.environ),
             **self._load_config_from_env(os.environ),
+            **self._load_sysconfig_paths(),
+        }
+
+    def _load_sysconfig_paths(self) -> Mapping[str, str]:
+        # Load the values of sysconfig.get_paths() with a
+        # "pyodide_sysconfig_" prefix to differentiate them
+        # from other configuration variables
+        return {
+            f"pyodide_sysconfig_{k}": v
+            for k, v in sysconfig.get_paths().items()
         }
 
     def _load_default_config(self) -> Mapping[str, str]:
