@@ -61,7 +61,7 @@ def get_config(
     ),
 ) -> None:
     """
-    Get a value of a single config variable used in pyodide
+    Get a value of a single config variable used in Pyodide
     """
     configs = _get_configs()
 
