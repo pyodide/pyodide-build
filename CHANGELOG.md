@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## Changed
+
+- The `pyodide config list` command now displays additional config variables
+  derived from the Python `sysconfig` module. These variables may also be accessed
+  through `pyodide config get <variable name>` for use in out-of-tree builds.
+  [#14](https://github.com/pyodide/pyodide-build/pull/14)
+
 ## [0.27.3] - 2024/07/17
 
 - It is now possible to override `_f2c_fixes.py` file, with `_f2c_fixes_wrapper` variable.
