@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sysconfig
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
