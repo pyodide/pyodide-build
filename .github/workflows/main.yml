@@ -85,6 +85,9 @@ jobs:
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
       - uses: actions/checkout@v4
+        with:
+          # include tags so that hatch-vcs can infer the version
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -95,9 +98,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      - name: Fetch tags for versioning
-        run: git fetch --tags
 
       - name: Install the package
         run: |
