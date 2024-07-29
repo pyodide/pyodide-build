@@ -96,6 +96,9 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Fetch tags for versioning
+        run: git fetch --tags
+
       - name: Install the package
         run: |
           python -m pip install --upgrade pip
