@@ -143,6 +143,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "pyminor": "PYMINOR",
     "pyo3_cross_include_dir": "PYO3_CROSS_INCLUDE_DIR",
     "pyo3_cross_lib_dir": "PYO3_CROSS_LIB_DIR",
+    "pyo3_cross_python_version": "PYO3_CROSS_PYTHON_VERSION",
     "pyodide_emscripten_version": "PYODIDE_EMSCRIPTEN_VERSION",
     "pyodide_jobs": "PYODIDE_JOBS",
     "pyodide_root": "PYODIDE_ROOT",
@@ -215,6 +216,7 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     # Rust-specific configuration
     "pyo3_cross_lib_dir": "$(CPYTHONINSTALL)/lib",
     "pyo3_cross_include_dir": "$(PYTHONINCLUDE)",
+    "pyo3_cross_python_version": "$(PYMAJOR).$(PYMINOR)",
     # Misc
     "stdlib_module_cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE) -I Include/ -I. -IInclude/internal/",  # TODO: remove this
     # Paths to build dependencies
