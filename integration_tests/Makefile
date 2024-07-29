@@ -6,7 +6,7 @@ all:
 test-recipe: check
 	@echo "... Running integration tests for building recipes"
 
-	pyodide build-recipes --recipe-dir=recipes --force-rebuild
+	pyodide build-recipes --recipe-dir=recipes --force-rebuild "*"
 
 	@echo "... Passed"
 
@@ -18,3 +18,9 @@ check:
 	@which emsdk > /dev/null || (echo "emscripten is not installed"; exit 1)
 
 	@echo "... Passed"
+
+.PHONY: clean
+clean:
+	rm -rf .pyodide-xbuildenv*
+	rm -rf recipes/*/build
+	rm -rf dist
