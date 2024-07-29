@@ -28,3 +28,5 @@ dist/
 pyodide_build/**/build.log
 xbuildenv/
 .pyodide-xbuildenv*
+pyodide/
+venv/
