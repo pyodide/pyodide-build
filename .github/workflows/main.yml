@@ -64,7 +64,7 @@ jobs:
         with:
           fail_ci_if_error: false
 
-  test-integration-test-trigger:
+  check-integration-test-trigger:
     name: test-integration-test-trigger
     runs-on: ubuntu-latest
     outputs:
@@ -76,13 +76,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - id: check-integration-test-trigger
-        name: Check build trigger
+        name: Check integration test trigger
         run: bash tools/check_integration_test_trigger.sh
 
   integration-test:
     runs-on: ubuntu-latest
-    needs: [test-integration-test-trigger]
-    if: needs.test-integration-test-trigger.outputs.run-integration-test
+    needs: [check-integration-test-trigger]
+    if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
       - uses: actions/checkout@v4
 
