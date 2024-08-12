@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- `pyodide xbuildenv` subcommand is not publically available.
+- `pyodide xbuildenv` subcommand is not publicly available.
   [#15](https://github.com/pyodide/pyodide-build/pull/15)
 
 ## [0.27.3] - 2024/07/17
