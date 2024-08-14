@@ -12,7 +12,7 @@ from ..xbuildenv_releases import (
 
 DIRNAME = xbuildenv_dirname()
 
-app = typer.Typer(hidden=True, no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True)
 
 
 @app.callback()

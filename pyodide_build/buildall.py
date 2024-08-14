@@ -731,11 +731,7 @@ def generate_packagedata(
 
         pkg_type = pkg.package_type
         if pkg_type == "shared_library":
-            # We handle cpython modules as shared libraries
-            pkg_entry.shared_library = True
-            pkg_entry.install_dir = (
-                "stdlib" if pkg_type == "cpython_module" else "dynlib"
-            )
+            pkg_entry.install_dir = "dynlib"
 
         pkg_entry.depends = [x.lower() for x in pkg.run_dependencies]
 
