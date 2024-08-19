@@ -221,7 +221,7 @@ def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
         libdir = get_hostsitepackages()
     
     package_dir = libdir / package_name
-    return libdir, [str(f.relative_to(libdir)) for f in package_dir.rglob("*")]
+    return libdir, [str(f.relative_to(libdir)) for f in package_dir.rglob("*") if f.is_file()]
         
 
 

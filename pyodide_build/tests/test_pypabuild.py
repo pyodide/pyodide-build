@@ -12,7 +12,7 @@ class MockIsolatedEnv:
 
 
 def test_remove_avoided_requirements():
-    assert pypabuild.remove_avoided_requirements(
+    assert pypabuild._remove_avoided_requirements(
         {"foo", "bar", "baz"},
         {"foo", "bar", "qux"},
     ) == {"baz"}

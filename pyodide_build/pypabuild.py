@@ -105,13 +105,6 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
 
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
-    host_site_packages = Path(get_hostsitepackages())
-    for name in get_unisolated_packages():
-        for path in chain(
-            host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
-        ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
 
 
 def _remove_avoided_requirements(
@@ -170,6 +163,14 @@ def _replace_unisoloated_packages(
                 requires_new.remove(reqstr)
                 requires_new.add(f"{name}=={version}")
                 unisolated.add(name)
+                break
+        else:
+            # oldest-supported-numpy is a meta package for numpy
+            # TODO: use dependency resolution instead of hardcoding this
+            if req.name == "oldest-supported-numpy" and "numpy" in unisolated_packages:
+                requires_new.remove(reqstr)
+                requires_new.add(f"numpy=={unisolated_packages['numpy']}")
+                unisolated.add("numpy")
                 break
         
 
