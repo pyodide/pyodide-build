@@ -162,7 +162,6 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "sysconfig_name": "SYSCONFIG_NAME",
     "targetinstalldir": "TARGETINSTALLDIR",
     "cmake_toolchain_file": "CMAKE_TOOLCHAIN_FILE",
-    "pyo3_config_file": "PYO3_CONFIG_FILE",
     "meson_cross_file": "MESON_CROSS_FILE",
     "cflags_base": "CFLAGS_BASE",
     "cxxflags_base": "CXXFLAGS_BASE",
@@ -193,7 +192,6 @@ TOOLS_DIR = Path(__file__).parent / "tools"
 DEFAULT_CONFIG: dict[str, str] = {
     # Paths to toolchain configuration files
     "cmake_toolchain_file": str(TOOLS_DIR / "cmake/Modules/Platform/Emscripten.cmake"),
-    "pyo3_config_file": str(TOOLS_DIR / "pyo3_config.ini"),
     "meson_cross_file": str(TOOLS_DIR / "emscripten.meson.cross"),
     # Rust-specific configuration
     "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT -Z link-native-libraries=no",
