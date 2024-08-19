@@ -24,6 +24,7 @@ import contextlib
 import os
 import subprocess
 import sys
+import sysconfig
 import traceback
 import warnings
 from collections.abc import Iterator
@@ -124,3 +125,47 @@ def _handle_build_error() -> Iterator[None]:
             tb = traceback.format_exc(-1)  # type: ignore[unreachable]
         _cprint("\n{dim}{}{reset}\n", tb.strip("\n"))
         _error(str(e))
+
+
+
+def _get_venv_paths(path: str) -> dict[str, str]:
+    """
+    Find the sysconfig paths for a virtual environment.
+
+    Copied from pypabuild (https://github.com/pypa/build/blob/562907e605c3becb135ac52b6eb2aa939e84bdda/src/build/env.py#L326)
+
+    Parameters
+    ----------
+    path
+        The root path of the virtual environment
+    """
+    config_vars = sysconfig.get_config_vars().copy()  # globally cached, copy before altering it
+    config_vars['base'] = path
+    scheme_names = sysconfig.get_scheme_names()
+    if 'venv' in scheme_names:
+        # Python distributors with custom default installation scheme can set a
+        # scheme that can't be used to expand the paths in a venv.
+        # This can happen if build itself is not installed in a venv.
+        # The distributors are encouraged to set a "venv" scheme to be used for this.
+        # See https://bugs.python.org/issue45413
+        # and https://github.com/pypa/virtualenv/issues/2208
+        paths = sysconfig.get_paths(scheme='venv', vars=config_vars)
+    elif 'posix_local' in scheme_names:
+        # The Python that ships on Debian/Ubuntu varies the default scheme to
+        # install to /usr/local
+        # But it does not (yet) set the "venv" scheme.
+        # If we're the Debian "posix_local" scheme is available, but "venv"
+        # is not, we use "posix_prefix" instead which is venv-compatible there.
+        paths = sysconfig.get_paths(scheme='posix_prefix', vars=config_vars)
+    elif 'osx_framework_library' in scheme_names:
+        # The Python that ships with the macOS developer tools varies the
+        # default scheme depending on whether the ``sys.prefix`` is part of a framework.
+        # But it does not (yet) set the "venv" scheme.
+        # If the Apple-custom "osx_framework_library" scheme is available but "venv"
+        # is not, we use "posix_prefix" instead which is venv-compatible there.
+        paths = sysconfig.get_paths(scheme='posix_prefix', vars=config_vars)
+    else:
+        paths = sysconfig.get_paths(vars=config_vars)
+
+
+    return paths

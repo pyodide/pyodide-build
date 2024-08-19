@@ -21,6 +21,7 @@ from .build_env import (
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
+    get_unisolated_files,
     platform,
 )
 from .io import _BuildSpecExports
@@ -30,6 +31,7 @@ from .vendor._pypabuild import (
     _error,
     _handle_build_error,
     _ProjectBuilder,
+    _get_venv_paths,
 )
 
 AVOIDED_REQUIREMENTS = [
@@ -112,24 +114,97 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
             (env_site_packages / path.name).symlink_to(path)
 
 
-def remove_avoided_requirements(
-    requires: set[str], avoided_requirements: set[str] | list[str]
+def _remove_avoided_requirements(
+    requires: set[str],
+    avoided_requirements: set[str] | list[str],
 ) -> set[str]:
+    """
+    Remove requirements that are in the list of avoided requirements.
+
+    Parameters
+    ----------
+    requires
+        The set of requirements to filter.
+    avoided_requirements
+        The set of requirements to avoid.
+    
+    Returns
+    -------
+    The filtered set of requirements.
+    """
+    avoided_requirements = set(avoided_requirements)
     for reqstr in list(requires):
         req = Requirement(reqstr)
-        for avoid_name in set(avoided_requirements):
+        for avoid_name in avoided_requirements:
             if avoid_name in req.name.lower():
                 requires.remove(reqstr)
+                break
+
     return requires
 
 
+def _replace_unisoloated_packages(
+    requires: set[str],
+    unisolated_packages: dict[str, str],
+) -> tuple[set[str], set[str]]:
+    """
+    Replace unisolated packages with the correct version.
+
+    Parameters
+    ----------
+    requires
+        The set of requirements to filter.
+    unisolated_packages
+        The dictionary of unisolated packages.
+    
+    Returns
+    -------
+    tuple of (The filtered set of requirements, The set of unisolated requirements)
+    """
+    requires_new = requires.copy()
+    unisolated = set()
+    for reqstr in list(requires):
+        req = Requirement(reqstr)
+        for name, version in unisolated_packages.items():
+            if req.name == name and req.specifier.contains(version):
+                requires_new.remove(reqstr)
+                requires_new.add(f"{name}=={version}")
+                unisolated.add(name)
+                break
+        
+
+    return requires_new, unisolated
+
+
+def _install_cross_build_files(path: str, unisolated: set[str]) -> None:
+    """
+    Install the cross build files to the isolated environment.
+
+    Parameters
+    ----------
+    path
+        The path to the isolated environment.
+    
+    unisolated
+        The set of unisolated packages.
+    """
+
+    sitepackagesdir = Path(_get_venv_paths(path)["purelib"])
+    for name in unisolated:
+        base, files = get_unisolated_files(name)
+        for cross_build_file in files:
+            shutil.copy(
+                base / cross_build_file,
+                sitepackagesdir / cross_build_file,
+            )
+
 def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
-    env.install(
-        remove_avoided_requirements(
-            reqs,
-            get_unisolated_packages() + AVOIDED_REQUIREMENTS,
-        )
-    )
+    reqs = _remove_avoided_requirements(reqs, AVOIDED_REQUIREMENTS)
+    reqs, unisolated = _replace_unisoloated_packages(reqs, get_unisolated_packages())
+
+    env.install(reqs)
+
+    _install_cross_build_files(env.path, unisolated)
 
 
 def _build_in_isolated_env(

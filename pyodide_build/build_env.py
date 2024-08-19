@@ -129,7 +129,6 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
             "PYODIDE": "1",
             # This is the legacy environment variable used for the aforementioned purpose
             "PYODIDE_PACKAGE_ABI": "1",
-            "PYTHONPATH": env["HOSTSITEPACKAGES"],
         }
     )
 
@@ -169,22 +168,61 @@ def get_hostsitepackages() -> str:
 
 
 @functools.cache
-def get_unisolated_packages() -> list[str]:
+def get_unisolated_packages() -> dict[str, str]:
+    """
+    Get a list of unisolated packages.
+    Unisolated packages are packages that are often used during the build process
+    and have some platform-specific files. When these packages are required during
+    the build process, we switch some files to platform-specific ones.
+
+    Returns
+    -------
+    A dictionary of package names and versions.
+    """
+
     PYODIDE_ROOT = get_pyodide_root()
 
-    unisolated_file = PYODIDE_ROOT / "unisolated.txt"
-    if unisolated_file.exists():
-        # in xbuild env, read from file
-        unisolated_packages = unisolated_file.read_text().splitlines()
+    if in_xbuildenv():
+        unisolated_file = PYODIDE_ROOT / ".." / "requirements.txt"
+        unisolated_packages = {}
+        for line in unisolated_file.read_text().splitlines():
+            name, version = line.split("==")
+            unisolated_packages[name] = version
     else:
-        unisolated_packages = []
+        unisolated_packages = {}
         recipe_dir = PYODIDE_ROOT / "packages"
         recipes = load_all_recipes(recipe_dir)
         for name, config in recipes.items():
             if config.build.cross_build_env:
-                unisolated_packages.append(name)
+                unisolated_packages[name] = config.package.version
 
     return unisolated_packages
+
+
+def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
+    """
+    Get a list of unisolated files for a package.
+
+    Parameters
+    ----------
+    package_name
+        The name of the package
+
+    Returns
+    -------
+    A tuple of the package directory and a list of file paths relative to the package directory.
+    """
+    PYODIDE_ROOT = get_pyodide_root()
+
+    # TODO: unify libdir for in-tree and out-of-tree builds
+    if in_xbuildenv():
+        libdir = PYODIDE_ROOT / ".." / "site-packages-extras"
+    else:
+        libdir = get_hostsitepackages()
+    
+    package_dir = libdir / package_name
+    return libdir, [str(f.relative_to(libdir)) for f in package_dir.rglob("*")]
+        
 
 
 def platform() -> str:
