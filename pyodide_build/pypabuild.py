@@ -6,7 +6,6 @@ import sys
 import traceback
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal, cast
@@ -18,10 +17,9 @@ from packaging.requirements import Requirement
 from . import _f2c_fixes, common, pywasmcross
 from .build_env import (
     get_build_flag,
-    get_hostsitepackages,
     get_pyversion,
-    get_unisolated_packages,
     get_unisolated_files,
+    get_unisolated_packages,
     platform,
 )
 from .io import _BuildSpecExports
@@ -29,9 +27,9 @@ from .vendor._pypabuild import (
     _STYLES,
     _DefaultIsolatedEnv,
     _error,
+    _get_venv_paths,
     _handle_build_error,
     _ProjectBuilder,
-    _get_venv_paths,
 )
 
 AVOIDED_REQUIREMENTS = [
@@ -120,7 +118,7 @@ def _remove_avoided_requirements(
         The set of requirements to filter.
     avoided_requirements
         The set of requirements to avoid.
-    
+
     Returns
     -------
     The filtered set of requirements.
@@ -149,7 +147,7 @@ def _replace_unisoloated_packages(
         The set of requirements to filter.
     unisolated_packages
         The dictionary of unisolated packages.
-    
+
     Returns
     -------
     tuple of (The filtered set of requirements, The set of unisolated requirements)
@@ -172,7 +170,6 @@ def _replace_unisoloated_packages(
                 requires_new.add(f"numpy=={unisolated_packages['numpy']}")
                 unisolated.add("numpy")
                 break
-        
 
     return requires_new, unisolated
 
@@ -185,7 +182,7 @@ def _install_cross_build_files(path: str, unisolated: set[str]) -> None:
     ----------
     path
         The path to the isolated environment.
-    
+
     unisolated
         The set of unisolated packages.
     """
@@ -198,6 +195,7 @@ def _install_cross_build_files(path: str, unisolated: set[str]) -> None:
                 base / cross_build_file,
                 sitepackagesdir / cross_build_file,
             )
+
 
 def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
     reqs = _remove_avoided_requirements(reqs, AVOIDED_REQUIREMENTS)

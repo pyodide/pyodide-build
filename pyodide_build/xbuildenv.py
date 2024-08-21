@@ -1,6 +1,5 @@
 import json
 import shutil
-import subprocess
 import warnings
 from pathlib import Path
 from tempfile import NamedTemporaryFile
