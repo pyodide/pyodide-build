@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- `pyo3_config_file` is no longer available in `pyodide config` command.
+  Pyodide now sets `PYO3_CROSS_PYTHON_VERSION`, `PYO3_CROSS_LIB_DIR` to specify the cross compilation environment
+  for PyO3.
+  [#19](https://github.com/pyodide/pyodide-build/pull/19)
+
 ## [0.28.0] - 2024/08/14
 
 - `pyodide xbuildenv` subcommand is now publicly available.
