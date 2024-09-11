@@ -256,6 +256,15 @@ def update_package(
     sha256 = dist_metadata["digests"]["sha256"]
     sha256_local = yaml_content["source"].get("sha256")
 
+    # fail if local version is newer than PyPI version
+    # since updating isn't possible in that case
+    if pypi_ver <= local_ver:
+        raise MkpkgFailedException(
+            f"Local version {local_ver} is newer than PyPI version {pypi_ver}, "
+            f"cannot update {package}. Please verify in case the version was "
+            "updated manually and is correct."
+        )
+
     # conditions to check if the package is up to date
     is_sha256_up_to_date = sha256 == sha256_local
     is_version_up_to_date = pypi_ver <= local_ver
@@ -266,7 +275,7 @@ def update_package(
     if already_up_to_date:
         logger.success(
             f"{package} already up to date."
-            f" Local: {local_ver} PyPI: {pypi_ver}"
+            f" Local: {local_ver} and PyPI: {pypi_ver}"
             f" and checksum received: {sha256} matches local: {sha256_local} ✅"
         )
         return
