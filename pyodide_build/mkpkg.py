@@ -245,18 +245,37 @@ def update_package(
         old_fmt = "sdist"
 
     pypi_metadata = _get_metadata(package, version)
+
+    # Grab versions from metadata
     pypi_ver = Version(pypi_metadata["info"]["version"])
     local_ver = Version(yaml_content["package"]["version"])
-    already_up_to_date = pypi_ver <= local_ver and (
+
+    # and grab checksums from metadata
+    source_fmt = source_fmt or old_fmt
+    dist_metadata = _find_dist(pypi_metadata, [source_fmt])
+    sha256 = dist_metadata["digests"]["sha256"]
+    sha256_local = yaml_content["source"].get("sha256")
+
+    # conditions to check if the package is up to date
+    is_sha256_up_to_date = sha256 == sha256_local
+    is_version_up_to_date = pypi_ver <= local_ver
+
+    already_up_to_date = (is_sha256_up_to_date and is_version_up_to_date) and (
         source_fmt is None or source_fmt == old_fmt
     )
     if already_up_to_date:
         logger.success(
-            f"{package} already up to date. Local: {local_ver} PyPI: {pypi_ver}"
+            f"{package} already up to date."
+            f" Local: {local_ver} PyPI: {pypi_ver}"
+            f" and checksum received: {sha256} matches local: {sha256_local} ✅"
         )
         return
 
-    logger.info(f"{package} is out of date: {local_ver} <= {pypi_ver}.")
+    logger.info(
+        f"{package} is out of date:"
+        f" either {local_ver} < {pypi_ver}"
+        f" or checksums might have mismatched: received {sha256} against local {sha256_local} 🚨"
+    )
 
     if yaml_content["source"].get("patches"):
         if update_patched:
