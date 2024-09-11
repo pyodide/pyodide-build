@@ -286,6 +286,7 @@ def update_package(
         else:
             raise MkpkgFailedException(
                 f"Pyodide applies patches to {package}. Skipping update."
+                f" Use --update-patched to force updating {package}."
             )
 
     if source_fmt:
