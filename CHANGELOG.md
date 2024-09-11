@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `pyodide skeleton pypi --update` command and the `--update-patched` variant now
+  validate the version and the source checksum when updating a package's recipe.
+  [#27](https://github.com/pyodide/pyodide-build/pull/27)
+
 - `pyo3_config_file` is no longer available in `pyodide config` command.
   Pyodide now sets `PYO3_CROSS_PYTHON_VERSION`, `PYO3_CROSS_LIB_DIR` to specify the cross compilation environment
   for PyO3.
