@@ -206,7 +206,7 @@ def _search(
 
     def _print_table_output(releases, local) -> None:
         """A helper function to print a tabular output"""
-        table = []
+
         columns = [
             ("Version", 10),
             ("Python", 10),
@@ -214,12 +214,46 @@ def _search(
             ("pyodide-build", 25),
             ("Compatible", 10),
         ]
-        header = [f"{name:{width}}" for name, width in columns]
-        divider = ["-" * width for _, width in columns]
 
-        table.append("\t".join(header))
-        table.append("\t".join(divider))
+        # Unicode box-drawing characters
+        top_left = "┌"
+        top_right = "┐"
+        bottom_left = "└"
+        bottom_right = "┘"
+        horizontal = "─"
+        vertical = "│"
+        t_down = "┬"
+        t_up = "┴"
+        t_right = "├"
+        t_left = "┤"
+        cross = "┼"
 
+        # Table elements
+        top_border = (
+            top_left
+            + t_down.join(horizontal * (width + 2) for _, width in columns)
+            + top_right
+        )
+        header = (
+            vertical
+            + vertical.join(f" {name:<{width}} " for name, width in columns)
+            + vertical
+        )
+        separator = (
+            t_right
+            + cross.join(horizontal * (width + 2) for _, width in columns)
+            + t_left
+        )
+        bottom_border = (
+            bottom_left
+            + t_up.join(horizontal * (width + 2) for _, width in columns)
+            + bottom_right
+        )
+
+        ### Printing
+        print(top_border)
+        print(header)
+        print(separator)
         for release in releases:
             compatible = (
                 "Yes"
@@ -232,16 +266,15 @@ def _search(
             pyodide_build_range = f"{release.min_pyodide_build_version or ''} - {release.max_pyodide_build_version or ''}"
 
             row = [
-                f"{release.version:{columns[0][1]}}",
-                f"{release.python_version:{columns[1][1]}}",
-                f"{release.emscripten_version:{columns[2][1]}}",
-                f"{pyodide_build_range:{columns[3][1]}}",
-                f"{compatible:{columns[4][1]}}",
+                f"{release.version:<{columns[0][1]}}",
+                f"{release.python_version:<{columns[1][1]}}",
+                f"{release.emscripten_version:<{columns[2][1]}}",
+                f"{pyodide_build_range:<{columns[3][1]}}",
+                f"{compatible:<{columns[4][1]}}",
             ]
 
-            table.append("\t".join(row))
-
-        print("\n".join(table))
+            print(vertical + vertical.join(f" {cell} " for cell in row) + vertical)
+        print(bottom_border)
 
     if json_output:
         _generate_json_output(releases, local)
