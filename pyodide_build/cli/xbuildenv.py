@@ -151,7 +151,12 @@ def _search(
         "-a",
         help="search all versions, without filtering out incompatible ones",
     ),
-) -> None:
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="output results in JSON format",
+    ),
+) -> None | str:
     """
     Search for available versions of cross-build environment.
     """
@@ -175,40 +180,70 @@ def _search(
         )
         raise typer.Exit(1)
 
-    table = []
-    columns = [
-        # column name, width
-        ("Version", 10),
-        ("Python", 10),
-        ("Emscripten", 10),
-        ("pyodide-build", 25),
-        ("Compatible", 10),
-    ]
-    header = [f"{name:{width}}" for name, width in columns]
-    divider = ["-" * width for _, width in columns]
+    def _generate_json_output(releases, local) -> str:
+        """A helper function to help generate JSON output"""
+        import json
 
-    table.append("\t".join(header))
-    table.append("\t".join(divider))
+        output = {
+            "environments": [
+                {
+                    "version": release.version,
+                    "python": release.python_version,
+                    "emscripten": release.emscripten_version,
+                    "pyodide_build": {
+                        "min": release.min_pyodide_build_version,
+                        "max": release.max_pyodide_build_version,
+                    },
+                    "compatible": release.is_compatible(
+                        python_version=local["python"],
+                        pyodide_build_version=local["pyodide-build"],
+                    ),
+                }
+                for release in releases
+            ]
+        }
+        return json.dumps(output, indent=2)
 
-    for release in releases:
-        compatible = (
-            "Yes"
-            if release.is_compatible(
-                python_version=local["python"],
-                pyodide_build_version=local["pyodide-build"],
-            )
-            else "No"
-        )
-        pyodide_build_range = f"{release.min_pyodide_build_version or ''} - {release.max_pyodide_build_version or ''}"
-
-        row = [
-            f"{release.version:{columns[0][1]}}",
-            f"{release.python_version:{columns[1][1]}}",
-            f"{release.emscripten_version:{columns[2][1]}}",
-            f"{pyodide_build_range:{columns[3][1]}}",
-            f"{compatible:{columns[4][1]}}",
+    def _print_table_output(releases, local) -> None:
+        """A helper function to print a tabular output"""
+        table = []
+        columns = [
+            ("Version", 10),
+            ("Python", 10),
+            ("Emscripten", 10),
+            ("pyodide-build", 25),
+            ("Compatible", 10),
         ]
+        header = [f"{name:{width}}" for name, width in columns]
+        divider = ["-" * width for _, width in columns]
 
-        table.append("\t".join(row))
+        table.append("\t".join(header))
+        table.append("\t".join(divider))
 
-    print("\n".join(table))
+        for release in releases:
+            compatible = (
+                "Yes"
+                if release.is_compatible(
+                    python_version=local["python"],
+                    pyodide_build_version=local["pyodide-build"],
+                )
+                else "No"
+            )
+            pyodide_build_range = f"{release.min_pyodide_build_version or ''} - {release.max_pyodide_build_version or ''}"
+
+            row = [
+                f"{release.version:{columns[0][1]}}",
+                f"{release.python_version:{columns[1][1]}}",
+                f"{release.emscripten_version:{columns[2][1]}}",
+                f"{pyodide_build_range:{columns[3][1]}}",
+                f"{compatible:{columns[4][1]}}",
+            ]
+
+            table.append("\t".join(row))
+
+        print("\n".join(table))
+
+    if json_output:
+        print(_generate_json_output(releases, local))
+    else:
+        _print_table_output(releases, local)
