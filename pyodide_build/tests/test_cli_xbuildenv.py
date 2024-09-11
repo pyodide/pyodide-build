@@ -344,8 +344,9 @@ def test_xbuildenv_search(
 
     assert result.exit_code == 0, result.stdout
 
-    header = result.stdout.splitlines()[0]
-    assert header.split() == [
+    lines = result.stdout.splitlines()
+    header = lines[1].strip().split("│")[1:-1]
+    assert [col.strip() for col in header] == [
         "Version",
         "Python",
         "Emscripten",
@@ -353,8 +354,8 @@ def test_xbuildenv_search(
         "Compatible",
     ]
 
-    row1 = result.stdout.splitlines()[2]
-    assert row1.split() == ["0.1.0", "4.5.6", "1.39.8", "-", "No"]
+    row1 = lines[3].strip().split("│")[1:-1]
+    assert [col.strip() for col in row1] == ["0.1.0", "4.5.6", "1.39.8", "-", "No"]
 
 
 def test_xbuildenv_search_json(
