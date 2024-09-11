@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 from pathlib import Path
@@ -28,8 +29,6 @@ def mock_pyodide_lock() -> PyodideLockSpec:
 @pytest.fixture()
 def is_valid_json():
     def _is_valid_json(json_str):
-        import json
-
         try:
             json.loads(json_str)
         except json.JSONDecodeError:
