@@ -156,7 +156,7 @@ def _search(
         "--json",
         help="output results in JSON format",
     ),
-) -> None | str:
+) -> None:
     """
     Search for available versions of cross-build environment.
     """
@@ -202,7 +202,7 @@ def _search(
                 for release in releases
             ]
         }
-        return json.dumps(output, indent=2)
+        print(json.dumps(output, indent=2))
 
     def _print_table_output(releases, local) -> None:
         """A helper function to print a tabular output"""
@@ -244,6 +244,6 @@ def _search(
         print("\n".join(table))
 
     if json_output:
-        print(_generate_json_output(releases, local))
+        _generate_json_output(releases, local)
     else:
         _print_table_output(releases, local)
