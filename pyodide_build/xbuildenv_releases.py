@@ -231,7 +231,7 @@ def load_cross_build_env_metadata(url_or_filename: str) -> CrossBuildEnvMetaSpec
     CrossBuildEnvMetaSpec
         The Pyodide cross-build environment metadata
     """
-    if url_or_filename.startswith("https"):
+    if url_or_filename.startswith("http"):
         import requests
 
         with _suppress_urllib3_logging():
