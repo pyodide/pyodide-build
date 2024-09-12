@@ -48,7 +48,7 @@ def new_recipe_pypi(
     ),
 ) -> None:
     """
-    Create a new package from PyPI.
+    Create a new package recipe from PyPI or update an existing recipe.
     """
 
     if recipe_dir:
