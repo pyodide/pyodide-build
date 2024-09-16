@@ -4,6 +4,7 @@ import typer
 
 from ..build_env import local_versions
 from ..common import xbuildenv_dirname
+from ..views import MetadataView
 from ..xbuildenv import CrossBuildEnvManager
 from ..xbuildenv_releases import (
     cross_build_env_metadata_url,
@@ -180,103 +181,25 @@ def _search(
         )
         raise typer.Exit(1)
 
-    def _generate_json_output(releases, local) -> str:
-        """A helper function to help generate JSON output"""
-        import json
-
-        output = {
-            "environments": [
-                {
-                    "version": release.version,
-                    "python": release.python_version,
-                    "emscripten": release.emscripten_version,
-                    "pyodide_build": {
-                        "min": release.min_pyodide_build_version,
-                        "max": release.max_pyodide_build_version,
-                    },
-                    "compatible": release.is_compatible(
-                        python_version=local["python"],
-                        pyodide_build_version=local["pyodide-build"],
-                    ),
-                }
-                for release in releases
-            ]
-        }
-        print(json.dumps(output, indent=2))
-
-    def _print_table_output(releases, local) -> None:
-        """A helper function to print a tabular output"""
-
-        columns = [
-            ("Version", 10),
-            ("Python", 10),
-            ("Emscripten", 10),
-            ("pyodide-build", 25),
-            ("Compatible", 10),
-        ]
-
-        # Unicode box-drawing characters
-        top_left = "┌"
-        top_right = "┐"
-        bottom_left = "└"
-        bottom_right = "┘"
-        horizontal = "─"
-        vertical = "│"
-        t_down = "┬"
-        t_up = "┴"
-        t_right = "├"
-        t_left = "┤"
-        cross = "┼"
-
-        # Table elements
-        top_border = (
-            top_left
-            + t_down.join(horizontal * (width + 2) for _, width in columns)
-            + top_right
+    # Generate views for the metadata objects (currently tabular or JSON)
+    views = [
+        MetadataView(
+            version=release.version,
+            python=release.python_version,
+            emscripten=release.emscripten_version,
+            pyodide_build={
+                "min": release.min_pyodide_build_version,
+                "max": release.max_pyodide_build_version,
+            },
+            compatible=release.is_compatible(
+                python_version=local["python"],
+                pyodide_build_version=local["pyodide-build"],
+            ),
         )
-        header = (
-            vertical
-            + vertical.join(f" {name:<{width}} " for name, width in columns)
-            + vertical
-        )
-        separator = (
-            t_right
-            + cross.join(horizontal * (width + 2) for _, width in columns)
-            + t_left
-        )
-        bottom_border = (
-            bottom_left
-            + t_up.join(horizontal * (width + 2) for _, width in columns)
-            + bottom_right
-        )
-
-        ### Printing
-        print(top_border)
-        print(header)
-        print(separator)
-        for release in releases:
-            compatible = (
-                "Yes"
-                if release.is_compatible(
-                    python_version=local["python"],
-                    pyodide_build_version=local["pyodide-build"],
-                )
-                else "No"
-            )
-            pyodide_build_range = f"{release.min_pyodide_build_version or ''} - {release.max_pyodide_build_version or ''}"
-
-            row = [
-                f"{release.version:<{columns[0][1]}}",
-                f"{release.python_version:<{columns[1][1]}}",
-                f"{release.emscripten_version:<{columns[2][1]}}",
-                f"{pyodide_build_range:<{columns[3][1]}}",
-                f"{compatible:<{columns[4][1]}}",
-            ]
-
-            print(vertical + vertical.join(f" {cell} " for cell in row) + vertical)
-        print(bottom_border)
+        for release in releases
+    ]
 
     if json_output:
-        _generate_json_output(releases, local)
+        MetadataView.to_json(views)
     else:
-        _print_table_output(releases, local)
+        MetadataView.to_table(views)
