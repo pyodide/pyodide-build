@@ -15,25 +15,6 @@ class MetadataView:
     compatible: bool
 
     @classmethod
-    def to_json(cls, views: list["MetadataView"]) -> None:
-        result = json.dumps(
-            {
-                "environments": [
-                    {
-                        "version": view.version,
-                        "python": view.python,
-                        "emscripten": view.emscripten,
-                        "pyodide_build": view.pyodide_build,
-                        "compatible": view.compatible,
-                    }
-                    for view in views
-                ]
-            },
-            indent=2,
-        )
-        print(result)
-
-    @classmethod
     def to_table(cls, views: list["MetadataView"]) -> None:
         columns = [
             ("Version", 10),
@@ -89,5 +70,23 @@ class MetadataView:
                 vertical + vertical.join(f" {cell} " for cell in row) + vertical
             )
         table.append(bottom_border)
-
         print("\n".join(table))
+
+    @classmethod
+    def to_json(cls, views: list["MetadataView"]) -> None:
+        result = json.dumps(
+            {
+                "environments": [
+                    {
+                        "version": view.version,
+                        "python": view.python,
+                        "emscripten": view.emscripten,
+                        "pyodide_build": view.pyodide_build,
+                        "compatible": view.compatible,
+                    }
+                    for view in views
+                ]
+            },
+            indent=2,
+        )
+        print(result)
