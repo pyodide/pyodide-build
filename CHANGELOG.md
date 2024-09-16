@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `pyodide xbuildenv search` command now accepts a `--json` flag to output the
-  search results in JSON format that is machine-readable.
+  search results in JSON format that is machine-readable. The design for the regular
+  tabular output has been improved.
   [#28](https://github.com/pyodide/pyodide-build/pull/28)
 
 ### Changed
