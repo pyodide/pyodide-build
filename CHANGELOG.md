@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Changed
+### Added
 
 - The `pyodide xbuildenv search` command now accepts a `--json` flag to output the
   search results in JSON format that is machine-readable.
   [#28](https://github.com/pyodide/pyodide-build/pull/28)
+
+### Changed
 
 - `pyo3_config_file` is no longer available in `pyodide config` command.
   Pyodide now sets `PYO3_CROSS_PYTHON_VERSION`, `PYO3_CROSS_LIB_DIR` to specify the cross compilation environment
@@ -30,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.27.2] - 2024/07/11
 
-## Changed
+### Changed
 
 - `pyodide py-compile` command now accepts `excludes` flag.
   [#9](https://github.com/pyodide/pyodide-build/pull/9)
@@ -40,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.27.1] - 2024/06/28
 
-## Changed
+### Changed
 
 - ported f2c_fixes patch from https://github.com/pyodide/pyodide/pull/4822
 
