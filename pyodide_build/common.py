@@ -23,11 +23,11 @@ from packaging.tags import Tag
 from packaging.utils import canonicalize_name as canonicalize_package_name
 from packaging.utils import parse_wheel_filename
 
-from .logger import logger
+from pyodide_build.logger import logger
 
 
 def xbuildenv_dirname() -> str:
-    from . import __version__
+    from pyodide_build import __version__
 
     return f".pyodide-xbuildenv-{__version__}"
 
@@ -204,7 +204,7 @@ def get_num_cores() -> int:
     Return the number of CPUs the current process can use.
     If the number of CPUs cannot be determined, return 1.
     """
-    from .vendor.loky import cpu_count
+    from pyodide_build.vendor.loky import cpu_count
 
     return cpu_count()
 

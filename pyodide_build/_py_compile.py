@@ -11,8 +11,8 @@ from typing import Any
 from packaging.tags import Tag
 from packaging.utils import parse_wheel_filename
 
-from .common import _get_sha256_checksum
-from .logger import logger, set_log_level
+from pyodide_build.common import _get_sha256_checksum
+from pyodide_build.logger import logger, set_log_level
 
 
 def _specialize_convert_tags(tags: set[Tag] | frozenset[Tag], wheel_name: str) -> Tag:

@@ -9,12 +9,12 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, TextIO
 
-from .build_env import (
+from pyodide_build.build_env import (
     get_build_environment_vars,
     get_pyodide_root,
 )
-from .common import exit_with_stdio
-from .logger import logger
+from pyodide_build.common import exit_with_stdio
+from pyodide_build.logger import logger
 
 
 class BashRunnerWithSharedEnvironment:

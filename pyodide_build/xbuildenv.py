@@ -8,10 +8,10 @@ from urllib.request import urlopen
 
 from pyodide_lock import PyodideLockSpec
 
-from . import build_env
-from .create_package_index import create_package_index
-from .logger import logger
-from .xbuildenv_releases import (
+from pyodide_build import build_env
+from pyodide_build.create_package_index import create_package_index
+from pyodide_build.logger import logger
+from pyodide_build.xbuildenv_releases import (
     CrossBuildEnvReleaseSpec,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,

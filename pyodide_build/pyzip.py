@@ -3,8 +3,8 @@ from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from ._py_compile import _compile
-from .common import make_zip_archive
+from pyodide_build._py_compile import _compile
+from pyodide_build.common import make_zip_archive
 
 
 def default_filterfunc(

@@ -29,17 +29,17 @@ from rich.progress import BarColumn, Progress, TimeElapsedColumn
 from rich.spinner import Spinner
 from rich.table import Table
 
-from . import build_env, recipe
-from .build_env import BuildArgs
-from .buildpkg import needs_rebuild
-from .common import (
+from pyodide_build import build_env, recipe
+from pyodide_build.build_env import BuildArgs
+from pyodide_build.buildpkg import needs_rebuild
+from pyodide_build.common import (
     extract_wheel_metadata_file,
     find_matching_wheels,
     find_missing_executables,
     repack_zip_archive,
 )
-from .io import MetaConfig, _BuildSpecTypes
-from .logger import console_stdout, logger
+from pyodide_build.io import MetaConfig, _BuildSpecTypes
+from pyodide_build.logger import console_stdout, logger
 
 
 class BuildError(Exception):

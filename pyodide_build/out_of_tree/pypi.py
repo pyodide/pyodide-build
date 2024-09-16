@@ -27,11 +27,11 @@ from resolvelib.providers import AbstractProvider
 from unearth.evaluator import TargetPython
 from unearth.finder import PackageFinder
 
-from .. import build_env
-from ..common import repack_zip_archive
-from ..io import _BuildSpecExports
-from ..logger import logger
-from . import build
+from pyodide_build import build_env
+from pyodide_build.common import repack_zip_archive
+from pyodide_build.io import _BuildSpecExports
+from pyodide_build.logger import logger
+from pyodide_build.out_of_tree import build
 
 _PYPI_INDEX = ["https://pypi.org/simple/"]
 _PYPI_TRUSTED_HOSTS = ["pypi.org"]
