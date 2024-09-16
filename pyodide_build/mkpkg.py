@@ -258,7 +258,7 @@ def update_package(
 
     # fail if local version is newer than PyPI version
     # since updating isn't possible in that case
-    if pypi_ver <= local_ver:
+    if pypi_ver < local_ver:
         raise MkpkgFailedException(
             f"Local version {local_ver} is newer than PyPI version {pypi_ver}, "
             f"cannot update {package}. Please verify in case the version was "
@@ -267,7 +267,7 @@ def update_package(
 
     # conditions to check if the package is up to date
     is_sha256_up_to_date = sha256 == sha256_local
-    is_version_up_to_date = pypi_ver <= local_ver
+    is_version_up_to_date = pypi_ver == local_ver
 
     already_up_to_date = (is_sha256_up_to_date and is_version_up_to_date) and (
         source_fmt is None or source_fmt == old_fmt
