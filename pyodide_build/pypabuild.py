@@ -15,16 +15,16 @@ from build import BuildBackendException, ConfigSettingsType
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 
-from . import _f2c_fixes, common, pywasmcross
-from .build_env import (
+from pyodide_build import _f2c_fixes, common, pywasmcross
+from pyodide_build.build_env import (
     get_build_flag,
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
     platform,
 )
-from .io import _BuildSpecExports
-from .vendor._pypabuild import (
+from pyodide_build.io import _BuildSpecExports
+from pyodide_build.vendor._pypabuild import (
     _STYLES,
     _DefaultIsolatedEnv,
     _error,

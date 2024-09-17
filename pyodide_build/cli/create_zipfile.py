@@ -3,7 +3,7 @@ from pathlib import Path
 
 import typer
 
-from ..pyzip import create_zipfile
+from pyodide_build.pyzip import create_zipfile
 
 
 def main(

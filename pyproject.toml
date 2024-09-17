@@ -158,3 +158,6 @@ known-third-party = [
 
 [tool.ruff.lint.mccabe]
 max-complexity = 31  # C901: Recommended goal is 10
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"

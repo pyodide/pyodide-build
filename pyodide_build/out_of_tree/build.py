@@ -3,9 +3,9 @@ from pathlib import Path
 
 from build import ConfigSettingsType
 
-from .. import build_env, common, pypabuild
-from ..build_env import get_pyodide_root, wheel_platform
-from ..io import _BuildSpecExports
+from pyodide_build import build_env, common, pypabuild
+from pyodide_build.build_env import get_pyodide_root, wheel_platform
+from pyodide_build.io import _BuildSpecExports
 
 
 def run(

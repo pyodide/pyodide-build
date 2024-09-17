@@ -16,8 +16,8 @@ from urllib import request
 from packaging.version import Version
 from ruamel.yaml import YAML
 
-from .common import parse_top_level_import_name
-from .logger import logger
+from pyodide_build.common import parse_top_level_import_name
+from pyodide_build.logger import logger
 
 
 class URLDict(TypedDict):

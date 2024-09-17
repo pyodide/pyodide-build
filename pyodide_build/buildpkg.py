@@ -19,9 +19,9 @@ from typing import Any, cast
 
 import requests
 
-from . import common, pypabuild
-from .bash_runner import BashRunnerWithSharedEnvironment, get_bash_runner
-from .build_env import (
+from pyodide_build import common, pypabuild
+from pyodide_build.bash_runner import BashRunnerWithSharedEnvironment, get_bash_runner
+from pyodide_build.build_env import (
     RUST_BUILD_PRELUDE,
     BuildArgs,
     get_build_environment_vars,
@@ -30,7 +30,7 @@ from .build_env import (
     replace_so_abi_tags,
     wheel_platform,
 )
-from .common import (
+from pyodide_build.common import (
     _environment_substitute_str,
     _get_sha256_checksum,
     chdir,
@@ -40,8 +40,8 @@ from .common import (
     modify_wheel,
     retag_wheel,
 )
-from .io import MetaConfig, _SourceSpec
-from .logger import logger
+from pyodide_build.io import MetaConfig, _SourceSpec
+from pyodide_build.logger import logger
 
 
 def _make_whlfile(

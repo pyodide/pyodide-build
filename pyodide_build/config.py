@@ -4,8 +4,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 
-from .common import _environment_substitute_str, exit_with_stdio, search_pyproject_toml
-from .logger import logger
+from pyodide_build.common import (
+    _environment_substitute_str,
+    exit_with_stdio,
+    search_pyproject_toml,
+)
+from pyodide_build.logger import logger
 
 
 class ConfigManager:
