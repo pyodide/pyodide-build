@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 from pathlib import Path
@@ -23,6 +24,14 @@ def mock_pyodide_lock() -> PyodideLockSpec:
         },
         packages={},
     )
+
+
+def is_valid_json(json_str) -> bool:
+    try:
+        json.loads(json_str)
+    except json.JSONDecodeError:
+        return False
+    return True
 
 
 @pytest.fixture()
@@ -331,8 +340,9 @@ def test_xbuildenv_search(
 
     assert result.exit_code == 0, result.stdout
 
-    header = result.stdout.splitlines()[0]
-    assert header.split() == [
+    lines = result.stdout.splitlines()
+    header = lines[1].strip().split("│")[1:-1]
+    assert [col.strip() for col in header] == [
         "Version",
         "Python",
         "Emscripten",
@@ -340,5 +350,67 @@ def test_xbuildenv_search(
         "Compatible",
     ]
 
-    row1 = result.stdout.splitlines()[2]
-    assert row1.split() == ["0.1.0", "4.5.6", "1.39.8", "-", "No"]
+    row1 = lines[3].strip().split("│")[1:-1]
+    assert [col.strip() for col in row1] == ["0.1.0", "4.5.6", "1.39.8", "-", "No"]
+
+
+def test_xbuildenv_search_json(tmp_path, fake_xbuildenv_releases_compatible):
+    result = runner.invoke(
+        xbuildenv.app,
+        [
+            "search",
+            "--metadata",
+            str(fake_xbuildenv_releases_compatible),
+            "--json",
+            "--all",
+        ],
+    )
+
+    # Sanity check
+    assert result.exit_code == 0, result.stdout
+    assert is_valid_json(result.stdout), "Output is not valid JSON"
+
+    output = json.loads(result.stdout)
+
+    # First, check overall structure of JSON response
+    assert isinstance(output, dict), "Output should be a dictionary"
+    assert "environments" in output, "Output should have an 'environments' key"
+    assert isinstance(output["environments"], list), "'environments' should be a list"
+
+    # Now, we'll check types in each environment entry
+    for environment in output["environments"]:
+        assert isinstance(environment, dict), "Each environment should be a dictionary"
+        assert set(environment.keys()) == {
+            "version",
+            "python",
+            "emscripten",
+            "pyodide_build",
+            "compatible",
+        }, f"Environment {environment} has unexpected keys: {environment.keys()}"
+
+        assert isinstance(environment["version"], str), "version should be a string"
+        assert isinstance(environment["python"], str), "python should be a string"
+        assert isinstance(
+            environment["emscripten"], str
+        ), "emscripten should be a string"
+        assert isinstance(
+            environment["compatible"], bool
+        ), "compatible should be either True or False"
+
+        assert isinstance(
+            environment["pyodide_build"], dict
+        ), "pyodide_build should be a dictionary"
+        assert set(environment["pyodide_build"].keys()) == {
+            "min",
+            "max",
+        }, f"pyodide_build has unexpected keys: {environment['pyodide_build'].keys()}"
+        assert isinstance(
+            environment["pyodide_build"]["min"], (str, type(None))
+        ), "pyodide_build-min should be a string or None"
+        assert isinstance(
+            environment["pyodide_build"]["max"], (str, type(None))
+        ), "pyodide_build-max should be a string or None"
+
+    assert any(
+        env["compatible"] for env in output["environments"]
+    ), "There should be at least one compatible environment"

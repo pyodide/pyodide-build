@@ -1,4 +1,6 @@
+import logging
 import os
+from contextlib import contextmanager
 from functools import cache
 
 from packaging.version import Version
@@ -19,7 +21,7 @@ class CrossBuildEnvReleaseSpec(BaseModel):
     python_version: str
     # The version of the Emscripten SDK
     emscripten_version: str
-    # Minimum and maximum pyodide-build versions that is compatible with this release
+    # Minimum and maximum pyodide-build versions that are compatible with this release
     min_pyodide_build_version: str | None = None
     max_pyodide_build_version: str | None = None
     model_config = ConfigDict(extra="forbid", title="CrossBuildEnvReleasesSpec")
@@ -184,6 +186,20 @@ class CrossBuildEnvMetaSpec(BaseModel):
         return self.releases[version]
 
 
+@contextmanager
+def _suppress_urllib3_logging():
+    """
+    Temporarily suppresses urllib3 logging for internal use.
+    """
+    logger = logging.getLogger("urllib3")
+    original_level = logger.level
+    logger.setLevel(logging.WARNING)
+    try:
+        yield
+    finally:
+        logger.setLevel(original_level)
+
+
 def cross_build_env_metadata_url() -> str:
     """
     Get the URL to the Pyodide cross-build environment metadata
@@ -218,9 +234,11 @@ def load_cross_build_env_metadata(url_or_filename: str) -> CrossBuildEnvMetaSpec
     if url_or_filename.startswith("http"):
         import requests
 
-        response = requests.get(url_or_filename)
-        response.raise_for_status()
-        data = response.json()
+        with _suppress_urllib3_logging():
+            with requests.get(url_or_filename) as response:
+                response.raise_for_status()
+            data = response.json()
+
         return CrossBuildEnvMetaSpec.model_validate(data)
 
     with open(url_or_filename) as f:

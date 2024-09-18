@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- The `pyodide xbuildenv search` command now accepts a `--json` flag to output the
+  search results in JSON format that is machine-readable. The design for the regular
+  tabular output has been improved.
+  [#28](https://github.com/pyodide/pyodide-build/pull/28)
+
 ### Changed
 
 - The `pyodide skeleton pypi --update` command and the `--update-patched` variant now
@@ -30,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.27.2] - 2024/07/11
 
-## Changed
+### Changed
 
 - `pyodide py-compile` command now accepts `excludes` flag.
   [#9](https://github.com/pyodide/pyodide-build/pull/9)
@@ -40,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.27.1] - 2024/06/28
 
-## Changed
+### Changed
 
 - ported f2c_fixes patch from https://github.com/pyodide/pyodide/pull/4822
 
