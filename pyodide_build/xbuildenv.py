@@ -250,7 +250,7 @@ class CrossBuildEnvManager:
             Path to extract the cross-build environment to.
             If the path already exists, raise an error.
         """
-        logger.info(f"Downloading Pyodide cross-build environment from {url}")
+        logger.info("Downloading Pyodide cross-build environment from %s", url)
 
         if path.exists():
             raise FileExistsError(f"Path {path} already exists")
