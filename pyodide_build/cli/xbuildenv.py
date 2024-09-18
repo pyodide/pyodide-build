@@ -200,6 +200,6 @@ def _search(
     ]
 
     if json_output:
-        MetadataView.to_json(views)
+        print(MetadataView.to_json(views))
     else:
-        MetadataView.to_table(views)
+        print(MetadataView.to_table(views))

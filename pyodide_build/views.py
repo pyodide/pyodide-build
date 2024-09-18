@@ -15,7 +15,7 @@ class MetadataView:
     compatible: bool
 
     @classmethod
-    def to_table(cls, views: list["MetadataView"]) -> None:
+    def to_table(cls, views: list["MetadataView"]) -> str:
         columns = [
             ("Version", 10),
             ("Python", 10),
@@ -70,10 +70,10 @@ class MetadataView:
                 vertical + vertical.join(f" {cell} " for cell in row) + vertical
             )
         table.append(bottom_border)
-        print("\n".join(table))
+        return "\n".join(table)
 
     @classmethod
-    def to_json(cls, views: list["MetadataView"]) -> None:
+    def to_json(cls, views: list["MetadataView"]) -> str:
         result = json.dumps(
             {
                 "environments": [
@@ -89,4 +89,4 @@ class MetadataView:
             },
             indent=2,
         )
-        print(result)
+        return result
