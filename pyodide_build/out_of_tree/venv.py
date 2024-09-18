@@ -5,9 +5,9 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-from ..build_env import get_build_flag, get_pyodide_root, in_xbuildenv
-from ..common import exit_with_stdio
-from ..logger import logger
+from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
+from pyodide_build.common import exit_with_stdio
+from pyodide_build.logger import logger
 
 
 def check_result(result: subprocess.CompletedProcess[str], msg: str) -> None:

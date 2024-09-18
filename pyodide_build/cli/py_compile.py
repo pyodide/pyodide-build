@@ -3,7 +3,7 @@ from pathlib import Path
 
 import typer
 
-from .._py_compile import _py_compile_archive, _py_compile_archive_dir
+from pyodide_build._py_compile import _py_compile_archive, _py_compile_archive_dir
 
 
 def main(

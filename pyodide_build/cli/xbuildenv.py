@@ -2,11 +2,11 @@ from pathlib import Path
 
 import typer
 
-from ..build_env import local_versions
-from ..common import xbuildenv_dirname
-from ..views import MetadataView
-from ..xbuildenv import CrossBuildEnvManager
-from ..xbuildenv_releases import (
+from pyodide_build.build_env import local_versions
+from pyodide_build.common import xbuildenv_dirname
+from pyodide_build.views import MetadataView
+from pyodide_build.xbuildenv import CrossBuildEnvManager
+from pyodide_build.xbuildenv_releases import (
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
