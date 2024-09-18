@@ -96,7 +96,7 @@ def search_pyodide_root(curdir: str | Path, *, max_depth: int = 10) -> Path | No
     """
     Recursively search for the root of the Pyodide repository,
     by looking for the pyproject.toml file in the parent directories
-    which contains [tool.pyodide] section.
+    which contains the [tool._pyodide] section.
     """
     pyproject_path, pyproject_file = search_pyproject_toml(curdir, max_depth)
 

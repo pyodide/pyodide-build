@@ -227,7 +227,7 @@ def update_package(
     meta_path = root / package / "meta.yaml"
     if not meta_path.exists():
         logger.error(f"{meta_path} does not exist")
-        exit(1)
+        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
 
     yaml_content = yaml.load(meta_path.read_bytes())
 

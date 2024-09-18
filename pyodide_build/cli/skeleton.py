@@ -48,18 +48,25 @@ def new_recipe_pypi(
     ),
 ) -> None:
     """
-    Create a new package from PyPI.
+    Create a new package recipe from PyPI or update an existing recipe.
     """
+
+    # Determine the recipe directory. If it is specified by the user, we use that;
+    # otherwise, we assume that the recipe directory is the ``packages`` directory
+    # in the root of the Pyodide tree, without the need to initialize the
+    # cross-build environment.
+    #
+    # It is unlikely that a user will run this command outside of the Pyodide
+    # tree, so we do not need to initialize the environment at this stage.
 
     if recipe_dir:
         recipe_dir_ = Path(recipe_dir)
     else:
         cwd = Path.cwd()
+        root = build_env.search_pyodide_root(curdir=cwd)
 
-        if build_env.in_xbuildenv():
+        if not root:
             root = cwd
-        else:
-            root = build_env.search_pyodide_root(cwd) or cwd
 
         recipe_dir_ = root / "packages"
 
@@ -76,7 +83,7 @@ def new_recipe_pypi(
             logger.error(f"{name} update failed: {e}")
             sys.exit(1)
         except mkpkg.MkpkgSkipped as e:
-            logger.warn(f"{name} update skipped: {e}")
+            logger.warning(f"{name} update skipped: {e}")
         except Exception:
             print(name)
             raise
