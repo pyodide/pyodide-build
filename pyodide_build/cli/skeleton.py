@@ -59,15 +59,15 @@ def new_recipe_pypi(
     # It is unlikely that a user will run this command outside of the Pyodide
     # tree, so we do not need to initialize the environment at this stage.
 
-    cwd = Path.cwd()
-    root = build_env.search_pyodide_root(curdir=cwd)
-
-    if not root:
-        root = cwd
-
     if recipe_dir:
         recipe_dir_ = Path(recipe_dir)
     else:
+        cwd = Path.cwd()
+        root = build_env.search_pyodide_root(curdir=cwd)
+
+        if not root:
+            root = cwd
+
         recipe_dir_ = root / "packages"
 
     if update or update_patched:
