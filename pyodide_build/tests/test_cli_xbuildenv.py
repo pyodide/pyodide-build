@@ -26,16 +26,12 @@ def mock_pyodide_lock() -> PyodideLockSpec:
     )
 
 
-@pytest.fixture()
-def is_valid_json():
-    def _is_valid_json(json_str):
-        try:
-            json.loads(json_str)
-        except json.JSONDecodeError:
-            return False
-        return True
-
-    return _is_valid_json
+def is_valid_json(json_str) -> bool:
+    try:
+        json.loads(json_str)
+    except json.JSONDecodeError:
+        return False
+    return True
 
 
 @pytest.fixture()
@@ -358,9 +354,7 @@ def test_xbuildenv_search(
     assert [col.strip() for col in row1] == ["0.1.0", "4.5.6", "1.39.8", "-", "No"]
 
 
-def test_xbuildenv_search_json(
-    tmp_path, fake_xbuildenv_releases_compatible, is_valid_json
-):
+def test_xbuildenv_search_json(tmp_path, fake_xbuildenv_releases_compatible):
     result = runner.invoke(
         xbuildenv.app,
         [
