@@ -101,7 +101,7 @@ def parse_top_level_import_name(whlfile: Path) -> list[str] | None:
 
     if not top_level_imports:
         logger.warning(
-            f"WARNING: failed to parse top level import name from {whlfile}."
+            "WARNING: failed to parse top level import name from %s.", whlfile
         )
         return None
 
@@ -293,7 +293,7 @@ def unpack_wheel(wheel_path: Path, target_dir: Path | None = None) -> None:
         encoding="utf-8",
     )
     if result.returncode != 0:
-        logger.error(f"ERROR: Unpacking wheel {wheel_path.name} failed")
+        logger.error("ERROR: Unpacking wheel %s failed", wheel_path.name)
         exit_with_stdio(result)
 
 
@@ -306,7 +306,7 @@ def pack_wheel(wheel_dir: Path, target_dir: Path | None = None) -> None:
         encoding="utf-8",
     )
     if result.returncode != 0:
-        logger.error(f"ERROR: Packing wheel {wheel_dir} failed")
+        logger.error("ERROR: Packing wheel %s failed", wheel_dir)
         exit_with_stdio(result)
 
 
@@ -348,7 +348,7 @@ def retag_wheel(wheel_path: Path, platform: str) -> Path:
         capture_output=True,
     )
     if result.returncode != 0:
-        logger.error(f"ERROR: Retagging wheel {wheel_path} to {platform} failed")
+        logger.error("ERROR: Retagging wheel %s to %s failed", wheel_path, platform)
         exit_with_stdio(result)
     return wheel_path.parent / result.stdout.splitlines()[-1].strip()
 

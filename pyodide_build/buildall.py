@@ -434,7 +434,7 @@ def generate_dependency_graph(
 
     if disabled_packages:
         logger.warning(
-            f"The following packages are disabled: {', '.join(disabled_packages)}"
+            "The following packages are disabled: %s", ", ".join(disabled_packages)
         )
 
     return pkg_map
@@ -688,8 +688,8 @@ def build_from_graph(
 
     if already_built:
         logger.info(
-            "The following packages are already built: "
-            f"[bold]{format_name_list(sorted(already_built))}[/bold]"
+            "The following packages are already built: [bold]%s[/bold]",
+            format_name_list(sorted(already_built)),
         )
     if not needs_build:
         logger.success("All packages already built. Quitting.")
@@ -697,8 +697,8 @@ def build_from_graph(
 
     sorted_needs_build = sorted(needs_build)
     logger.info(
-        "Building the following packages: "
-        f"[bold]{format_name_list(sorted_needs_build)}[/bold]"
+        "Building the following packages: [bold]%s[/bold]",
+        format_name_list(sorted_needs_build),
     )
     build_state = _GraphBuilder(pkg_map, build_args, build_dir, set(needs_build))
     try:
@@ -850,14 +850,14 @@ def copy_logs(pkg_map: dict[str, BasePackage], log_dir: Path) -> None:
     """
 
     log_dir.mkdir(exist_ok=True, parents=True)
-    logger.info(f"Copying build logs to {log_dir}")
+    logger.info("Copying build logs to %s", log_dir)
 
     for pkg in pkg_map.values():
         log_file = pkg.pkgdir / "build.log"
         if log_file.exists():
             shutil.copy(log_file, log_dir / f"{pkg.name}.log")
         else:
-            logger.warning(f"Warning: {pkg.name} has no build log")
+            logger.warning("Warning: %s has no build log", pkg.name)
 
 
 def install_packages(
@@ -881,7 +881,7 @@ def install_packages(
 
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    logger.info(f"Copying built packages to {output_dir}")
+    logger.info("Copying built packages to %s", output_dir)
     copy_packages_to_dist_dir(
         pkg_map.values(),
         output_dir,
@@ -890,7 +890,7 @@ def install_packages(
     )
 
     lockfile_path = output_dir / "pyodide-lock.json"
-    logger.info(f"Writing pyodide-lock.json to {lockfile_path}")
+    logger.info("Writing pyodide-lock.json to %s", lockfile_path)
 
     package_data = generate_lockfile(output_dir, pkg_map)
     package_data.to_json(lockfile_path)

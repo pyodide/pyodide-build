@@ -151,7 +151,7 @@ def make_package(
     Creates a template that will work for most pure Python packages,
     but will have to be edited for more complex things.
     """
-    logger.info(f"Creating meta.yaml package for {package}")
+    logger.info("Creating meta.yaml package for %s", package)
 
     yaml = YAML()
 
@@ -226,7 +226,7 @@ def update_package(
 
     meta_path = root / package / "meta.yaml"
     if not meta_path.exists():
-        logger.error(f"{meta_path} does not exist")
+        logger.error("%s does not exist", meta_path)
         raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
 
     yaml_content = yaml.load(meta_path.read_bytes())
@@ -281,16 +281,19 @@ def update_package(
         return
 
     logger.info(
-        f"{package} is out of date:"
-        f" either {local_ver} < {pypi_ver}"
-        f" or checksums might have mismatched: received {sha256} against local {sha256_local} 🚨"
+        "%s is out of date: either %s < %s or checksums might have mismatched: received %s against local %s 🚨",
+        package,
+        local_ver,
+        pypi_ver,
+        sha256,
+        sha256_local,
     )
 
     if yaml_content["source"].get("patches"):
         if update_patched:
             logger.warning(
-                f"Pyodide applies patches to {package}. Update the "
-                "patches (if needed) to avoid build failing."
+                "Pyodide applies patches to %s. Update the patches (if needed) to avoid build failing.",
+                package,
             )
         else:
             raise MkpkgFailedException(

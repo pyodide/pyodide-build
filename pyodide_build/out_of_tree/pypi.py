@@ -95,7 +95,7 @@ def _get_built_wheel_internal(url):
             source_path = build_path / files[0]
         else:
             source_path = build_path
-    logger.info(f"Building wheel for {gz_name}...")
+    logger.info("Building wheel for %s...", gz_name)
     with (
         tempfile.NamedTemporaryFile(mode="w+") as logfile,
         stream_redirected(to=logfile, stream=sys.stdout),
