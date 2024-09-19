@@ -125,7 +125,11 @@ lint.select = [
   "PLC",    # pylint conventions
   "PLE",    # pylint errors
   "UP",     # pyupgrade
+  "G004",   # f-string logging should be avoided
 ]
+
+lint.logger-objects = ["pyodide_build.logger.logger"]
+
 lint.ignore = ["E402", "E501", "E731", "E741", "UP038"]
 # line-length = 219  # E501: Recommended goal is 88 to match black
 target-version = "py311"
