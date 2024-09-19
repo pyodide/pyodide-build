@@ -130,7 +130,7 @@ class RecipeBuilder:
 
         t0 = datetime.now()
         timestamp = t0.strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(f"[{timestamp}] Building package {self.name}...")
+        logger.info("[%s] Building package %s...", timestamp, self.name)
         success = True
         try:
             self._build()
@@ -439,7 +439,7 @@ class RecipeBuilder:
             # Retag platformed wheels to pyodide
             wheel = retag_wheel(wheel, wheel_platform())
 
-        logger.info(f"Unpacking wheel to {str(wheel)}")
+        logger.info("Unpacking wheel to %s", str(wheel))
 
         name, ver, _ = wheel.name.split("-", 2)
 
@@ -509,7 +509,7 @@ class RecipeBuilder:
                 cwd=self.src_extract_dir,
             )
             if result.returncode != 0:
-                logger.error(f"ERROR: Patch {patch_abspath} failed")
+                logger.error("ERROR: Patch %s failed", patch_abspath)
                 exit_with_stdio(result)
 
         # Add any extra files
@@ -612,7 +612,7 @@ def copy_sharedlibs(
         logger.info("Copied shared libraries:")
         for lib, path in dep_map_new.items():
             original_path = dep_map[lib]
-            logger.info(f"  {original_path} -> {path}")
+            logger.info("  %s -> %s", original_path, path)
 
         return dep_map_new
 
@@ -695,7 +695,7 @@ def needs_rebuild(
     packaged_token = buildpath / ".packaged"
     if not packaged_token.is_file():
         logger.debug(
-            f"{pkg_root} needs rebuild because {packaged_token} does not exist"
+            "%s needs rebuild because %s does not exist", pkg_root, packaged_token
         )
         return True
 

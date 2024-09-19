@@ -106,7 +106,7 @@ class CrossBuildEnvManager:
         version
             The version of xbuildenv to use.
         """
-        logger.info(f"Using Pyodide cross-build environment version: {version}")
+        logger.info("Using Pyodide cross-build environment version: %s", version)
 
         version_path = self._path_for_version(version)
         if not version_path.exists():
@@ -358,7 +358,8 @@ class CrossBuildEnvManager:
 
         if not lockfile_path.exists():
             logger.warning(
-                f"Pyodide lockfile not found at {lockfile_path}. Skipping PyPI index creation"
+                "Pyodide lockfile not found at %s. Skipping PyPI index creation",
+                lockfile_path,
             )
             return
 

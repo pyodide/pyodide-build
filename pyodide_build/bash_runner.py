@@ -76,11 +76,11 @@ class BashRunnerWithSharedEnvironment:
         if cwd is None:
             cwd = Path.cwd()
         cwd = Path(cwd).absolute()
-        logger.info(f"Running {script_name} in {str(cwd)}")
+        logger.info("Running %s in %s", script_name, str(cwd))
         opts["cwd"] = cwd
         result = self.run_unchecked(cmd, **opts)
         if result.returncode != 0:
-            logger.error(f"ERROR: {script_name} failed")
+            logger.error("ERROR: %s failed", script_name)
             logger.error(textwrap.indent(cmd, "    "))
             exit_with_stdio(result)
         return result

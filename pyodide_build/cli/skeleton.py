@@ -80,10 +80,10 @@ def new_recipe_pypi(
                 update_patched=update_patched,
             )
         except mkpkg.MkpkgFailedException as e:
-            logger.error(f"{name} update failed: {e}")
+            logger.error("%s update failed: %s", name, e)
             sys.exit(1)
         except mkpkg.MkpkgSkipped as e:
-            logger.warning(f"{name} update skipped: {e}")
+            logger.warning("%s update skipped: %s", name, e)
         except Exception:
             print(name)
             raise

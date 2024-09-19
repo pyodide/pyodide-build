@@ -114,7 +114,7 @@ def _compile(
     output_name = output_path.name
 
     with set_log_level(logger, verbose):
-        logger.debug(f"Running py-compile on {input_path} to {output_path}")
+        logger.debug("Running py-compile on %s to %s", input_path, output_path)
 
         if compression_level > 0:
             compression = zipfile.ZIP_DEFLATED

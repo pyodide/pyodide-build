@@ -87,8 +87,9 @@ def load_recipes(
 
         elif name_or_tag in ("core", "min-scipy-stack"):
             logger.warning(
-                f"Using meta package without the 'tag:' prefix is deprecated,"
-                f" use 'tag:{name_or_tag}' instead."
+                "Using meta package without the 'tag:' prefix is deprecated, "
+                "use 'tag:%s' instead.",
+                name_or_tag,
             )
             for recipe in tagged_recipes[name_or_tag]:
                 recipes[recipe.package.name] = recipe.model_copy(deep=True)
