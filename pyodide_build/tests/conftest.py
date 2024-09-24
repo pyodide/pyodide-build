@@ -97,7 +97,8 @@ def dummy_xbuildenv(dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache):
 
     manager = CrossBuildEnvManager(tmp_path / xbuildenv_dirname())
     manager.install(
-        version=None, url=dummy_xbuildenv_url,
+        version=None,
+        url=dummy_xbuildenv_url,
     )
 
     cur_dir = os.getcwd()

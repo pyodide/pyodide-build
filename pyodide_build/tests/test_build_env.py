@@ -123,8 +123,10 @@ class TestOutOfTree(TestInTree):
         e = build_env.get_build_environment_vars(pyodide_root)
         assert "HOME" not in e
         assert "RANDOM_ENV" not in e
-    
-    def test_get_unisolated_packages(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+
+    def test_get_unisolated_packages(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
         expected = {"numpy", "scipy"}  # this relies on the dummy xbuildenv file
         pkgs = build_env.get_unisolated_packages()
         for pkg in expected:

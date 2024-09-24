@@ -221,10 +221,11 @@ def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
         libdir = PYODIDE_ROOT / ".." / "site-packages-extras"
     else:
         libdir = Path(get_hostsitepackages())
-    
+
     package_dir = libdir / package_name
-    return libdir, [str(f.relative_to(libdir)) for f in package_dir.rglob("*") if f.is_file()]
-        
+    return libdir, [
+        str(f.relative_to(libdir)) for f in package_dir.rglob("*") if f.is_file()
+    ]
 
 
 def platform() -> str:
