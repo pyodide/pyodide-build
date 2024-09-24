@@ -171,7 +171,7 @@ def get_hostsitepackages() -> str:
 def get_unisolated_packages() -> dict[str, str]:
     """
     Get a map of unisolated packages.
-    
+
     Unisolated packages are packages that are used during the build process
     and have some platform-specific files. When these packages are used
     during the build process, we switch need to switch platform-specific files,
@@ -187,7 +187,7 @@ def get_unisolated_packages() -> dict[str, str]:
     unisolated_packages = {}
     if in_xbuildenv():
         unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
-        
+
         for line in unisolated_packages_file.read_text().splitlines():
             name, version = line.split("==")
             unisolated_packages[name] = version
