@@ -23,11 +23,11 @@ from packaging.tags import Tag
 from packaging.utils import canonicalize_name as canonicalize_package_name
 from packaging.utils import parse_wheel_filename
 
-from .logger import logger
+from pyodide_build.logger import logger
 
 
 def xbuildenv_dirname() -> str:
-    from . import __version__
+    from pyodide_build import __version__
 
     return f".pyodide-xbuildenv-{__version__}"
 
@@ -101,7 +101,7 @@ def parse_top_level_import_name(whlfile: Path) -> list[str] | None:
 
     if not top_level_imports:
         logger.warning(
-            f"WARNING: failed to parse top level import name from {whlfile}."
+            "WARNING: failed to parse top level import name from %s.", whlfile
         )
         return None
 
@@ -204,7 +204,7 @@ def get_num_cores() -> int:
     Return the number of CPUs the current process can use.
     If the number of CPUs cannot be determined, return 1.
     """
-    from .vendor.loky import cpu_count
+    from pyodide_build.vendor.loky import cpu_count
 
     return cpu_count()
 
@@ -293,7 +293,7 @@ def unpack_wheel(wheel_path: Path, target_dir: Path | None = None) -> None:
         encoding="utf-8",
     )
     if result.returncode != 0:
-        logger.error(f"ERROR: Unpacking wheel {wheel_path.name} failed")
+        logger.error("ERROR: Unpacking wheel %s failed", wheel_path.name)
         exit_with_stdio(result)
 
 
@@ -306,7 +306,7 @@ def pack_wheel(wheel_dir: Path, target_dir: Path | None = None) -> None:
         encoding="utf-8",
     )
     if result.returncode != 0:
-        logger.error(f"ERROR: Packing wheel {wheel_dir} failed")
+        logger.error("ERROR: Packing wheel %s failed", wheel_dir)
         exit_with_stdio(result)
 
 
@@ -348,7 +348,7 @@ def retag_wheel(wheel_path: Path, platform: str) -> Path:
         capture_output=True,
     )
     if result.returncode != 0:
-        logger.error(f"ERROR: Retagging wheel {wheel_path} to {platform} failed")
+        logger.error("ERROR: Retagging wheel %s to %s failed", wheel_path, platform)
         exit_with_stdio(result)
     return wheel_path.parent / result.stdout.splitlines()[-1].strip()
 

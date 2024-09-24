@@ -1,6 +1,10 @@
 import typer
 
-from ..build_env import get_build_environment_vars, get_pyodide_root, init_environment
+from pyodide_build.build_env import (
+    get_build_environment_vars,
+    get_pyodide_root,
+    init_environment,
+)
 
 app = typer.Typer(help="Manage config variables used in pyodide")
 
@@ -11,7 +15,6 @@ PYODIDE_CONFIGS = {
     "python_version": "PYVERSION",
     "rustflags": "RUSTFLAGS",
     "cmake_toolchain_file": "CMAKE_TOOLCHAIN_FILE",
-    "pyo3_config_file": "PYO3_CONFIG_FILE",
     "rust_toolchain": "RUST_TOOLCHAIN",
     "cflags": "SIDE_MODULE_CFLAGS",
     "cxxflags": "SIDE_MODULE_CXXFLAGS",

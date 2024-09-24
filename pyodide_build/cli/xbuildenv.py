@@ -2,10 +2,11 @@ from pathlib import Path
 
 import typer
 
-from ..build_env import local_versions
-from ..common import xbuildenv_dirname
-from ..xbuildenv import CrossBuildEnvManager
-from ..xbuildenv_releases import (
+from pyodide_build.build_env import local_versions
+from pyodide_build.common import xbuildenv_dirname
+from pyodide_build.views import MetadataView
+from pyodide_build.xbuildenv import CrossBuildEnvManager
+from pyodide_build.xbuildenv_releases import (
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
@@ -151,6 +152,11 @@ def _search(
         "-a",
         help="search all versions, without filtering out incompatible ones",
     ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="output results in JSON format",
+    ),
 ) -> None:
     """
     Search for available versions of cross-build environment.
@@ -175,40 +181,25 @@ def _search(
         )
         raise typer.Exit(1)
 
-    table = []
-    columns = [
-        # column name, width
-        ("Version", 10),
-        ("Python", 10),
-        ("Emscripten", 10),
-        ("pyodide-build", 25),
-        ("Compatible", 10),
-    ]
-    header = [f"{name:{width}}" for name, width in columns]
-    divider = ["-" * width for _, width in columns]
-
-    table.append("\t".join(header))
-    table.append("\t".join(divider))
-
-    for release in releases:
-        compatible = (
-            "Yes"
-            if release.is_compatible(
+    # Generate views for the metadata objects (currently tabular or JSON)
+    views = [
+        MetadataView(
+            version=release.version,
+            python=release.python_version,
+            emscripten=release.emscripten_version,
+            pyodide_build={
+                "min": release.min_pyodide_build_version,
+                "max": release.max_pyodide_build_version,
+            },
+            compatible=release.is_compatible(
                 python_version=local["python"],
                 pyodide_build_version=local["pyodide-build"],
-            )
-            else "No"
+            ),
         )
-        pyodide_build_range = f"{release.min_pyodide_build_version or ''} - {release.max_pyodide_build_version or ''}"
+        for release in releases
+    ]
 
-        row = [
-            f"{release.version:{columns[0][1]}}",
-            f"{release.python_version:{columns[1][1]}}",
-            f"{release.emscripten_version:{columns[2][1]}}",
-            f"{pyodide_build_range:{columns[3][1]}}",
-            f"{compatible:{columns[4][1]}}",
-        ]
-
-        table.append("\t".join(row))
-
-    print("\n".join(table))
+    if json_output:
+        print(MetadataView.to_json(views))
+    else:
+        print(MetadataView.to_table(views))

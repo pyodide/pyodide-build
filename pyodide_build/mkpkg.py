@@ -16,8 +16,8 @@ from urllib import request
 from packaging.version import Version
 from ruamel.yaml import YAML
 
-from .common import parse_top_level_import_name
-from .logger import logger
+from pyodide_build.common import parse_top_level_import_name
+from pyodide_build.logger import logger
 
 
 class URLDict(TypedDict):
@@ -151,7 +151,7 @@ def make_package(
     Creates a template that will work for most pure Python packages,
     but will have to be edited for more complex things.
     """
-    logger.info(f"Creating meta.yaml package for {package}")
+    logger.info("Creating meta.yaml package for %s", package)
 
     yaml = YAML()
 
@@ -226,8 +226,8 @@ def update_package(
 
     meta_path = root / package / "meta.yaml"
     if not meta_path.exists():
-        logger.error(f"{meta_path} does not exist")
-        exit(1)
+        logger.error("%s does not exist", meta_path)
+        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
 
     yaml_content = yaml.load(meta_path.read_bytes())
 
@@ -245,28 +245,60 @@ def update_package(
         old_fmt = "sdist"
 
     pypi_metadata = _get_metadata(package, version)
+
+    # Grab versions from metadata
     pypi_ver = Version(pypi_metadata["info"]["version"])
     local_ver = Version(yaml_content["package"]["version"])
-    already_up_to_date = pypi_ver <= local_ver and (
+
+    # and grab checksums from metadata
+    source_fmt = source_fmt or old_fmt
+    dist_metadata = _find_dist(pypi_metadata, [source_fmt])
+    sha256 = dist_metadata["digests"]["sha256"]
+    sha256_local = yaml_content["source"].get("sha256")
+
+    # fail if local version is newer than PyPI version
+    # since updating isn't possible in that case
+    if pypi_ver < local_ver:
+        raise MkpkgFailedException(
+            f"Local version {local_ver} is newer than PyPI version {pypi_ver}, "
+            f"cannot update {package}. Please verify in case the version was "
+            "updated manually and is correct."
+        )
+
+    # conditions to check if the package is up to date
+    is_sha256_up_to_date = sha256 == sha256_local
+    is_version_up_to_date = pypi_ver == local_ver
+
+    already_up_to_date = (is_sha256_up_to_date and is_version_up_to_date) and (
         source_fmt is None or source_fmt == old_fmt
     )
     if already_up_to_date:
         logger.success(
-            f"{package} already up to date. Local: {local_ver} PyPI: {pypi_ver}"
+            f"{package} already up to date."
+            f" Local: {local_ver} and PyPI: {pypi_ver}"
+            f" and checksum received: {sha256} matches local: {sha256_local} ✅"
         )
         return
 
-    logger.info(f"{package} is out of date: {local_ver} <= {pypi_ver}.")
+    logger.info(
+        "%s is out of date: either %s < %s or checksums might have mismatched: received %s against local %s 🚨",
+        package,
+        local_ver,
+        pypi_ver,
+        sha256,
+        sha256_local,
+    )
 
     if yaml_content["source"].get("patches"):
         if update_patched:
             logger.warning(
-                f"Pyodide applies patches to {package}. Update the "
-                "patches (if needed) to avoid build failing."
+                "Pyodide applies patches to %s. Update the patches (if needed) to avoid build failing.",
+                package,
             )
         else:
             raise MkpkgFailedException(
                 f"Pyodide applies patches to {package}. Skipping update."
+                f" Use --update-patched to force updating {package}."
             )
 
     if source_fmt:

@@ -9,12 +9,12 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, TextIO
 
-from .build_env import (
+from pyodide_build.build_env import (
     get_build_environment_vars,
     get_pyodide_root,
 )
-from .common import exit_with_stdio
-from .logger import logger
+from pyodide_build.common import exit_with_stdio
+from pyodide_build.logger import logger
 
 
 class BashRunnerWithSharedEnvironment:
@@ -76,11 +76,11 @@ class BashRunnerWithSharedEnvironment:
         if cwd is None:
             cwd = Path.cwd()
         cwd = Path(cwd).absolute()
-        logger.info(f"Running {script_name} in {str(cwd)}")
+        logger.info("Running %s in %s", script_name, str(cwd))
         opts["cwd"] = cwd
         result = self.run_unchecked(cmd, **opts)
         if result.returncode != 0:
-            logger.error(f"ERROR: {script_name} failed")
+            logger.error("ERROR: %s failed", script_name)
             logger.error(textwrap.indent(cmd, "    "))
             exit_with_stdio(result)
         return result

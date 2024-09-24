@@ -5,9 +5,9 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-from ..build_env import get_build_flag, get_pyodide_root, in_xbuildenv
-from ..common import exit_with_stdio
-from ..logger import logger
+from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
+from pyodide_build.common import exit_with_stdio
+from pyodide_build.logger import logger
 
 
 def check_result(result: subprocess.CompletedProcess[str], msg: str) -> None:
@@ -254,11 +254,11 @@ def install_stdlib(venv_bin: Path) -> None:
 
 def create_pyodide_venv(dest: Path) -> None:
     """Create a Pyodide virtualenv and store it into dest"""
-    logger.info(f"Creating Pyodide virtualenv at {dest}")
+    logger.info("Creating Pyodide virtualenv at %s", dest)
     from virtualenv import session_via_cli
 
     if dest.exists():
-        logger.error(f"ERROR: dest directory '{dest}' already exists")
+        logger.error("ERROR: dest directory '%s' already exists", dest)
         sys.exit(1)
 
     interp_path = pyodide_dist_dir() / "python"

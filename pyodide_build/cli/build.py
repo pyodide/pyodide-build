@@ -10,16 +10,20 @@ import requests
 import typer
 from build import ConfigSettingsType
 
-from ..build_env import check_emscripten_version, get_pyodide_root, init_environment
-from ..io import _BuildSpecExports, _ExportTypes
-from ..logger import logger
-from ..out_of_tree import build
-from ..out_of_tree.pypi import (
+from pyodide_build.build_env import (
+    check_emscripten_version,
+    get_pyodide_root,
+    init_environment,
+)
+from pyodide_build.io import _BuildSpecExports, _ExportTypes
+from pyodide_build.logger import logger
+from pyodide_build.out_of_tree import build
+from pyodide_build.out_of_tree.pypi import (
     build_dependencies_for_wheel,
     build_wheels_from_pypi_requirements,
     fetch_pypi_package,
 )
-from ..pypabuild import parse_backend_flags
+from pyodide_build.pypabuild import parse_backend_flags
 
 
 def convert_exports(exports: str) -> _BuildSpecExports:

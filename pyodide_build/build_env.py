@@ -13,10 +13,10 @@ from pathlib import Path
 
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
-from . import __version__
-from .common import search_pyproject_toml, xbuildenv_dirname
-from .config import ConfigManager
-from .recipe import load_all_recipes
+from pyodide_build import __version__
+from pyodide_build.common import search_pyproject_toml, xbuildenv_dirname
+from pyodide_build.config import ConfigManager
+from pyodide_build.recipe import load_all_recipes
 
 RUST_BUILD_PRELUDE = """
 rustup toolchain install ${RUST_TOOLCHAIN} && rustup default ${RUST_TOOLCHAIN}
@@ -74,7 +74,7 @@ def _init_xbuild_env(*, quiet: bool = False) -> Path:
     -------
         The path to the Pyodide root directory inside the xbuild environment
     """
-    from .xbuildenv import CrossBuildEnvManager  # avoid circular import
+    from pyodide_build.xbuildenv import CrossBuildEnvManager  # avoid circular import
 
     xbuildenv_path = Path(xbuildenv_dirname()).resolve()
     context = redirect_stdout(StringIO()) if quiet else nullcontext()
@@ -96,7 +96,7 @@ def search_pyodide_root(curdir: str | Path, *, max_depth: int = 10) -> Path | No
     """
     Recursively search for the root of the Pyodide repository,
     by looking for the pyproject.toml file in the parent directories
-    which contains [tool.pyodide] section.
+    which contains the [tool._pyodide] section.
     """
     pyproject_path, pyproject_file = search_pyproject_toml(curdir, max_depth)
 

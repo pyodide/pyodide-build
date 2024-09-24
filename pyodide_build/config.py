@@ -4,8 +4,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 
-from .common import _environment_substitute_str, exit_with_stdio, search_pyproject_toml
-from .logger import logger
+from pyodide_build.common import (
+    _environment_substitute_str,
+    exit_with_stdio,
+    search_pyproject_toml,
+)
+from pyodide_build.logger import logger
 
 
 class ConfigManager:
@@ -106,7 +110,8 @@ class ConfigManager:
             for key, v in configs["tool"]["pyodide"]["build"].items():
                 if key not in OVERRIDABLE_BUILD_KEYS:
                     logger.warning(
-                        f"WARNING: The provided build key {key} is either invalid or not overridable, hence ignored."
+                        "WARNING: The provided build key %s is either invalid or not overridable, hence ignored.",
+                        key,
                     )
                     continue
                 build_config[key] = _environment_substitute_str(v, env)
@@ -143,6 +148,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "pyminor": "PYMINOR",
     "pyo3_cross_include_dir": "PYO3_CROSS_INCLUDE_DIR",
     "pyo3_cross_lib_dir": "PYO3_CROSS_LIB_DIR",
+    "pyo3_cross_python_version": "PYO3_CROSS_PYTHON_VERSION",
     "pyodide_emscripten_version": "PYODIDE_EMSCRIPTEN_VERSION",
     "pyodide_jobs": "PYODIDE_JOBS",
     "pyodide_root": "PYODIDE_ROOT",
@@ -161,7 +167,6 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "sysconfig_name": "SYSCONFIG_NAME",
     "targetinstalldir": "TARGETINSTALLDIR",
     "cmake_toolchain_file": "CMAKE_TOOLCHAIN_FILE",
-    "pyo3_config_file": "PYO3_CONFIG_FILE",
     "meson_cross_file": "MESON_CROSS_FILE",
     "cflags_base": "CFLAGS_BASE",
     "cxxflags_base": "CXXFLAGS_BASE",
@@ -192,7 +197,6 @@ TOOLS_DIR = Path(__file__).parent / "tools"
 DEFAULT_CONFIG: dict[str, str] = {
     # Paths to toolchain configuration files
     "cmake_toolchain_file": str(TOOLS_DIR / "cmake/Modules/Platform/Emscripten.cmake"),
-    "pyo3_config_file": str(TOOLS_DIR / "pyo3_config.ini"),
     "meson_cross_file": str(TOOLS_DIR / "emscripten.meson.cross"),
     # Rust-specific configuration
     "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT -Z link-native-libraries=no",
@@ -213,8 +217,9 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     "cxxflags": "$(CXXFLAGS_BASE)",
     "ldflags": "$(LDFLAGS_BASE) -s SIDE_MODULE=1",
     # Rust-specific configuration
-    "pyo3_cross_lib_dir": "$(CPYTHONINSTALL)/lib",
+    "pyo3_cross_lib_dir": "$(CPYTHONINSTALL)/sysconfigdata",  # FIXME: pyodide xbuildenv stores sysconfigdata here
     "pyo3_cross_include_dir": "$(PYTHONINCLUDE)",
+    "pyo3_cross_python_version": "$(PYMAJOR).$(PYMINOR)",
     # Misc
     "stdlib_module_cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE) -I Include/ -I. -IInclude/internal/",  # TODO: remove this
     # Paths to build dependencies

@@ -11,8 +11,8 @@ from typing import Any
 from packaging.tags import Tag
 from packaging.utils import parse_wheel_filename
 
-from .common import _get_sha256_checksum
-from .logger import logger, set_log_level
+from pyodide_build.common import _get_sha256_checksum
+from pyodide_build.logger import logger, set_log_level
 
 
 def _specialize_convert_tags(tags: set[Tag] | frozenset[Tag], wheel_name: str) -> Tag:
@@ -114,7 +114,7 @@ def _compile(
     output_name = output_path.name
 
     with set_log_level(logger, verbose):
-        logger.debug(f"Running py-compile on {input_path} to {output_path}")
+        logger.debug("Running py-compile on %s to %s", input_path, output_path)
 
         if compression_level > 0:
             compression = zipfile.ZIP_DEFLATED
