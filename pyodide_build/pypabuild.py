@@ -136,7 +136,7 @@ def _remove_avoided_requirements(
     return requires
 
 
-def _replace_unisoloated_packages(
+def _replace_unisolated_packages(
     requires: set[str],
     unisolated_packages: dict[str, str],
 ) -> tuple[set[str], set[str]]:
@@ -201,7 +201,7 @@ def _install_cross_build_files(path: str, unisolated: set[str]) -> None:
 
 def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
     reqs = _remove_avoided_requirements(reqs, AVOIDED_REQUIREMENTS)
-    reqs, unisolated = _replace_unisoloated_packages(reqs, get_unisolated_packages())
+    reqs, unisolated = _replace_unisolated_packages(reqs, get_unisolated_packages())
 
     env.install(reqs)
 

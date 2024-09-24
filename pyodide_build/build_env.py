@@ -170,10 +170,12 @@ def get_hostsitepackages() -> str:
 @functools.cache
 def get_unisolated_packages() -> dict[str, str]:
     """
-    Get a list of unisolated packages.
-    Unisolated packages are packages that are often used during the build process
-    and have some platform-specific files. When these packages are required during
-    the build process, we switch some files to platform-specific ones.
+    Get a map of unisolated packages.
+    
+    Unisolated packages are packages that are used during the build process
+    and have some platform-specific files. When these packages are used
+    during the build process, we switch need to switch platform-specific files,
+    in order to build the package correctly.
 
     Returns
     -------
@@ -182,14 +184,14 @@ def get_unisolated_packages() -> dict[str, str]:
 
     PYODIDE_ROOT = get_pyodide_root()
 
+    unisolated_packages = {}
     if in_xbuildenv():
-        unisolated_file = PYODIDE_ROOT / ".." / "requirements.txt"
-        unisolated_packages = {}
-        for line in unisolated_file.read_text().splitlines():
+        unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
+        
+        for line in unisolated_packages_file.read_text().splitlines():
             name, version = line.split("==")
             unisolated_packages[name] = version
     else:
-        unisolated_packages = {}
         recipe_dir = PYODIDE_ROOT / "packages"
         recipes = load_all_recipes(recipe_dir)
         for name, config in recipes.items():
