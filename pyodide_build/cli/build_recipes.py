@@ -5,8 +5,8 @@ from pathlib import Path
 import typer
 
 from pyodide_build import build_env, buildall
-from pyodide_build.buildpkg import RecipeBuilder
 from pyodide_build.build_env import BuildArgs, init_environment
+from pyodide_build.buildpkg import RecipeBuilder
 from pyodide_build.common import get_num_cores
 from pyodide_build.logger import logger
 

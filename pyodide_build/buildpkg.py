@@ -99,7 +99,7 @@ class RecipeBuilder:
         self.source_metadata = self.recipe.source
         self.build_metadata = self.recipe.build
         self.package_type = self.build_metadata.package_type
-        
+
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
@@ -137,10 +137,12 @@ class RecipeBuilder:
             case "static_library":
                 builder = RecipeBuilderStaticLibrary
             case "shared_library":
-                builder = RecipeBuilderSharedLibrary            
+                builder = RecipeBuilderSharedLibrary
             case _:
-                raise ValueError(f"Unknown package type: {config.build_metadata.package_type}")
-        
+                raise ValueError(
+                    f"Unknown package type: {config.build_metadata.package_type}"
+                )
+
         return builder(recipe, build_args, build_dir, force_rebuild, continue_)
 
     def build(self) -> None:
@@ -448,6 +450,7 @@ class RecipeBuilderPackage(RecipeBuilder):
     """
     Recipe builder for python packages.
     """
+
     def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
         if self.recipe.is_rust_package():
             bash_runner.run(
@@ -543,10 +546,12 @@ class RecipeBuilderPackage(RecipeBuilder):
             finally:
                 shutil.rmtree(test_dir, ignore_errors=True)
 
+
 class RecipeBuilderStaticLibrary(RecipeBuilder):
     """
     Recipe builder for static libraries.
     """
+
     def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
         bash_runner.run(
             self.build_metadata.script,
@@ -559,6 +564,7 @@ class RecipeBuilderSharedLibrary(RecipeBuilder):
     """
     Recipe builder for shared libraries.
     """
+
     def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
         bash_runner.run(
             self.build_metadata.script,
@@ -570,9 +576,8 @@ class RecipeBuilderSharedLibrary(RecipeBuilder):
         # and create a zip archive of the .so files
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         self.dist_dir.mkdir(parents=True)
-        make_zip_archive(
-            self.dist_dir / f"{self.fullname}.zip", self.src_dist_dir
-        )
+        make_zip_archive(self.dist_dir / f"{self.fullname}.zip", self.src_dist_dir)
+
 
 @cache
 def _load_recipe(package_dir: Path) -> tuple[Path, MetaConfig]:
@@ -602,6 +607,7 @@ def _load_recipe(package_dir: Path) -> tuple[Path, MetaConfig]:
         package_dir = meta_file.parent
 
     return package_dir, MetaConfig.from_yaml(meta_file)
+
 
 def check_checksum(archive: Path, checksum: str) -> None:
     """

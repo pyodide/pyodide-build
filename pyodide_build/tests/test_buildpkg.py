@@ -9,7 +9,13 @@ import pytest
 
 from pyodide_build import buildpkg, common
 from pyodide_build.build_env import BuildArgs
-from pyodide_build.buildpkg import RecipeBuilder, _load_recipe
+from pyodide_build.buildpkg import (
+    RecipeBuilder,
+    RecipeBuilderPackage,
+    RecipeBuilderSharedLibrary,
+    RecipeBuilderStaticLibrary,
+    _load_recipe,
+)
 from pyodide_build.io import _SourceSpec
 
 RECIPE_DIR = Path(__file__).parent / "_test_recipes"
@@ -54,6 +60,41 @@ def test_constructor(tmp_path):
     )
     assert builder.dist_dir == RECIPE_DIR / "beautifulsoup4" / "dist"
     assert builder.library_install_prefix == tmp_path / ".libs"
+
+
+def test_get_builder(tmp_path):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_1",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+        force_rebuild=False,
+        continue_=False,
+    )
+
+    assert isinstance(builder, RecipeBuilder)
+    assert isinstance(builder, RecipeBuilderPackage)
+
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "libtest",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+        force_rebuild=False,
+        continue_=False,
+    )
+
+    assert isinstance(builder, RecipeBuilder)
+    assert isinstance(builder, RecipeBuilderStaticLibrary)
+
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "libtest_shared",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+        force_rebuild=False,
+        continue_=False,
+    )
+
+    assert isinstance(builder, RecipeBuilder)
+    assert isinstance(builder, RecipeBuilderSharedLibrary)
 
 
 def test_load_recipe():
