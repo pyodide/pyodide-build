@@ -14,6 +14,7 @@ import sys
 import warnings
 from collections.abc import Iterator
 from datetime import datetime
+from functools import cache
 from pathlib import Path
 from typing import Any, cast
 
@@ -89,19 +90,20 @@ class RecipeBuilder:
             If True, continue a build from the middle. For debugging. Implies "force_rebuild".
         """
         recipe = Path(recipe).resolve()
-        self.pkg_root, self.recipe = self._load_recipe(recipe)
+        self.pkg_root, self.recipe = _load_recipe(recipe)
 
         self.name = self.recipe.package.name
         self.version = self.recipe.package.version
         self.fullname = f"{self.name}-{self.version}"
-        self.build_args = build_args
 
+        self.source_metadata = self.recipe.source
+        self.build_metadata = self.recipe.build
+        self.package_type = self.build_metadata.package_type
+        
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
-
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
-
         self.src_extract_dir = (
             self.build_dir / self.fullname
         )  # where we extract the source
@@ -114,13 +116,32 @@ class RecipeBuilder:
         # where Pyodide will look for the built artifacts when building pyodide-lock.json.
         # after building packages, artifacts in src_dist_dir will be copied to dist_dir
         self.dist_dir = self.pkg_root / "dist"
-
-        self.source_metadata = self.recipe.source
-        self.build_metadata = self.recipe.build
-        self.package_type = self.build_metadata.package_type
-
+        self.build_args = build_args
         self.force_rebuild = force_rebuild or continue_
         self.continue_ = continue_
+
+    @classmethod
+    def get_builder(
+        cls,
+        recipe: str | Path,
+        build_args: BuildArgs,
+        build_dir: str | Path | None = None,
+        force_rebuild: bool = False,
+        continue_: bool = False,
+    ) -> "RecipeBuilder":
+        recipe = Path(recipe).resolve()
+        _, config = _load_recipe(recipe)
+        match config.build.package_type:
+            case "package":
+                builder = RecipeBuilderPackage
+            case "static_library":
+                builder = RecipeBuilderStaticLibrary
+            case "shared_library":
+                builder = RecipeBuilderSharedLibrary            
+            case _:
+                raise ValueError(f"Unknown package type: {config.build_metadata.package_type}")
+        
+        return builder(recipe, build_args, build_dir, force_rebuild, continue_)
 
     def build(self) -> None:
         """
@@ -153,6 +174,9 @@ class RecipeBuilder:
             else:
                 logger.error(msg)
 
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        raise NotImplementedError("Subclasses must implement this method")
+
     def _build(self) -> None:
         if not self.force_rebuild and not needs_rebuild(
             self.pkg_root, self.build_dir, self.source_metadata
@@ -175,70 +199,7 @@ class RecipeBuilder:
             chdir(self.pkg_root),
             get_bash_runner(self._get_helper_vars() | os.environ.copy()) as bash_runner,
         ):
-            if self.recipe.is_rust_package():
-                bash_runner.run(
-                    RUST_BUILD_PRELUDE,
-                    script_name="rust build prelude",
-                    cwd=self.src_extract_dir,
-                )
-
-            bash_runner.run(
-                self.build_metadata.script,
-                script_name="build script",
-                cwd=self.src_extract_dir,
-            )
-
-            # TODO: maybe subclass this for different package types?
-            if self.package_type == "static_library":
-                # Nothing needs to be done for a static library
-                pass
-
-            elif self.package_type == "shared_library":
-                # If shared library, we copy .so files to dist_dir
-                # and create a zip archive of the .so files
-                shutil.rmtree(self.dist_dir, ignore_errors=True)
-                self.dist_dir.mkdir(parents=True)
-                make_zip_archive(
-                    self.dist_dir / f"{self.fullname}.zip", self.src_dist_dir
-                )
-
-            else:  # wheel
-                url = self.source_metadata.url
-                prebuilt_wheel = url and url.endswith(".whl")
-                if not prebuilt_wheel:
-                    self._compile(bash_runner)
-
-                self._package_wheel(bash_runner)
-                shutil.rmtree(self.dist_dir, ignore_errors=True)
-                shutil.copytree(self.src_dist_dir, self.dist_dir)
-
-    def _load_recipe(self, package_dir: Path) -> tuple[Path, MetaConfig]:
-        """
-        Load the package configuration from the given directory.
-
-        Parameters
-        ----------
-        package_dir
-            The directory containing the package configuration, or the path to the
-            package configuration file.
-
-        Returns
-        -------
-        pkg_dir
-            The directory containing the package configuration.
-        pkg
-            The package configuration.
-        """
-        if not package_dir.exists():
-            raise FileNotFoundError(f"Package directory {package_dir} does not exist")
-
-        if package_dir.is_dir():
-            meta_file = package_dir / "meta.yaml"
-        else:
-            meta_file = package_dir
-            package_dir = meta_file.parent
-
-        return package_dir, MetaConfig.from_yaml(meta_file)
+            self._build_package(bash_runner)
 
     def _check_executables(self) -> None:
         """
@@ -412,6 +373,104 @@ class RecipeBuilder:
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings
             )
 
+    def _patch(self) -> None:
+        """
+        Apply patches to the source.
+        """
+        token_path = self.src_extract_dir / ".patched"
+        if token_path.is_file():
+            return
+
+        patches = self.source_metadata.patches
+        extras = self.source_metadata.extras
+        cast(str, self.source_metadata.url)
+
+        if not patches and not extras:
+            return
+
+        # Apply all the patches
+        for patch in patches:
+            patch_abspath = self.pkg_root / patch
+            result = subprocess.run(
+                ["patch", "-p1", "--binary", "--verbose", "-i", patch_abspath],
+                check=False,
+                encoding="utf-8",
+                cwd=self.src_extract_dir,
+            )
+            if result.returncode != 0:
+                logger.error("ERROR: Patch %s failed", patch_abspath)
+                exit_with_stdio(result)
+
+        # Add any extra files
+        for src, dst in extras:
+            shutil.copyfile(self.pkg_root / src, self.src_extract_dir / dst)
+
+        token_path.touch()
+
+    def _redirect_stdout_stderr_to_logfile(self) -> None:
+        """
+        Redirect stdout and stderr to a log file.
+        """
+        try:
+            stdout_fileno = sys.stdout.fileno()
+            stderr_fileno = sys.stderr.fileno()
+
+            tee = subprocess.Popen(
+                ["tee", self.pkg_root / "build.log"], stdin=subprocess.PIPE
+            )
+
+            # Cause tee's stdin to get a copy of our stdin/stdout (as well as that
+            # of any child processes we spawn)
+            os.dup2(tee.stdin.fileno(), stdout_fileno)  # type: ignore[union-attr]
+            os.dup2(tee.stdin.fileno(), stderr_fileno)  # type: ignore[union-attr]
+        except OSError:
+            # This normally happens when testing
+            logger.warning("stdout/stderr does not have a fileno, not logging to file")
+
+    def _get_helper_vars(self) -> dict[str, str]:
+        """
+        Get the helper variables for the build script.
+        """
+        return {
+            "PKGDIR": str(self.pkg_root),
+            "PKG_VERSION": self.version,
+            "PKG_BUILD_DIR": str(self.src_extract_dir),
+            "DISTDIR": str(self.src_dist_dir),
+            # TODO: rename this to something more compatible with Makefile or CMake conventions
+            "WASM_LIBRARY_DIR": str(self.library_install_prefix),
+            # Using PKG_CONFIG_LIBDIR instead of PKG_CONFIG_PATH,
+            # so pkg-config will not look in the default system directories
+            "PKG_CONFIG_LIBDIR": str(self.library_install_prefix / "lib/pkgconfig"),
+        }
+
+
+class RecipeBuilderPackage(RecipeBuilder):
+    """
+    Recipe builder for python packages.
+    """
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        if self.recipe.is_rust_package():
+            bash_runner.run(
+                RUST_BUILD_PRELUDE,
+                script_name="rust build prelude",
+                cwd=self.src_extract_dir,
+            )
+
+        bash_runner.run(
+            self.build_metadata.script,
+            script_name="build script",
+            cwd=self.src_extract_dir,
+        )
+
+        url = self.source_metadata.url
+        prebuilt_wheel = url and url.endswith(".whl")
+        if not prebuilt_wheel:
+            self._compile(bash_runner)
+
+        self._package_wheel(bash_runner)
+        shutil.rmtree(self.dist_dir, ignore_errors=True)
+        shutil.copytree(self.src_dist_dir, self.dist_dir)
+
     def _package_wheel(
         self,
         bash_runner: BashRunnerWithSharedEnvironment,
@@ -484,76 +543,65 @@ class RecipeBuilder:
             finally:
                 shutil.rmtree(test_dir, ignore_errors=True)
 
-    def _patch(self) -> None:
-        """
-        Apply patches to the source.
-        """
-        token_path = self.src_extract_dir / ".patched"
-        if token_path.is_file():
-            return
+class RecipeBuilderStaticLibrary(RecipeBuilder):
+    """
+    Recipe builder for static libraries.
+    """
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        bash_runner.run(
+            self.build_metadata.script,
+            script_name="build script",
+            cwd=self.src_extract_dir,
+        )
 
-        patches = self.source_metadata.patches
-        extras = self.source_metadata.extras
-        cast(str, self.source_metadata.url)
 
-        if not patches and not extras:
-            return
+class RecipeBuilderSharedLibrary(RecipeBuilder):
+    """
+    Recipe builder for shared libraries.
+    """
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        bash_runner.run(
+            self.build_metadata.script,
+            script_name="build script",
+            cwd=self.src_extract_dir,
+        )
 
-        # Apply all the patches
-        for patch in patches:
-            patch_abspath = self.pkg_root / patch
-            result = subprocess.run(
-                ["patch", "-p1", "--binary", "--verbose", "-i", patch_abspath],
-                check=False,
-                encoding="utf-8",
-                cwd=self.src_extract_dir,
-            )
-            if result.returncode != 0:
-                logger.error("ERROR: Patch %s failed", patch_abspath)
-                exit_with_stdio(result)
+        # copy .so files to dist_dir
+        # and create a zip archive of the .so files
+        shutil.rmtree(self.dist_dir, ignore_errors=True)
+        self.dist_dir.mkdir(parents=True)
+        make_zip_archive(
+            self.dist_dir / f"{self.fullname}.zip", self.src_dist_dir
+        )
 
-        # Add any extra files
-        for src, dst in extras:
-            shutil.copyfile(self.pkg_root / src, self.src_extract_dir / dst)
+@cache
+def _load_recipe(package_dir: Path) -> tuple[Path, MetaConfig]:
+    """
+    Load the package configuration from the given directory.
 
-        token_path.touch()
+    Parameters
+    ----------
+    package_dir
+        The directory containing the package configuration, or the path to the
+        package configuration file.
 
-    def _redirect_stdout_stderr_to_logfile(self) -> None:
-        """
-        Redirect stdout and stderr to a log file.
-        """
-        try:
-            stdout_fileno = sys.stdout.fileno()
-            stderr_fileno = sys.stderr.fileno()
+    Returns
+    -------
+    pkg_dir
+        The directory containing the package configuration.
+    pkg
+        The package configuration.
+    """
+    if not package_dir.exists():
+        raise FileNotFoundError(f"Package directory {package_dir} does not exist")
 
-            tee = subprocess.Popen(
-                ["tee", self.pkg_root / "build.log"], stdin=subprocess.PIPE
-            )
+    if package_dir.is_dir():
+        meta_file = package_dir / "meta.yaml"
+    else:
+        meta_file = package_dir
+        package_dir = meta_file.parent
 
-            # Cause tee's stdin to get a copy of our stdin/stdout (as well as that
-            # of any child processes we spawn)
-            os.dup2(tee.stdin.fileno(), stdout_fileno)  # type: ignore[union-attr]
-            os.dup2(tee.stdin.fileno(), stderr_fileno)  # type: ignore[union-attr]
-        except OSError:
-            # This normally happens when testing
-            logger.warning("stdout/stderr does not have a fileno, not logging to file")
-
-    def _get_helper_vars(self) -> dict[str, str]:
-        """
-        Get the helper variables for the build script.
-        """
-        return {
-            "PKGDIR": str(self.pkg_root),
-            "PKG_VERSION": self.version,
-            "PKG_BUILD_DIR": str(self.src_extract_dir),
-            "DISTDIR": str(self.src_dist_dir),
-            # TODO: rename this to something more compatible with Makefile or CMake conventions
-            "WASM_LIBRARY_DIR": str(self.library_install_prefix),
-            # Using PKG_CONFIG_LIBDIR instead of PKG_CONFIG_PATH,
-            # so pkg-config will not look in the default system directories
-            "PKG_CONFIG_LIBDIR": str(self.library_install_prefix / "lib/pkgconfig"),
-        }
-
+    return package_dir, MetaConfig.from_yaml(meta_file)
 
 def check_checksum(archive: Path, checksum: str) -> None:
     """
