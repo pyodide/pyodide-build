@@ -66,7 +66,7 @@ class TestOutOfTree(TestInTree):
         build_vars = build_env.get_build_environment_vars(manager.pyodide_root)
 
         # extra variables that does not come from config files.
-        extra_vars = set(["PYODIDE", "PYODIDE_PACKAGE_ABI", "PYTHONPATH"])
+        extra_vars = set(["PYODIDE", "PYODIDE_PACKAGE_ABI"])
 
         all_keys = set(BUILD_KEY_TO_VAR.values()) | extra_vars
         for var in build_vars:
@@ -123,6 +123,21 @@ class TestOutOfTree(TestInTree):
         e = build_env.get_build_environment_vars(pyodide_root)
         assert "HOME" not in e
         assert "RANDOM_ENV" not in e
+
+    def test_get_unisolated_packages(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        expected = {"numpy", "scipy"}  # this relies on the dummy xbuildenv file
+        pkgs = build_env.get_unisolated_packages()
+        for pkg in expected:
+            assert pkg in pkgs
+
+    def test_get_unisolated_files(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+        pkgs = build_env.get_unisolated_packages()
+
+        for pkg in pkgs:
+            files = build_env.get_unisolated_files(pkg)
+            assert files
 
 
 def test_check_emscripten_version(dummy_xbuildenv, monkeypatch):
