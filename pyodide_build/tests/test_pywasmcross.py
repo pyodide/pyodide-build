@@ -262,3 +262,11 @@ def test_is_link_cmd():
     assert is_link_cmd(["test.so"])
     assert is_link_cmd(["test.so.1.2.3"])
     assert not is_link_cmd(["test", "test.a", "test.o", "test.c", "test.cpp", "test.h"])
+
+
+def test_handle_command_cargo(build_args):
+    assert handle_command_generate_args(["cargo", "build"], build_args) == [
+        "cargo",
+        "-Zbuild-std",
+        "build",
+    ]
