@@ -146,7 +146,7 @@ def _replace_unisolated_packages(
     requires
         The set of requirements to filter.
     unisolated_packages
-        The dictionary of unisolated packages.
+        The dictionary of unisolated packages [name: version].
 
     Returns
     -------

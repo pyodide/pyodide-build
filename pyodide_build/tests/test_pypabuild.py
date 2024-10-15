@@ -96,3 +96,30 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
         assert "builddir" in wasmcross_args
+
+
+def test_replace_unisolated_packages():
+    requires = {"foo", "bar<1.0", "baz==1.0", "qux"}
+    unisolated = {
+        "foo": "2.0",
+        "bar": "0.5",
+        "baz": "1.1",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(requires, unisolated)
+    assert new_requires == {"foo==2.0", "bar==0.5", "baz==1.0", "qux"}
+    assert replaced == {"foo", "bar"}
+
+
+def test_replace_unisoloated_packages_oldest_supported_numpy():
+    """
+    oldest-supported-numpy is a special case where we want to replace it with numpy instead.
+    """
+    requires = {"oldest-supported-numpy"}
+    unisolated = {
+        "numpy": "1.20",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(requires, unisolated)
+    assert new_requires == {"numpy==1.20"}
+    assert replaced == {"numpy"}
