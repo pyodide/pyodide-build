@@ -18,9 +18,9 @@ index dfc0516ac..92d7d7d6b 100644
 --- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_cdefs.h
 +++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_cdefs.h
 @@ -262,9 +262,9 @@ extern void    ccheck_tempv(int, singlecomplex *);
-
+ 
  /*! \brief BLAS */
-
+ 
 -extern int cgemm_(const char*, const char*, const int*, const int*, const int*,
 -                  const singlecomplex*, const singlecomplex*, const int*, const singlecomplex*,
 -		  const int*, const singlecomplex*, singlecomplex*, const int*);
@@ -35,9 +35,9 @@ index 3b5aa509f..1305641bd 100644
 --- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_ddefs.h
 +++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_ddefs.h
 @@ -260,9 +260,9 @@ extern void    dcheck_tempv(int, double *);
-
+ 
  /*! \brief BLAS */
-
+ 
 -extern int dgemm_(const char*, const char*, const int*, const int*, const int*,
 -                  const double*, const double*, const int*, const double*,
 -		  const int*, const double*, double*, const int*);
@@ -52,9 +52,9 @@ index 9bb6a38e7..b013962a4 100644
 --- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_sdefs.h
 +++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_sdefs.h
 @@ -259,9 +259,9 @@ extern void    scheck_tempv(int, float *);
-
+ 
  /*! \brief BLAS */
-
+ 
 -extern int sgemm_(const char*, const char*, const int*, const int*, const int*,
 -                  const float*, const float*, const int*, const float*,
 -		  const int*, const float*, float*, const int*);
@@ -69,9 +69,9 @@ index c6418d584..c5a2692be 100644
 --- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_zdefs.h
 +++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_zdefs.h
 @@ -262,9 +262,9 @@ extern void    zcheck_tempv(int, doublecomplex *);
-
+ 
  /*! \brief BLAS */
-
+ 
 -extern int zgemm_(const char*, const char*, const int*, const int*, const int*,
 -                  const doublecomplex*, const doublecomplex*, const int*, const doublecomplex*,
 -		  const int*, const doublecomplex*, doublecomplex*, const int*);
@@ -81,5 +81,6 @@ index c6418d584..c5a2692be 100644
  extern int ztrsv_(char*, char*, char*, int*, doublecomplex*, int*,
                    doublecomplex*, int*);
  extern int ztrsm_(char*, char*, char*, char*, int*, int*,
---
+-- 
 2.34.1
+

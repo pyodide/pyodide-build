@@ -48,9 +48,9 @@ index 8d92a63..54c4ff1 100644
 @@ -28,11 +28,11 @@ extern
  extern "C" {
  #endif
-
+ 
 - VOID
-+
++ 
  #ifdef KR_headers
 -s_cat(lp, rpp, rnp, np, ll) char *lp, *rpp[]; ftnint rnp[], *np; ftnlen ll;
 +int s_cat(lp, rpp, rnp, np, ll) char *lp, *rpp[]; ftnint rnp[], *np; ftnlen ll;
@@ -66,7 +66,7 @@ index 9dacfc7..8d8963f 100644
 +++ b/F2CLIBS/libf2c/s_copy.c
 @@ -12,9 +12,9 @@ extern "C" {
  /* assign strings:  a = b */
-
+ 
  #ifdef KR_headers
 -VOID s_copy(a, b, la, lb) register char *a, *b; ftnlen la, lb;
 +int s_copy(a, b, la, lb) register char *a, *b; ftnlen la, lb;
@@ -76,5 +76,6 @@ index 9dacfc7..8d8963f 100644
  #endif
  {
  	register char *aend, *bend;
---
+-- 
 2.25.1
+

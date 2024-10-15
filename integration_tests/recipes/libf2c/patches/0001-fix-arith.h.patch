@@ -22,8 +22,9 @@ index 0a3ed0d..a473ed8 100644
 -	rm -f a.out arithchk.o
 +	node a.out.js >arith.h
 +	rm -f a.out.js a.out.wasm
-
+ 
  check:
  	xsum Notice README abort_.c arithchk.c backspac.c c_abs.c c_cos.c \
---
+-- 
 2.25.1
+

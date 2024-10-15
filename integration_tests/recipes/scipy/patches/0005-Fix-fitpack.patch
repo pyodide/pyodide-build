@@ -62,7 +62,7 @@ index f02569a40..1e4d65724 100644
 +      evapol = f
        return
        end
-
+ 
 diff --git a/scipy/interpolate/fitpack/fprati.f b/scipy/interpolate/fitpack/fprati.f
 index 71c57eb01..97b5851df 100644
 --- a/scipy/interpolate/fitpack/fprati.f
@@ -107,5 +107,6 @@ index 02b00da6a..6024a0476 100644
    10  continue
        return
        end
---
+-- 
 2.34.1
+
