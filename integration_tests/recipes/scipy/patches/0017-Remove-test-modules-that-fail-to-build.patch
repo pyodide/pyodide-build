@@ -18,7 +18,7 @@ index ae9e2466e1..e11626db0d 100644
 @@ -187,24 +187,6 @@ py3.extension_module('_test_multivariate',
    install_tag: 'tests'
  )
- 
+
 -_test_odeint_banded_module = custom_target('_test_odeint_banded_module',
 -  output: ['_test_odeint_bandedmodule.c', '_test_odeint_banded-f2pywrappers.f'],
 -  input: 'tests/test_odeint_banded.pyf',
@@ -39,7 +39,7 @@ index ae9e2466e1..e11626db0d 100644
 -
  subdir('_ivp')
  subdir('tests')
- 
+
 diff --git a/scipy/io/meson.build b/scipy/io/meson.build
 index d6fc6dc749..af04022208 100644
 --- a/scipy/io/meson.build
@@ -69,6 +69,5 @@ index d6fc6dc749..af04022208 100644
  py3.install_sources([
      '__init__.py',
      '_fortran.py',
--- 
+--
 2.39.3 (Apple Git-146)
-

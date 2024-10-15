@@ -17,7 +17,7 @@ index 0d20ba1ca..d4325f71f 100644
                                double *work, CBLAS_INT *lwork, CBLAS_INT *iwork, CBLAS_INT *liwork,
 -                              CBLAS_INT *info, size_t jobz_len, size_t range_len);
 +                              CBLAS_INT *info);
- 
+
  static void c_dstevr(char *jobz, char *range, CBLAS_INT *n, double *d, double *e,
                       double *vl, double *vu, CBLAS_INT *il, CBLAS_INT *iu, double *abstol,
                       CBLAS_INT *m, double *w, double *z, CBLAS_INT *ldz, CBLAS_INT *isuppz,
@@ -27,6 +27,5 @@ index 0d20ba1ca..d4325f71f 100644
 -                      1, 1);
 +                      w, z, ldz, isuppz, work, lwork, iwork, liwork, info);
  }
--- 
+--
 2.34.1
-

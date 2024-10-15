@@ -22,6 +22,5 @@ index 57eff0d..136050f 100644
  REAL =	r_abs.o r_acos.o r_asin.o r_atan.o r_atn2.o r_cnjg.o r_cos.o\
  	r_cosh.o r_dim.o r_exp.o r_imag.o r_int.o\
  	r_lg10.o r_log.o r_mod.o r_nint.o r_sign.o\
--- 
+--
 2.34.1
-

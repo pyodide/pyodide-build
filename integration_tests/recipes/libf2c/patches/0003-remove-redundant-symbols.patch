@@ -20,15 +20,14 @@ index 5f1eb22..32e669b 100644
 @@ -48,9 +48,9 @@ include ../make.inc
  #
  #######################################################################
- 
+
 -ALLAUX = maxloc.o ilaenv.o ieeeck.o lsamen.o xerbla.o xerbla_array.o iparmq.o	\
 +ALLAUX = maxloc.o ilaenv.o ieeeck.o lsamen.o iparmq.o	\
      ilaprec.o ilatrans.o ilauplo.o iladiag.o chla_transtype.o \
 -    ../INSTALL/ilaver.o ../INSTALL/lsame.o
 +    ../INSTALL/ilaver.o
- 
- ALLXAUX =
- 
--- 
-2.25.1
 
+ ALLXAUX =
+
+--
+2.25.1

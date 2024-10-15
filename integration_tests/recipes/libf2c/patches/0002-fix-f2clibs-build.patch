@@ -26,6 +26,5 @@ index a473ed8..e51d826 100644
  ## Under Solaris (and other systems that do not understand ld -x),
  ## omit -x in the ld line above.
  ## If your system does not have the ld command, comment out
--- 
+--
 2.25.1
-

@@ -20,6 +20,5 @@ index 8a00f5d279..aeb86e8926 100644
      blas_macro, blas_name = get_blas_macro_and_name(name, accelerate)
      c_args = ', '.join(f'{t} *{n}' for t, n in zip(c_argtypes, argnames))
      return f"{c_return_type} {blas_macro}({blas_name})({c_args});\n"
--- 
+--
 2.39.3 (Apple Git-146)
-
