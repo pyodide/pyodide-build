@@ -1,0 +1,182 @@
+package:
+  name: scipy
+  version: 1.14.1
+  tag:
+    - min-scipy-stack
+  top-level:
+    - scipy
+
+# See extra explanation in info.md
+#
+# For future reference: if you see the following errors:
+#   Declaration error: adjustable dimension on non-argument
+# or:
+#   nonconstant array size
+# you are trying to compile code that isn't written to the fortran 77 standard.
+# The line number in the error points to the last line of the problematic
+# subroutine. Try deleting it.
+
+source:
+  url: https://files.pythonhosted.org/packages/62/11/4d44a1f274e002784e4dbdb81e0ea96d2de2d1045b2132d5af62cc31fd28/scipy-1.14.1.tar.gz
+  sha256: 5a275584e726026a5699459aa72f828a610821006228e841b94275c4a7c08417
+
+  patches:
+    - patches/0001-Fix-dstevr-in-special-lapack_defs.h.patch
+    - patches/0002-int-to-string.patch
+    - patches/0003-gemm_-no-const.patch
+    - patches/0004-make-int-return-values.patch
+    - patches/0005-Fix-fitpack.patch
+    - patches/0006-Fix-gees-calls.patch
+    - patches/0007-MAINT-linalg-Remove-id_dist-Fortran-files.patch
+    - patches/0008-Mark-mvndst-functions-recursive.patch
+    - patches/0009-Make-sreorth-recursive.patch
+    - patches/0010-Link-openblas-with-modules-that-require-f2c.patch
+    - patches/0011-Remove-fpchec-inline-if-then-endif-constructs.patch # remove with SciPy v1.15.0
+    - patches/0012-Remove-chla_transtype.patch
+    - patches/0013-Set-wrapper-return-type-to-int.patch
+    - patches/0014-Skip-svd_gesdd-test.patch # remove with SciPy v1.15.0
+    - patches/0015-Remove-f2py-generators.patch
+    - patches/0016-Make-sf_error_state_lib-a-static-library.patch
+    - patches/0017-Remove-test-modules-that-fail-to-build.patch
+    - patches/0018-Fix-lapack-larfg-function-signature.patch
+
+build:
+  cflags: |
+    -I$(WASM_LIBRARY_DIR)/include
+    -Wno-return-type
+    -DUNDERSCORE_G77
+    -fvisibility=default
+  cxxflags: |
+    -fexceptions
+    -fvisibility=default
+  ldflags: |
+    -L$(NUMPY_LIB)/core/lib/
+    -L$(NUMPY_LIB)/random/lib/
+    -fexceptions
+
+  # Exclude tests via Meson's install tags functionality.
+  unvendor-tests: true
+  # install-args=--tags=runtime,python-runtime,devel
+  # Disable when running tests, enable when a PR is ready, i.e., building for distribution.
+  backend-flags: |
+    build-dir=build
+
+  # IMPORTANT: Other locations important in scipy build process:
+  # There are two files built in the "capture" pass that need patching:
+  #    _blas_subroutines.h, and _cython
+  # Scipy has a bunch of custom logic implemented in
+  # pyodide-build/pyodide_build/_f2c_fixes.py.
+  script: |
+    set -x
+    git clone https://github.com/hoodmane/f2c.git --depth 1
+    (cd f2c/src && cp makefile.u makefile && sed -i "s/gram.c:/gram.c1:/" makefile && make)
+    export F2C_PATH=$(pwd)/f2c/src/f2c
+
+    echo F2C_PATH: $F2C_PATH
+    export NPY_BLAS_LIBS="-I$WASM_LIBRARY_DIR/include $WASM_LIBRARY_DIR/lib/libopenblas.so"
+    export NPY_LAPACK_LIBS="-I$WASM_LIBRARY_DIR/include $WASM_LIBRARY_DIR/lib/libopenblas.so"
+
+    sed -i 's/void DQA/int DQA/g' scipy/integrate/__quadpack.h
+
+    # Change many functions that return void into functions that return int
+    find scipy -name "*.c*" -type f | xargs sed -i 's/extern void F_FUNC/extern int F_FUNC/g'
+
+    sed -i 's/void F_FUNC/int F_FUNC/g' scipy/odr/__odrpack.c
+    sed -i 's/^void/int/g' scipy/odr/odrpack.h
+    sed -i 's/^void/int/g' scipy/odr/__odrpack.c
+
+    sed -i 's/void BLAS_FUNC/int BLAS_FUNC/g' scipy/special/lapack_defs.h
+    # sed -i 's/void F_FUNC/int F_FUNC/g' scipy/linalg/_lapack_subroutines.h
+    sed -i 's/extern void/extern int/g' scipy/optimize/__minpack.h
+    sed -i 's/void/int/g' scipy/linalg/cython_blas_signatures.txt
+    sed -i 's/void/int/g' scipy/linalg/cython_lapack_signatures.txt
+    sed -i 's/^void/int/g' scipy/interpolate/src/_fitpackmodule.c
+
+    sed -i 's/extern void/extern int/g' scipy/sparse/linalg/_dsolve/SuperLU/SRC/*.{c,h}
+    sed -i 's/PUBLIC void/PUBLIC int/g' scipy/sparse/linalg/_dsolve/SuperLU/SRC/*.{c,h}
+    sed -i 's/^void/int/g' scipy/sparse/linalg/_dsolve/SuperLU/SRC/*.{c,h}
+    sed -i 's/^void/int/g' scipy/sparse/linalg/_dsolve/*.{c,h}
+    sed -i 's/void \(.\)print/int \1/g' scipy/sparse/linalg/_dsolve/SuperLU/SRC/*.{c,h}
+    sed -i 's/TYPE_GENERIC_FUNC(\(.*\), void)/TYPE_GENERIC_FUNC(\1, int)/g' scipy/sparse/linalg/_dsolve/_superluobject.h
+
+    sed -i 's/^void/int/g' scipy/optimize/_trlib/trlib_private.h
+    sed -i 's/^void/int/g' scipy/optimize/_trlib/trlib/trlib_private.h
+    sed -i 's/^void/int/g' scipy/_build_utils/src/wrap_dummy_g77_abi.c
+    sed -i 's/, int)/)/g' scipy/optimize/_trlib/trlib_private.h
+    sed -i 's/, 1)/)/g' scipy/optimize/_trlib/trlib_private.h
+
+    sed -i 's/^void/int/g' scipy/spatial/qhull_misc.h
+    sed -i 's/, size_t)/)/g' scipy/spatial/qhull_misc.h
+    sed -i 's/,1)/)/g' scipy/spatial/qhull_misc.h
+
+    # Input error causes "duplicate symbol" linker errors. Empty out the file.
+    echo "" > scipy/sparse/linalg/_dsolve/SuperLU/SRC/input_error.c
+
+  _retain-test-patterns:
+    - "*_page_trend_test.py"
+    - "*bws_test.py"
+
+  cross-build-env: true
+  cross-build-files:
+    - scipy/linalg/cython_lapack.pxd
+    - scipy/linalg/cython_blas.pxd
+
+requirements:
+  host:
+    - numpy
+    - openblas
+  run:
+    - numpy
+    - openblas
+  executable:
+    - gfortran
+
+test:
+  imports:
+    - scipy
+    - scipy.cluster
+    - scipy.cluster.vq
+    - scipy.cluster.hierarchy
+    - scipy.constants
+    - scipy.fft
+    - scipy.fftpack
+    - scipy.integrate
+    - scipy.interpolate
+    - scipy.io
+    - scipy.io.arff
+    - scipy.io.matlab
+    - scipy.io.wavfile
+    - scipy.linalg
+    - scipy.linalg.blas
+    - scipy.linalg.cython_blas
+    - scipy.linalg.lapack
+    - scipy.linalg.cython_lapack
+    - scipy.linalg.interpolative
+    - scipy.misc
+    - scipy.ndimage
+    - scipy.odr
+    - scipy.optimize
+    - scipy.signal
+    - scipy.signal.windows
+    - scipy.sparse
+    - scipy.sparse.linalg
+    - scipy.sparse.csgraph
+    - scipy.spatial
+    - scipy.spatial.distance
+    - scipy.spatial.transform
+    - scipy.special
+    - scipy.stats
+    - scipy.stats.contingency
+    - scipy.stats.distributions
+    - scipy.stats.mstats
+    - scipy.stats.qmc
+about:
+  home: https://www.scipy.org
+  PyPI: https://pypi.org/project/scipy
+  summary: "SciPy: Scientific Library for Python"
+  license: BSD-3-Clause
+extra:
+  recipe-maintainers:
+    - lesteve
+    - steppi
+    - agriyakhetarpal
