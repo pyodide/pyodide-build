@@ -43,6 +43,8 @@ repos:
           [
             "--ignore-words-list",
             "ags,aray,asend,ba,classs,crate,falsy,feld,inflight,lits,nd,slowy,te,oint,conveniant",
+            "--skip",
+            "*.patch",
           ]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
