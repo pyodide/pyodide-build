@@ -106,7 +106,9 @@ def test_replace_unisolated_packages():
         "baz": "1.1",
     }
 
-    new_requires, replaced = pypabuild._replace_unisolated_packages(requires, unisolated)
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
     assert new_requires == {"foo==2.0", "bar==0.5", "baz==1.0", "qux"}
     assert replaced == {"foo", "bar"}
 
@@ -120,6 +122,8 @@ def test_replace_unisoloated_packages_oldest_supported_numpy():
         "numpy": "1.20",
     }
 
-    new_requires, replaced = pypabuild._replace_unisolated_packages(requires, unisolated)
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
     assert new_requires == {"numpy==1.20"}
     assert replaced == {"numpy"}
