@@ -157,7 +157,14 @@ def _replace_unisolated_packages(
     for reqstr in list(requires):
         req = Requirement(reqstr)
         for name, version in unisolated_packages.items():
-            if req.name == name and req.specifier.contains(version):
+            if req.name == name:
+                # TODO: find a better way to handle this case
+                if not req.specifier.contains(version):
+                    print(
+                        f"WARNING: found build dependency {req} but the only supported cross-build version is {name}=={version}"
+                    )
+                    print(f"WARNING: using {name}=={version} instead")
+
                 requires_new.remove(reqstr)
                 requires_new.add(f"{name}=={version}")
                 unisolated.add(name)
