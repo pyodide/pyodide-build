@@ -195,7 +195,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "pyo3_config_file": str(TOOLS_DIR / "pyo3_config.ini"),
     "meson_cross_file": str(TOOLS_DIR / "emscripten.meson.cross"),
     # Rust-specific configuration
-    "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT -Z link-native-libraries=no",
+    "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT",
     "cargo_build_target": "wasm32-unknown-emscripten",
     "cargo_target_wasm32_unknown_emscripten_linker": "emcc",
     "rust_toolchain": "nightly-2024-01-29",
