@@ -1,6 +1,5 @@
 import json
 import shutil
-import subprocess
 import warnings
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -155,7 +154,7 @@ class CrossBuildEnvManager:
             as the current version of pyodide-build, make sure that the cross-build
             environment is compatible with the current version of Pyodide.
         skip_install_cross_build_packages
-            If True, skip installing the cross-build packages. This is mostly for testing purposes.
+            Deprecated, no longer used.
         force_install
             If True, force the installation even if the cross-build environment is not compatible
 
@@ -203,11 +202,6 @@ class CrossBuildEnvManager:
             install_marker = download_path / ".installed"
             if not install_marker.exists():
                 logger.info("Installing Pyodide cross-build environment")
-
-                if not skip_install_cross_build_packages:
-                    self._install_cross_build_packages(
-                        xbuildenv_root, xbuildenv_pyodide_root
-                    )
 
                 if not url:
                     # If installed from url, skip creating the PyPI index (version is not known)
@@ -280,48 +274,6 @@ class CrossBuildEnvManager:
                 # https://github.com/python/cpython/issues/112760
                 warnings.simplefilter("ignore")
                 shutil.unpack_archive(str(f_path), path)
-
-    def _install_cross_build_packages(
-        self, xbuildenv_root: Path, xbuildenv_pyodide_root: Path
-    ) -> None:
-        """
-        Install package that are used in the cross-build environment.
-
-        Parameters
-        ----------
-        xbuildenv_root
-            Path to the xbuildenv directory.
-        xbuildenv_pyodide_root
-            Path to the pyodide-root directory inside the xbuildenv directory.
-        """
-        host_site_packages = self._host_site_packages_dir(xbuildenv_pyodide_root)
-        host_site_packages.mkdir(exist_ok=True, parents=True)
-        result = subprocess.run(
-            [
-                "pip",
-                "install",
-                "--no-user",
-                "-t",
-                str(host_site_packages),
-                "-r",
-                str(xbuildenv_root / "requirements.txt"),
-            ],
-            capture_output=True,
-            encoding="utf8",
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Failed to install cross-build packages: {result.stderr}"
-            )
-
-        # Copy the site-packages-extras (coming from the cross-build-files meta.yaml
-        # key) over the site-packages directory with the newly installed packages.
-        shutil.copytree(
-            xbuildenv_root / "site-packages-extras",
-            host_site_packages,
-            dirs_exist_ok=True,
-        )
 
     def _host_site_packages_dir(
         self, xbuildenv_pyodide_root: Path | None = None

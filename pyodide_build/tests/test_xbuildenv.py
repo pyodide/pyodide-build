@@ -205,33 +205,6 @@ class TestCrossBuildEnvManager:
         assert (tmp_path / version / ".installed").exists()
         assert manager.current_version == version
 
-    def test_install_cross_build_packages(
-        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
-    ):
-        pip_called_with = monkeypatch_subprocess_run_pip
-        manager = CrossBuildEnvManager(tmp_path)
-
-        download_path = tmp_path / "test"
-        manager._download(dummy_xbuildenv_url, download_path)
-
-        xbuildenv_root = download_path / "xbuildenv"
-        xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
-        manager._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
-
-        assert len(pip_called_with) == 7
-        assert pip_called_with[0:4] == ["pip", "install", "--no-user", "-t"]
-        assert pip_called_with[4].startswith(
-            str(xbuildenv_pyodide_root)
-        )  # hostsitepackages
-        assert pip_called_with[5:7] == ["-r", str(xbuildenv_root / "requirements.txt")]
-
-        hostsitepackages = manager._host_site_packages_dir(xbuildenv_pyodide_root)
-        assert hostsitepackages.exists()
-
-        cross_build_files = xbuildenv_root / "site-packages-extras"
-        for file in cross_build_files.iterdir():
-            assert (hostsitepackages / file.name).exists()
-
     def test_create_package_index(self, tmp_path, dummy_xbuildenv_url):
         manager = CrossBuildEnvManager(tmp_path)
 
