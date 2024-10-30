@@ -7,13 +7,13 @@ Builds a Pyodide package.
 import fnmatch
 import http.client
 import os
-import re
 import shutil
 import subprocess
 import sys
 import warnings
 from collections.abc import Iterator
 from datetime import datetime
+from email.message import Message
 from pathlib import Path
 from typing import Any, cast
 
@@ -57,6 +57,20 @@ shutil.register_unpack_format(
     shutil._unpack_zipfile,  # type: ignore[attr-defined]
     description="Wheel file",
 )
+
+
+def _extract_tarballname(url: str, headers: dict) -> str:
+    tarballname = url.split("/")[-1]
+
+    if "Content-Disposition" in headers:
+        msg = Message()
+        msg["Content-Disposition"] = headers["Content-Disposition"]
+
+        filename = msg.get_filename()
+        if filename is not None:
+            tarballname = filename
+
+    return tarballname
 
 
 class RecipeBuilder:
@@ -323,14 +337,7 @@ class RecipeBuilder:
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
-        tarballname = url.split("/")[-1]
-        if "Content-Disposition" in response.headers:
-            filenames = re.findall(
-                "filename=(.+)", response.headers["Content-Disposition"]
-            )
-            if filenames:
-                tarballname = filenames[0]
-
+        tarballname = _extract_tarballname(url, response.headers)
         tarballpath = self.build_dir / tarballname
         tarballpath.write_bytes(response.content)
 
