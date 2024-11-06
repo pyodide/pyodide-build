@@ -153,6 +153,7 @@ def _build_in_isolated_env(
 
         # first install the build dependencies
         symlink_unisolated_packages(env)
+        os.environ["PIP_CONSTRAINT"] = build_env["PIP_CONSTRAINT"]
         install_reqs(env, builder.build_system_requires)
         installed_requires_for_build = False
         try:
