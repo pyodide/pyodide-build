@@ -460,17 +460,14 @@ class RecipeBuilder:
                 Path(self.build_args.host_install_dir)
                 / f"lib/{python_dir}/site-packages"
             )
-            if self.build_metadata.cross_build_env:
-                subprocess.run(
-                    ["pip", "install", "-t", str(host_site_packages), f"{name}=={ver}"],
-                    check=True,
-                )
 
+            # Copy cross build files to host site packages
             for cross_build_file in self.build_metadata.cross_build_files:
-                shutil.copy(
-                    (wheel_dir / cross_build_file),
-                    host_site_packages / cross_build_file,
-                )
+                src_file = wheel_dir / cross_build_file
+                dest_file = host_site_packages / cross_build_file
+                dest_file.parent.mkdir(parents=True, exist_ok=True)
+
+                shutil.copy(src_file, dest_file)
 
             try:
                 test_dir = self.src_dist_dir / "tests"

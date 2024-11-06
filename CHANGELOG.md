@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2024/10/15
+
+### Changed
+
+- Changed how build dependencies "numpy" and "scipy" is handled.
+  Previously, if a package depends on "numpy" or "scipy", the build system would
+  not install those packages. Instead, it pointed to the pre-built packages that pyodide-build provides.
+  This caused some issues when the package relies on some tools that are not available in the pre-built packages.
+  Now, the build system will install the "numpy" and "scipy" during the build process, but replace some of the
+  files with the pre-built ones to make sure the target platform is compatible to WebAssembly.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
 ## [0.29.0] - 2024/09/19
 
 ### Added

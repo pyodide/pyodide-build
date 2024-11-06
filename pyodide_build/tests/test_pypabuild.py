@@ -12,7 +12,7 @@ class MockIsolatedEnv:
 
 
 def test_remove_avoided_requirements():
-    assert pypabuild.remove_avoided_requirements(
+    assert pypabuild._remove_avoided_requirements(
         {"foo", "bar", "baz"},
         {"foo", "bar", "qux"},
     ) == {"baz"}
@@ -96,3 +96,50 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
         assert "builddir" in wasmcross_args
+
+
+def test_replace_unisolated_packages():
+    requires = {"foo", "bar<1.0", "baz==1.0", "qux"}
+    unisolated = {
+        "foo": "2.0",
+        "bar": "0.5",
+        "baz": "1.0",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"foo==2.0", "bar==0.5", "baz==1.0", "qux"}
+    assert replaced == {"foo", "bar", "baz"}
+
+
+def test_replace_unisolated_packages_version_mismatch():
+    """
+    FIXME: This is not an ideal behavior, but for now wejust ignore the version mismatch.
+    """
+    requires = {"baz==1.0"}
+    unisolated = {
+        "baz": "1.1",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"baz==1.1"}
+    assert replaced == {"baz"}
+
+
+def test_replace_unisoloated_packages_oldest_supported_numpy():
+    """
+    oldest-supported-numpy is a special case where we want to replace it with numpy instead.
+    """
+    requires = {"oldest-supported-numpy"}
+    unisolated = {
+        "numpy": "1.20",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"numpy==1.20"}
+    assert replaced == {"numpy"}

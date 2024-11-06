@@ -1,3 +1,4 @@
+exclude: (^integration_tests)
 default_language_version:
   python: "3.12"
 repos:

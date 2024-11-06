@@ -6,7 +6,6 @@ import sys
 import traceback
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal, cast
@@ -18,8 +17,8 @@ from packaging.requirements import Requirement
 from pyodide_build import _f2c_fixes, common, pywasmcross
 from pyodide_build.build_env import (
     get_build_flag,
-    get_hostsitepackages,
     get_pyversion,
+    get_unisolated_files,
     get_unisolated_packages,
     platform,
 )
@@ -28,6 +27,7 @@ from pyodide_build.vendor._pypabuild import (
     _STYLES,
     _DefaultIsolatedEnv,
     _error,
+    _get_venv_paths,
     _handle_build_error,
     _ProjectBuilder,
 )
@@ -103,33 +103,114 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
 
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
-    host_site_packages = Path(get_hostsitepackages())
-    for name in get_unisolated_packages():
-        for path in chain(
-            host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
-        ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
 
 
-def remove_avoided_requirements(
-    requires: set[str], avoided_requirements: set[str] | list[str]
+def _remove_avoided_requirements(
+    requires: set[str],
+    avoided_requirements: set[str] | list[str],
 ) -> set[str]:
+    """
+    Remove requirements that are in the list of avoided requirements.
+
+    Parameters
+    ----------
+    requires
+        The set of requirements to filter.
+    avoided_requirements
+        The set of requirements to avoid.
+
+    Returns
+    -------
+    The filtered set of requirements.
+    """
+    avoided_requirements = set(avoided_requirements)
     for reqstr in list(requires):
         req = Requirement(reqstr)
-        for avoid_name in set(avoided_requirements):
+        for avoid_name in avoided_requirements:
             if avoid_name in req.name.lower():
                 requires.remove(reqstr)
+                break
+
     return requires
 
 
+def _replace_unisolated_packages(
+    requires: set[str],
+    unisolated_packages: dict[str, str],
+) -> tuple[set[str], set[str]]:
+    """
+    Replace unisolated packages with the correct version.
+
+    Parameters
+    ----------
+    requires
+        The set of requirements to filter.
+    unisolated_packages
+        The dictionary of unisolated packages [name: version].
+
+    Returns
+    -------
+    tuple of (The filtered set of requirements, The set of unisolated requirements)
+    """
+    requires_new = requires.copy()
+    unisolated = set()
+    for reqstr in list(requires):
+        req = Requirement(reqstr)
+        for name, version in unisolated_packages.items():
+            if req.name == name:
+                # TODO: find a better way to handle this case
+                if not req.specifier.contains(version):
+                    print(
+                        f"WARNING: found build dependency {req} but the only supported cross-build version is {name}=={version}"
+                    )
+                    print(f"WARNING: using {name}=={version} instead")
+
+                requires_new.remove(reqstr)
+                requires_new.add(f"{name}=={version}")
+                unisolated.add(name)
+                break
+        else:
+            # oldest-supported-numpy is a meta package for numpy
+            # TODO: use dependency resolution instead of hardcoding this
+            if req.name == "oldest-supported-numpy" and "numpy" in unisolated_packages:
+                requires_new.remove(reqstr)
+                requires_new.add(f"numpy=={unisolated_packages['numpy']}")
+                unisolated.add("numpy")
+                break
+
+    return requires_new, unisolated
+
+
+def _install_cross_build_files(path: str, unisolated: set[str]) -> None:
+    """
+    Install the cross build files to the isolated environment.
+
+    Parameters
+    ----------
+    path
+        The path to the isolated environment.
+
+    unisolated
+        The set of unisolated packages.
+    """
+
+    sitepackagesdir = Path(_get_venv_paths(path)["purelib"])
+    for name in unisolated:
+        base, files = get_unisolated_files(name)
+        for cross_build_file in files:
+            shutil.copy(
+                base / cross_build_file,
+                sitepackagesdir / cross_build_file,
+            )
+
+
 def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
-    env.install(
-        remove_avoided_requirements(
-            reqs,
-            get_unisolated_packages() + AVOIDED_REQUIREMENTS,
-        )
-    )
+    reqs = _remove_avoided_requirements(reqs, AVOIDED_REQUIREMENTS)
+    reqs, unisolated = _replace_unisolated_packages(reqs, get_unisolated_packages())
+
+    env.install(reqs)
+
+    _install_cross_build_files(env.path, unisolated)
 
 
 def _build_in_isolated_env(
