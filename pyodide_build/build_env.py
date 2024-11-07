@@ -14,7 +14,7 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import search_pyproject_toml, xbuildenv_dirname, to_bool
+from pyodide_build.common import search_pyproject_toml, to_bool, xbuildenv_dirname
 from pyodide_build.config import ConfigManager
 from pyodide_build.recipe import load_all_recipes
 

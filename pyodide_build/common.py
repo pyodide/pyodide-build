@@ -446,4 +446,4 @@ def to_bool(value: str) -> bool:
     """
     Convert a string to a boolean value. Useful for parsing environment variables.
     """
-    return not value.lower() in {"", "0", "false", "no", "off"}
+    return value.lower() not in {"", "0", "false", "no", "off"}
