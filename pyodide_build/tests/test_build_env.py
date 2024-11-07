@@ -165,6 +165,12 @@ clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b895
 """
     build_env.check_emscripten_version()
 
+    s = f"""\
+emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) {build_env.emscripten_version()}-git
+clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b8955821b8fdbd4f8f303e2)
+"""
+    build_env.check_emscripten_version()
+
     def get_emscripten_version_info():  # type: ignore[no-redef]
         raise FileNotFoundError()
 

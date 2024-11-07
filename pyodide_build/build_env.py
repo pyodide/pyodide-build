@@ -252,8 +252,10 @@ def check_emscripten_version() -> None:
     installed_version = None
     try:
         for x in reversed(version_info.partition("\n")[0].split(" ")):
-            if re.match(r"[0-9]+\.[0-9]+\.[0-9]+", x):
-                installed_version = x
+            # (X.Y.Z) or (X.Y.Z)-git
+            match = re.match(r"(\d+\.\d+\.\d+)(-\w+)?", x)
+            if match:
+                installed_version = match.group(1)
                 break
     except Exception:
         raise RuntimeError("Failed to determine Emscripten version.") from None
