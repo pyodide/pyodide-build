@@ -179,6 +179,16 @@ clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b895
         build_env.check_emscripten_version()
 
 
+def test_check_emscripten_version_skip(dummy_xbuildenv, monkeypatch, reset_cache):
+    with pytest.raises(RuntimeError):
+        monkeypatch.setenv("SKIP_EMSCRIPTEN_VERSION_CHECK", "0")
+        build_env.check_emscripten_version()
+
+    reset_cache()
+    monkeypatch.setenv("SKIP_EMSCRIPTEN_VERSION_CHECK", "1")
+    build_env.check_emscripten_version()
+
+
 def test_wheel_paths(dummy_xbuildenv):
     from pathlib import Path
 

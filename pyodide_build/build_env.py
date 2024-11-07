@@ -14,7 +14,7 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import search_pyproject_toml, xbuildenv_dirname
+from pyodide_build.common import search_pyproject_toml, xbuildenv_dirname, to_bool
 from pyodide_build.config import ConfigManager
 from pyodide_build.recipe import load_all_recipes
 
@@ -238,6 +238,10 @@ def get_emscripten_version_info() -> str:
 
 
 def check_emscripten_version() -> None:
+    skip = get_build_flag("SKIP_EMSCRIPTEN_VERSION_CHECK")
+    if to_bool(skip):
+        return
+
     needed_version = emscripten_version()
     try:
         version_info = get_emscripten_version_info()
