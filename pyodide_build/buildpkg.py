@@ -549,7 +549,11 @@ class RecipeBuilder:
             "DISTDIR": str(self.src_dist_dir),
             # TODO: rename this to something more compatible with Makefile or CMake conventions
             "WASM_LIBRARY_DIR": str(self.library_install_prefix),
-            # Using PKG_CONFIG_LIBDIR instead of PKG_CONFIG_PATH,
+            # Emscripten will use this variable to configure pkg-config in emconfigure
+            "EM_PKG_CONFIG_PATH": str(self.library_install_prefix / "lib/pkgconfig"),
+            # This variable is usually overwritten by emconfigure
+            # The value below will only be used if pkg-config is called without emconfigure
+            # We use PKG_CONFIG_LIBDIR instead of PKG_CONFIG_PATH,
             # so pkg-config will not look in the default system directories
             "PKG_CONFIG_LIBDIR": str(self.library_install_prefix / "lib/pkgconfig"),
         }
