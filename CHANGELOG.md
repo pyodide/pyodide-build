@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `skip_emscripten_version_check` flag to skip emscripten version check.
+- Add `skip_emscripten_version_check` flag and SKIP_EMSCRIPTEN_VERSION_CHECK environment
+variable to skip emscripten version check.
   [#53](https://github.com/pyodide/pyodide-build/pull/53)
 
 ## [0.29.0] - 2024/09/19
