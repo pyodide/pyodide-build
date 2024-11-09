@@ -440,3 +440,10 @@ def search_pyproject_toml(
             raise ValueError(f"Could not parse {pyproject_file}.") from e
 
     return None, None
+
+
+def to_bool(value: str) -> bool:
+    """
+    Convert a string to a boolean value. Useful for parsing environment variables.
+    """
+    return value.lower() not in {"", "0", "false", "no", "off"}

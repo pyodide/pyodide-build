@@ -174,6 +174,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "home": "HOME",
     "path": "PATH",
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
+    "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -188,6 +189,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "ldflags",
     "rust_toolchain",
     "meson_cross_file",
+    "skip_emscripten_version_check",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -205,6 +207,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "rust_toolchain": "nightly-2024-01-29",
     # Other configuration
     "pyodide_jobs": "1",
+    "skip_emscripten_version_check": "0",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }
