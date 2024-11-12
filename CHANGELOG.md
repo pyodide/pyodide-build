@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `skip_emscripten_version_check` flag and SKIP_EMSCRIPTEN_VERSION_CHECK environment
   variable to skip emscripten version check.
   [#53](https://github.com/pyodide/pyodide-build/pull/53)
+- Set the `EM_PKG_CONFIG_PATH` environment variable used by emscripten/`pkg-config` to discover dependencies
+  [#52](https://github.com/pyodide/pyodide-build/pull/52)
+
+### Changed
+
+- Source tar files are now extracted with python's [data filter](https://docs.python.org/3/library/tarfile.html#tarfile.data_filter)
+  [#52](https://github.com/pyodide/pyodide-build/pull/52)
 
 ## [0.29.0] - 2024/09/19
 
