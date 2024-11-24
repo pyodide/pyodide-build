@@ -18,6 +18,7 @@ from pyodide_build.xbuildenv_releases import (
 )
 
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
+PYTHON_VERSION_MARKER_FILE = ".build-python-version"
 
 
 class CrossBuildEnvManager:
@@ -215,6 +216,7 @@ class CrossBuildEnvManager:
 
             install_marker.touch()
             self.use_version(version)
+            self._add_version_marker()
         except Exception as e:
             # if the installation failed, remove the downloaded directory
             shutil.rmtree(download_path)
@@ -366,7 +368,7 @@ class CrossBuildEnvManager:
         lockfile = PyodideLockSpec(**json.loads(lockfile_path.read_bytes()))
         create_package_index(lockfile.packages, xbuildenv_pyodide_root, cdn_base)
 
-    def uninstall_version(self, version: str) -> None:
+    def uninstall_version(self, version: str | None) -> str:
         """
         Uninstall the installed xbuildenv version.
 
@@ -375,6 +377,12 @@ class CrossBuildEnvManager:
         version
             The version of xbuildenv to uninstall.
         """
+        if version is None:
+            version = self.current_version
+
+        if version is None:
+            raise ValueError("No xbuildenv version is currently in use")
+
         version_path = self._path_for_version(version)
 
         # if the target version is the current version, remove the symlink
@@ -387,6 +395,35 @@ class CrossBuildEnvManager:
         else:
             raise ValueError(
                 f"Cannot find cross-build environment version {version}, available versions: {self.list_versions()}"
+            )
+
+        return version
+
+    def _add_version_marker(self) -> None:
+        """
+        Store the Python version in the xbuildenv directory, so we can check compatibility later.
+        """
+        if not self.symlink_dir.is_dir():
+            raise ValueError("cross-build env directory does not exist")
+
+        version_file = self.symlink_dir / PYTHON_VERSION_MARKER_FILE
+        version_file.write_text(build_env.local_versions()["python"])
+
+    def check_version_marker(self):
+        if not self.symlink_dir.is_dir():
+            raise ValueError("cross-build env directory does not exist")
+
+        version_file = self.symlink_dir / PYTHON_VERSION_MARKER_FILE
+        if not version_file.exists():
+            raise ValueError("Python version marker file not found")
+
+        version_local = build_env.local_versions()["python"]
+        version_on_install = version_file.read_text().strip()
+        if version_on_install != version_local:
+            raise ValueError(
+                f"local Python version ({version_local}) does not match the Python version ({version_on_install}) "
+                "used to create the Pyodide cross-build environment. "
+                "Please reinstall the xbuildenv, by running `pyodide xbuildenv uninstall` and then `pyodide xbuildenv install`"
             )
 
 
