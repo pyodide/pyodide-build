@@ -89,6 +89,7 @@ class TestConfigManager_OutOfTree:
                                   ldflags = "-L/path/to/lib"
                                   rust_toolchain = "nightly"
                                   meson_cross_file = "$(MESON_CROSS_FILE)"
+                                  build_dependency_index_url = "https://example.com/simple"
                                   """)
 
         xbuildenv_manager = CrossBuildEnvManager(
@@ -103,6 +104,7 @@ class TestConfigManager_OutOfTree:
         assert config["ldflags"] == "-L/path/to/lib"
         assert config["rust_toolchain"] == "nightly"
         assert config["meson_cross_file"] == "/path/to/crossfile"
+        assert config["build_dependency_index_url"] == "https://example.com/simple"
 
     def test_config_all(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
