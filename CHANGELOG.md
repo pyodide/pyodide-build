@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variable to skip emscripten version check.
   [#53](https://github.com/pyodide/pyodide-build/pull/53)
 
+- The `pyodide build` command will now raise an error if the local Python version has been changed,
+  after the cross-build environment has been set up.
+  [#62](https://github.com/pyodide/pyodide-build/pull/62)
+
 ## [0.29.0] - 2024/09/19
 
 ### Added

@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
@@ -156,6 +158,11 @@ class TestCrossBuildEnvManager:
         ).exists()
         assert (manager.symlink_dir / "xbuildenv" / "site-packages-extras").exists()
 
+        assert (manager.symlink_dir / ".build-python-version").exists()
+        assert (
+            manager.symlink_dir / ".build-python-version"
+        ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
+
         # installing the same version again should be a no-op
         manager.install(version)
 
@@ -179,6 +186,11 @@ class TestCrossBuildEnvManager:
             manager.symlink_dir / "xbuildenv" / "pyodide-root" / "package_index"
         ).exists()
         assert (manager.symlink_dir / "xbuildenv" / "site-packages-extras").exists()
+
+        assert (manager.symlink_dir / ".build-python-version").exists()
+        assert (
+            manager.symlink_dir / ".build-python-version"
+        ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
 
     def test_install_force(
         self,
@@ -277,6 +289,37 @@ class TestCrossBuildEnvManager:
         assert not manager.symlink_dir.exists()
 
         assert set(manager.list_versions()) == set(versions) - {"0.25.0", "0.25.1"}
+
+    def test_version_marker(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        manager = CrossBuildEnvManager(
+            tmp_path, str(fake_xbuildenv_releases_compatible)
+        )
+        version = "0.1.0"
+
+        manager.install(version)
+
+        assert (manager.symlink_dir / ".build-python-version").exists()
+        assert (
+            manager.symlink_dir / ".build-python-version"
+        ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
+
+        # No error
+        assert manager.check_version_marker() is None
+
+        (manager.symlink_dir / ".build-python-version").write_text("2.7.10")
+
+        with pytest.raises(
+            ValueError,
+            match="does not match the Python version",
+        ):
+            manager.check_version_marker()
 
 
 @pytest.mark.parametrize(
