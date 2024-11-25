@@ -423,7 +423,8 @@ class CrossBuildEnvManager:
             raise ValueError(
                 f"local Python version ({version_local}) does not match the Python version ({version_on_install}) "
                 "used to create the Pyodide cross-build environment. "
-                "Please reinstall the xbuildenv, by running `pyodide xbuildenv uninstall` and then `pyodide xbuildenv install`"
+                "Please switch back to the original Python version, "
+                "or reinstall the xbuildenv, by running `pyodide xbuildenv uninstall` and then `pyodide xbuildenv install`"
             )
 
 
