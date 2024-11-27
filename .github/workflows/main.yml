@@ -98,6 +98,7 @@ jobs:
       - name: Install xbuildenv
         run: |
           pyodide xbuildenv install ${{ env.PYODIDE_VERSION }} --force
+          pyodide xbuildenv use ${{ env.PYODIDE_VERSION }}
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
       - name: Install Emscripten
