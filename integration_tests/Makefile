@@ -31,4 +31,5 @@ check:
 clean:
 	rm -rf .pyodide-xbuildenv*
 	rm -rf recipes/*/build
+	rm -rf src/numpy-*
 	rm -rf dist
