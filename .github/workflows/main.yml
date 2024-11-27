@@ -108,4 +108,5 @@ jobs:
 
       - name: Run the integration tests (recipes)
         run: |
+          cd integration_tests
           make ${{ matrix.task }}
