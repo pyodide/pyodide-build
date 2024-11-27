@@ -10,6 +10,14 @@ test-recipe: check
 
 	@echo "... Passed"
 
+.PHONY: test-src
+test-src: check
+	@echo "... Running integration tests for building src"
+
+	./src/numpy.sh
+
+	@echo "... Passed"
+
 .PHONY: check
 check:
 	@echo "... Checking dependencies"

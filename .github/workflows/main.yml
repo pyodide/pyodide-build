@@ -58,8 +58,8 @@ jobs:
           COMMIT_MSG=$(git log --no-merges -1 --oneline)
 
           # The integration tests will be triggered on push or on pull_request when the commit
-          # message contains "[integration]"
-          if [[ "$GITHUB_EVENT_NAME" == push ||
+          # message contains "[integration]" or if it is pushed to main branch.
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ||
                 "$COMMIT_MSG" =~ \[integration\] ]]; then
               echo "trigger=true" >> "$GITHUB_OUTPUT"
           fi
