@@ -97,8 +97,8 @@ jobs:
 
       - name: Install xbuildenv
         run: |
+          cd integration_tests
           pyodide xbuildenv install ${{ env.PYODIDE_VERSION }} --force
-          pyodide xbuildenv use ${{ env.PYODIDE_VERSION }}
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
       - name: Install Emscripten
@@ -108,4 +108,4 @@ jobs:
 
       - name: Run the integration tests (recipes)
         run: |
-          make -C integration_tests ${{ matrix.task }}
+          make ${{ matrix.task }}
