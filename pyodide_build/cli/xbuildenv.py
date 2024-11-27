@@ -117,8 +117,8 @@ def _uninstall(
     """
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
-    manager.uninstall_version(version)
-    typer.echo(f"Pyodide cross-build environment {version} uninstalled")
+    v = manager.uninstall_version(version)
+    typer.echo(f"Pyodide cross-build environment {v} uninstalled")
 
 
 @app.command("use")

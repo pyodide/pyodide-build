@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Source tar files are now extracted with python's [data filter](https://docs.python.org/3/library/tarfile.html#tarfile.data_filter)
   [#52](https://github.com/pyodide/pyodide-build/pull/52)
 
+- The `pyodide build` command will now raise an error if the local Python version has been changed,
+  after the cross-build environment has been set up.
+  [#62](https://github.com/pyodide/pyodide-build/pull/62)
+
 ## [0.29.0] - 2024/09/19
 
 ### Added

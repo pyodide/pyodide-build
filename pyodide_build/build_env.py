@@ -83,6 +83,8 @@ def _init_xbuild_env(*, quiet: bool = False) -> Path:
         if manager.current_version is None:
             manager.install()
 
+        manager.check_version_marker()
+
         return manager.pyodide_root
 
 
