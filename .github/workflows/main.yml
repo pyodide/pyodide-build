@@ -67,6 +67,10 @@ jobs:
   integration-test:
     runs-on: ubuntu-latest
     needs: [check-integration-test-trigger]
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [test-recipe, test-src]
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     env:
       PYODIDE_VERSION: "0.27.0a2"
@@ -104,4 +108,4 @@ jobs:
       - name: Run the integration tests (recipes)
         run: |
           cd integration_tests
-          make test-recipe
+          make ${{ matrix.task }}
