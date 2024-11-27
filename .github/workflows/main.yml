@@ -72,8 +72,6 @@ jobs:
       matrix:
         task: [test-recipe, test-src]
     if: needs.check-integration-test-trigger.outputs.run-integration-test
-    env:
-      PYODIDE_VERSION: "0.27.0a2"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -97,8 +95,7 @@ jobs:
 
       - name: Install xbuildenv
         run: |
-          cd integration_tests
-          pyodide xbuildenv install ${{ env.PYODIDE_VERSION }} --force
+          pyodide xbuildenv install
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
       - name: Install Emscripten
