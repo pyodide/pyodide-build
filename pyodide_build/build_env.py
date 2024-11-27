@@ -236,7 +236,9 @@ def emscripten_version() -> str:
 
 def get_emscripten_version_info() -> str:
     """Extracted for testing purposes."""
-    return subprocess.run(["emcc", "-v"], capture_output=True, encoding="utf8").stderr
+    return subprocess.run(
+        ["emcc", "-v"], capture_output=True, encoding="utf8", check=False
+    ).stderr
 
 
 def check_emscripten_version() -> None:

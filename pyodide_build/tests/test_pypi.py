@@ -46,9 +46,9 @@ def _make_fake_package(
                 else:
                     requirements.append(requirement)
             extras_requirements_text = ""
-            for e in extras_requirements.keys():
-                extras_requirements_text += f"{e} = [\n"
-                for r in extras_requirements[e]:
+            for key, value in extras_requirements.items():
+                extras_requirements_text += f"{key} = [\n"
+                for r in value:
                     extras_requirements_text += f"'{r}',\n"
                 extras_requirements_text += "]\n"
             template = dedent(
@@ -100,7 +100,8 @@ def _make_fake_package(
                     build_path,
                     "--outdir",
                     packageDir,
-                ]
+                ],
+                check=False,
             )
         else:
             # make cython sdist
@@ -128,7 +129,8 @@ setup(ext_modules=cythonize("src/{module_name}/*.pyx",language_level=3))
                     build_path,
                     "--outdir",
                     packageDir,
-                ]
+                ],
+                check=False,
             )
 
 
