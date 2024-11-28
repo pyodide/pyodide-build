@@ -95,7 +95,7 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         ],
         capture_output=True,
         encoding="utf8",
-        check=True,
+        check=False
     )
     check_result(result, "ERROR: failed to invoke Pyodide")
     platform_data = result.stdout

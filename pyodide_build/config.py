@@ -66,7 +66,7 @@ class ConfigManager:
             capture_output=True,
             text=True,
             env={"PYODIDE_ROOT": str(self.pyodide_root)},
-            check=True,
+            check=False,
         )
 
         if result.returncode != 0:
