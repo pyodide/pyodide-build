@@ -135,7 +135,7 @@ lint.logger-objects = ["pyodide_build.logger.logger"]
 
 lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038"]
 # line-length = 219  # E501: Recommended goal is 88 to match black
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "src/py/_pyodide/_base.py" = [
