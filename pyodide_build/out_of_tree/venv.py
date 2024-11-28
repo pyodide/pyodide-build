@@ -228,7 +228,6 @@ def install_stdlib(venv_bin: Path) -> None:
     # `--extra-index-url` it would install the pypi version which we don't want.
 
     # Other stuff we need to load with loadPackage
-    # TODO: Also load all shared libs.
     to_load = ["micropip"]
     result = subprocess.run(
         [
@@ -239,7 +238,7 @@ def install_stdlib(venv_bin: Path) -> None:
                 from pyodide_js import loadPackage
                 from pyodide_js._api import lockfile_packages
                 from pyodide_js._api import lockfile_unvendored_stdlibs_and_test
-                shared_libs = [pkgname for (pkgname,pkg) in lockfile_packages.object_entries() if getattr(pkg, "shared_library", False)]
+                shared_libs = [pkgname for (pkgname,pkg) in lockfile_packages.object_entries() if getattr(pkg, "package_type") == "shared_library"]
 
                 to_load = [*lockfile_unvendored_stdlibs_and_test, *shared_libs, *{to_load!r}]
                 loadPackage(to_load);
