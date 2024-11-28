@@ -375,7 +375,7 @@ def calculate_object_exports_nm(objects: list[str]) -> list[str]:
         encoding="utf8",
         capture_output=True,
         env={"PATH": os.environ["PATH"]},
-        check=False
+        check=False,
     )
     if result.returncode:
         print(f"Command '{' '.join(args)}' failed. Output to stderr was:")
