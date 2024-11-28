@@ -143,7 +143,7 @@ def test_unvendor_tests(tmpdir):
 
     def rlist(input_dir):
         """Recursively list files in input_dir"""
-        paths = list(sorted(input_dir.rglob("*")))
+        paths = sorted(input_dir.rglob("*"))
         res = []
 
         for el in paths:
