@@ -112,7 +112,9 @@ ignore_missing_imports = true
 
 
 [tool.ruff]
+lint.exclude = ["pyodide_build/vendor/*"]
 lint.select = [
+  "ASYNC",  # flake8-async
   "B0",     # bugbear (all B0* checks enabled by default)
   "B904",   # bugbear (Within an except clause, raise exceptions with raise ... from err)
   "B905",   # bugbear (zip() without an explicit strict= parameter set.)
@@ -144,12 +146,6 @@ target-version = "py311"
 ]
 "src/tests/test_typeconversions.py" = [
   "PGH001",  # No builtin `eval()` allowed
-]
-"tools/*" = [
-  "B008",  # Do not perform function call `typer.Optional` in argument defaults
-]
-"pyodide_build/vendor/loky.py" = [
-  "PLW0603",  # Using the global statement
 ]
 
 [tool.ruff.lint.flake8-bugbear]
