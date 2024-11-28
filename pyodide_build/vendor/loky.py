@@ -173,7 +173,7 @@ def _count_physical_cores():
                 "lscpu --parse=core".split(),
                 capture_output=True,
                 text=True,
-                check=False,
+                check=True,
             )
             cpu_info = cpu_info.stdout.splitlines()
             cpu_info = {line for line in cpu_info if not line.startswith("#")}
@@ -183,7 +183,7 @@ def _count_physical_cores():
                 "wmic CPU Get NumberOfCores /Format:csv".split(),
                 capture_output=True,
                 text=True,
-                check=False,
+                check=True,
             )
             cpu_info = cpu_info.stdout.splitlines()
             cpu_info = [
@@ -195,7 +195,7 @@ def _count_physical_cores():
                 "sysctl -n hw.physicalcpu".split(),
                 capture_output=True,
                 text=True,
-                check=False,
+                check=True,
             )
             cpu_info = cpu_info.stdout
             cpu_count_physical = int(cpu_info)

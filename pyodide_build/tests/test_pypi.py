@@ -101,7 +101,7 @@ def _make_fake_package(
                     "--outdir",
                     packageDir,
                 ],
-                check=False,
+                check=True,
             )
         else:
             # make cython sdist
@@ -130,7 +130,7 @@ setup(ext_modules=cythonize("src/{module_name}/*.pyx",language_level=3))
                     "--outdir",
                     packageDir,
                 ],
-                check=False,
+                check=True,
             )
 
 

@@ -355,7 +355,7 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
         encoding="utf8",
         capture_output=True,
         env={"PATH": os.environ["PATH"]},
-        check=False,
+        check=True,
     )
     if completedprocess.returncode:
         print(f"Command '{' '.join(args)}' failed. Output to stderr was:")
@@ -375,7 +375,7 @@ def calculate_object_exports_nm(objects: list[str]) -> list[str]:
         encoding="utf8",
         capture_output=True,
         env={"PATH": os.environ["PATH"]},
-        check=False,
+        check=True,
     )
     if result.returncode:
         print(f"Command '{' '.join(args)}' failed. Output to stderr was:")
@@ -605,7 +605,7 @@ def handle_command(
         if tmp is None:
             # No source file, it's a query for information about the compiler. Pretend we're
             # gfortran by letting gfortran handle it
-            return subprocess.run(line, check=False).returncode
+            return subprocess.run(line, check=True).returncode
 
         line = tmp
 
@@ -616,7 +616,7 @@ def handle_command(
 
         scipy_fixes(new_args)
 
-    result = subprocess.run(new_args, check=False)
+    result = subprocess.run(new_args, check=True)
     return result.returncode
 
 

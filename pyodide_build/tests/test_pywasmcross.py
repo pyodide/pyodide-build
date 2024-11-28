@@ -209,10 +209,10 @@ def test_exports_node(tmp_path):
     (tmp_path / "f1.c").write_text(template % (1, 1, 1))
     (tmp_path / "f2.c").write_text(template % (2, 2, 2))
     subprocess.run(
-        ["emcc", "-c", tmp_path / "f1.c", "-o", tmp_path / "f1.o", "-fPIC"], check=False
+        ["emcc", "-c", tmp_path / "f1.c", "-o", tmp_path / "f1.o", "-fPIC"], check=True
     )
     subprocess.run(
-        ["emcc", "-c", tmp_path / "f2.c", "-o", tmp_path / "f2.o", "-fPIC"], check=False
+        ["emcc", "-c", tmp_path / "f2.c", "-o", tmp_path / "f2.o", "-fPIC"], check=True
     )
     assert set(calculate_exports([str(tmp_path / "f1.o")], True)) == {"g1", "h1"}
     assert set(
@@ -227,7 +227,7 @@ def test_exports_node(tmp_path):
     # symbol visibility is.
     subprocess.run(
         ["emcc", "-c", tmp_path / "f1.c", "-o", tmp_path / "f1.o", "-fPIC", "-flto"],
-        check=False,
+        check=True,
     )
     assert set(calculate_exports([str(tmp_path / "f1.o")], True)) == {"f1", "g1", "h1"}
 
