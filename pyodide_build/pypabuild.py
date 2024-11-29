@@ -258,13 +258,13 @@ def get_build_env(
     a package with pypa/build.
     """
 
-    kwargs = dict(
-        pkgname=pkgname,
-        cflags=cflags,
-        cxxflags=cxxflags,
-        ldflags=ldflags,
-        target_install_dir=target_install_dir,
-    )
+    kwargs = {
+        "pkgname": pkgname,
+        "cflags": cflags,
+        "cxxflags": cxxflags,
+        "ldflags": ldflags,
+        "target_install_dir": target_install_dir,
+    }
 
     args = common.environment_substitute_args(kwargs, env)
     args["builddir"] = str(Path(".").absolute())

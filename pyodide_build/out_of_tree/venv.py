@@ -95,6 +95,7 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         ],
         capture_output=True,
         encoding="utf8",
+        check=False,
     )
     check_result(result, "ERROR: failed to invoke Pyodide")
     platform_data = result.stdout
@@ -247,6 +248,7 @@ def install_stdlib(venv_bin: Path) -> None:
         ],
         capture_output=True,
         encoding="utf8",
+        check=False,
     )
     check_result(result, "ERROR: failed to install unvendored stdlib modules")
 

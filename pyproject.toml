@@ -112,27 +112,30 @@ ignore_missing_imports = true
 
 
 [tool.ruff]
+lint.exclude = ["pyodide_build/vendor/*"]
 lint.select = [
+  "ASYNC",  # flake8-async
   "B0",     # bugbear (all B0* checks enabled by default)
   "B904",   # bugbear (Within an except clause, raise exceptions with raise ... from err)
   "B905",   # bugbear (zip() without an explicit strict= parameter set.)
+  "C4",     # flake8-comprehensions
   "C9",     # mccabe complexity
   "E",      # pycodestyles
-  "W",      # pycodestyles
   "F",      # pyflakes
-  "I",      # isort
-  "PGH",    # pygrep-hooks
-  "PLC",    # pylint conventions
-  "PLE",    # pylint errors
-  "UP",     # pyupgrade
   "G004",   # f-string logging should be avoided
+  "I",      # isort
+  "PERF",   # Perflint
+  "PGH",    # pygrep-hooks
+  "PL",     # Pylint
+  "UP",     # pyupgrade
+  "W",      # pycodestyles
 ]
 
 lint.logger-objects = ["pyodide_build.logger.logger"]
 
-lint.ignore = ["E402", "E501", "E731", "E741", "UP038"]
+lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038"]
 # line-length = 219  # E501: Recommended goal is 88 to match black
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "src/py/_pyodide/_base.py" = [
@@ -143,9 +146,6 @@ target-version = "py311"
 ]
 "src/tests/test_typeconversions.py" = [
   "PGH001",  # No builtin `eval()` allowed
-]
-"tools/*" = [
-  "B008",  # Do not perform function call `typer.Optional` in argument defaults
 ]
 
 [tool.ruff.lint.flake8-bugbear]
@@ -162,6 +162,13 @@ known-third-party = [
 
 [tool.ruff.lint.mccabe]
 max-complexity = 31  # C901: Recommended goal is 10
+
+[tool.ruff.lint.pylint]
+allow-magic-value-types = ["bytes", "int", "str"]
+max-args = 16        # Default is 5
+max-branches = 27    # Default is 12
+max-returns = 12     # Default is 6
+max-statements = 58  # Default is 50
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

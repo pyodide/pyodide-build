@@ -138,7 +138,7 @@ def _download_wheel(pypi_metadata: URLDict) -> Iterator[Path]:
 
 
 def run_prettier(meta_path: str | Path) -> None:
-    subprocess.run(["npx", "prettier", "-w", meta_path])
+    subprocess.run(["npx", "prettier", "-w", meta_path], check=True)
 
 
 def make_package(

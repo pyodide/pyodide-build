@@ -310,6 +310,7 @@ class CrossBuildEnvManager:
             ],
             capture_output=True,
             encoding="utf8",
+            check=False,
         )
 
         if result.returncode != 0:
