@@ -126,6 +126,9 @@ def test_get_helper_vars(tmp_path):
         tmp_path / "pkg_1" / "build" / "pkg_1-1.0.0" / "dist"
     )
     assert helper_vars["WASM_LIBRARY_DIR"] == str(tmp_path / ".libs")
+    assert helper_vars["EM_PKG_CONFIG_PATH"] == str(
+        tmp_path / ".libs" / "lib" / "pkgconfig"
+    )
     assert helper_vars["PKG_CONFIG_LIBDIR"] == str(
         tmp_path / ".libs" / "lib" / "pkgconfig"
     )
@@ -140,7 +143,7 @@ def test_unvendor_tests(tmpdir):
 
     def rlist(input_dir):
         """Recursively list files in input_dir"""
-        paths = list(sorted(input_dir.rglob("*")))
+        paths = sorted(input_dir.rglob("*"))
         res = []
 
         for el in paths:

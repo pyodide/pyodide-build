@@ -87,7 +87,7 @@ def test_py_compile_zip(tmp_path, keep):
     else:
         expected = {"test1.zip"}
 
-    assert set(el.name for el in tmp_path.glob("*")) == expected
+    assert {el.name for el in tmp_path.glob("*")} == expected
 
     with zipfile.ZipFile(archive_path) as fh_zip:
         assert fh_zip.namelist() == ["packageA/c/a.pyc", "packageA/d.c"]
@@ -215,7 +215,7 @@ def test_py_compile_archive_dir(tmp_path, with_lockfile):
         expected_in.add("pyodide-lock.json")
         expected_out.add("pyodide-lock.json")
 
-    assert set(el.name for el in tmp_path.glob("*")) == expected_in
+    assert {el.name for el in tmp_path.glob("*")} == expected_in
 
     mapping = _py_compile_archive_dir(tmp_path, keep=False)
 
@@ -224,7 +224,7 @@ def test_py_compile_archive_dir(tmp_path, with_lockfile):
         "test1.zip": "test1.zip",
     }
 
-    assert set(el.name for el in tmp_path.glob("*")) == expected_out
+    assert {el.name for el in tmp_path.glob("*")} == expected_out
 
     if not with_lockfile:
         return

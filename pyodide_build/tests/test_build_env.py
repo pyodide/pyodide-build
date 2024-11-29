@@ -66,7 +66,7 @@ class TestOutOfTree(TestInTree):
         build_vars = build_env.get_build_environment_vars(manager.pyodide_root)
 
         # extra variables that does not come from config files.
-        extra_vars = set(["PYODIDE", "PYODIDE_PACKAGE_ABI", "PYTHONPATH"])
+        extra_vars = {"PYODIDE", "PYODIDE_PACKAGE_ABI", "PYTHONPATH"}
 
         all_keys = set(BUILD_KEY_TO_VAR.values()) | extra_vars
         for var in build_vars:
