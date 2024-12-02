@@ -73,7 +73,7 @@ def parse_top_level_import_name(whlfile: Path) -> list[str] | None:
     whlzip = zipfile.Path(whlfile)
 
     def _valid_package_name(dirname: str) -> bool:
-        return all([invalid_chr not in dirname for invalid_chr in ".- "])
+        return all(invalid_chr not in dirname for invalid_chr in ".- ")
 
     def _has_python_file(subdir: zipfile.Path) -> bool:
         queue = deque([subdir])

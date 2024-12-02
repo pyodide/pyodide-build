@@ -5,13 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.29.2] - 2024/11/29
+
+### Fixed
+
+- Fixed `pyodide venv` command not loading the shared libraries correctly, resulting in the package load failure.
+  This bug was introduced in version 0.28.
+  [#67](https://github.com/pyodide/pyodide-build/pull/67)
+
+## [0.29.1] - 2024/11/27
 
 ### Added
 
 - Add `skip_emscripten_version_check` flag and SKIP_EMSCRIPTEN_VERSION_CHECK environment
   variable to skip emscripten version check.
   [#53](https://github.com/pyodide/pyodide-build/pull/53)
+- Set the `EM_PKG_CONFIG_PATH` environment variable used by emscripten/`pkg-config` to discover dependencies
+  [#52](https://github.com/pyodide/pyodide-build/pull/52)
+
+### Changed
+
+- Source tar files are now extracted with python's [data filter](https://docs.python.org/3/library/tarfile.html#tarfile.data_filter)
+  [#52](https://github.com/pyodide/pyodide-build/pull/52)
 
 - The `pyodide build` command will now raise an error if the local Python version has been changed,
   after the cross-build environment has been set up.

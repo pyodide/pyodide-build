@@ -351,7 +351,11 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
         "-st",
     ] + objects
     completedprocess = subprocess.run(
-        args, encoding="utf8", capture_output=True, env={"PATH": os.environ["PATH"]}
+        args,
+        encoding="utf8",
+        capture_output=True,
+        env={"PATH": os.environ["PATH"]},
+        check=False,
     )
     if completedprocess.returncode:
         print(f"Command '{' '.join(args)}' failed. Output to stderr was:")
@@ -367,7 +371,11 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
 def calculate_object_exports_nm(objects: list[str]) -> list[str]:
     args = ["emnm", "-j", "--export-symbols"] + objects
     result = subprocess.run(
-        args, encoding="utf8", capture_output=True, env={"PATH": os.environ["PATH"]}
+        args,
+        encoding="utf8",
+        capture_output=True,
+        env={"PATH": os.environ["PATH"]},
+        check=False,
     )
     if result.returncode:
         print(f"Command '{' '.join(args)}' failed. Output to stderr was:")
@@ -475,9 +483,9 @@ def handle_command_generate_args(  # noqa: C901
         return ["emcc", "-v"]
 
     cmd = line[0]
-    if cmd == "c++" or cmd == "g++":
+    if cmd in {"c++", "g++"}:
         new_args = ["em++"]
-    elif cmd in ("cc", "gcc", "ld", "lld"):
+    elif cmd in {"cc", "gcc", "ld", "lld"}:
         new_args = ["emcc"]
         # distutils doesn't use the c++ compiler when compiling c++ <sigh>
         if any(arg.endswith((".cpp", ".cc")) for arg in line):
@@ -514,7 +522,7 @@ def handle_command_generate_args(  # noqa: C901
             ]
 
         return line
-    elif cmd in ("install_name_tool", "otool"):
+    elif cmd in {"install_name_tool", "otool"}:
         # In MacOS, meson tries to run install_name_tool to fix the rpath of the shared library
         # assuming that it is a ELF file. We need to skip this step.
         # See: https://github.com/mesonbuild/meson/issues/8027
@@ -597,7 +605,7 @@ def handle_command(
         if tmp is None:
             # No source file, it's a query for information about the compiler. Pretend we're
             # gfortran by letting gfortran handle it
-            return subprocess.run(line).returncode
+            return subprocess.run(line, check=False).returncode
 
         line = tmp
 
@@ -608,7 +616,7 @@ def handle_command(
 
         scipy_fixes(new_args)
 
-    result = subprocess.run(new_args)
+    result = subprocess.run(new_args, check=False)
     return result.returncode
 
 
