@@ -276,7 +276,7 @@ def switch_index_url(index_url: str) -> Generator[None, None, None]:
         ]),
     }
 
-    return common.replace_env(env)
+    yield common.replace_env(env)
 
 
 @contextmanager
