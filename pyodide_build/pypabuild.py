@@ -105,13 +105,6 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
 
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
-    host_site_packages = Path(get_hostsitepackages())
-    for name in get_unisolated_packages():
-        for path in chain(
-            host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
-        ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
 
 
 def remove_avoided_requirements(
@@ -129,7 +122,6 @@ def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
     env.install(
         remove_avoided_requirements(
             reqs,
-            # get_unisolated_packages() + AVOIDED_REQUIREMENTS,
             AVOIDED_REQUIREMENTS,
         )
     )

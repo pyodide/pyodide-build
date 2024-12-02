@@ -170,25 +170,6 @@ def get_hostsitepackages() -> str:
     return get_build_flag("HOSTSITEPACKAGES")
 
 
-@functools.cache
-def get_unisolated_packages() -> list[str]:
-    PYODIDE_ROOT = get_pyodide_root()
-
-    unisolated_file = PYODIDE_ROOT / "unisolated.txt"
-    if unisolated_file.exists():
-        # in xbuild env, read from file
-        unisolated_packages = unisolated_file.read_text().splitlines()
-    else:
-        unisolated_packages = []
-        recipe_dir = PYODIDE_ROOT / "packages"
-        recipes = load_all_recipes(recipe_dir)
-        for name, config in recipes.items():
-            if config.build.cross_build_env:
-                unisolated_packages.append(name)
-
-    return unisolated_packages
-
-
 def platform() -> str:
     emscripten_version = get_build_flag("PYODIDE_EMSCRIPTEN_VERSION")
     version = emscripten_version.replace(".", "_")
