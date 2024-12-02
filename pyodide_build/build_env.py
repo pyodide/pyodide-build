@@ -14,7 +14,7 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import search_pyproject_toml, xbuildenv_dirname
+from pyodide_build.common import search_pyproject_toml, to_bool, xbuildenv_dirname
 from pyodide_build.config import ConfigManager
 from pyodide_build.recipe import load_all_recipes
 
@@ -82,6 +82,8 @@ def _init_xbuild_env(*, quiet: bool = False) -> Path:
         manager = CrossBuildEnvManager(xbuildenv_path)
         if manager.current_version is None:
             manager.install()
+
+        manager.check_version_marker()
 
         return manager.pyodide_root
 
@@ -234,10 +236,16 @@ def emscripten_version() -> str:
 
 def get_emscripten_version_info() -> str:
     """Extracted for testing purposes."""
-    return subprocess.run(["emcc", "-v"], capture_output=True, encoding="utf8").stderr
+    return subprocess.run(
+        ["emcc", "-v"], capture_output=True, encoding="utf8", check=True
+    ).stderr
 
 
 def check_emscripten_version() -> None:
+    skip = get_build_flag("SKIP_EMSCRIPTEN_VERSION_CHECK")
+    if to_bool(skip):
+        return
+
     needed_version = emscripten_version()
     try:
         version_info = get_emscripten_version_info()
@@ -248,8 +256,10 @@ def check_emscripten_version() -> None:
     installed_version = None
     try:
         for x in reversed(version_info.partition("\n")[0].split(" ")):
-            if re.match(r"[0-9]+\.[0-9]+\.[0-9]+", x):
-                installed_version = x
+            # (X.Y.Z) or (X.Y.Z)-git
+            match = re.match(r"(\d+\.\d+\.\d+)(-\w+)?", x)
+            if match:
+                installed_version = match.group(1)
                 break
     except Exception:
         raise RuntimeError("Failed to determine Emscripten version.") from None

@@ -7,14 +7,13 @@ Builds a Pyodide package.
 import fnmatch
 import http.client
 import os
-import re
 import shutil
 import subprocess
 import sys
-import warnings
 from collections.abc import Iterator
 from datetime import datetime
 from functools import cache
+from email.message import Message
 from pathlib import Path
 from typing import Any, cast
 
@@ -58,6 +57,20 @@ shutil.register_unpack_format(
     shutil._unpack_zipfile,  # type: ignore[attr-defined]
     description="Wheel file",
 )
+
+
+def _extract_tarballname(url: str, headers: dict) -> str:
+    tarballname = url.split("/")[-1]
+
+    if "Content-Disposition" in headers:
+        msg = Message()
+        msg["Content-Disposition"] = headers["Content-Disposition"]
+
+        filename = msg.get_filename()
+        if filename is not None:
+            tarballname = filename
+
+    return tarballname
 
 
 class RecipeBuilder:
@@ -286,14 +299,7 @@ class RecipeBuilder:
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
-        tarballname = url.split("/")[-1]
-        if "Content-Disposition" in response.headers:
-            filenames = re.findall(
-                "filename=(.+)", response.headers["Content-Disposition"]
-            )
-            if filenames:
-                tarballname = filenames[0]
-
+        tarballname = _extract_tarballname(url, response.headers)
         tarballpath = self.build_dir / tarballname
         tarballpath.write_bytes(response.content)
 
@@ -312,12 +318,18 @@ class RecipeBuilder:
             shutil.copy(tarballpath, self.src_dist_dir)
             return
 
-        with warnings.catch_warnings():
-            # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
-            # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
-            # https://github.com/python/cpython/issues/112760
-            warnings.simplefilter("ignore")
-            shutil.unpack_archive(tarballpath, self.build_dir)
+        # Use a Python 3.14-like filter (see https://github.com/python/cpython/issues/112760)
+        # Can be removed once we use Python 3.14
+        # The "data" filter will reset ownership but preserve permissions and modification times
+        # Without it, permissions and modification times will be silently skipped if the uid/git
+        # is too large for the chown() call. This behavior can lead to "Permission denied" errors
+        # (missing x bit) or random strange `make` behavior (due to wrong mtime order) in the CI
+        # pipeline.
+        shutil.unpack_archive(
+            tarballpath,
+            self.build_dir,
+            filter=None if tarballpath.suffix == ".zip" else "data",
+        )
 
         extract_dir_name = self.source_metadata.extract_dir
         if extract_dir_name is None:
@@ -440,11 +452,14 @@ class RecipeBuilder:
             "DISTDIR": str(self.src_dist_dir),
             # TODO: rename this to something more compatible with Makefile or CMake conventions
             "WASM_LIBRARY_DIR": str(self.library_install_prefix),
-            # Using PKG_CONFIG_LIBDIR instead of PKG_CONFIG_PATH,
+            # Emscripten will use this variable to configure pkg-config in emconfigure
+            "EM_PKG_CONFIG_PATH": str(self.library_install_prefix / "lib/pkgconfig"),
+            # This variable is usually overwritten by emconfigure
+            # The value below will only be used if pkg-config is called without emconfigure
+            # We use PKG_CONFIG_LIBDIR instead of PKG_CONFIG_PATH,
             # so pkg-config will not look in the default system directories
             "PKG_CONFIG_LIBDIR": str(self.library_install_prefix / "lib/pkgconfig"),
         }
-
 
 class RecipeBuilderPackage(RecipeBuilder):
     """

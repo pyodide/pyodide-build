@@ -66,6 +66,7 @@ class ConfigManager:
             capture_output=True,
             text=True,
             env={"PYODIDE_ROOT": str(self.pyodide_root)},
+            check=False,
         )
 
         if result.returncode != 0:
@@ -174,6 +175,8 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "home": "HOME",
     "path": "PATH",
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
+    "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
+    "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -188,6 +191,8 @@ OVERRIDABLE_BUILD_KEYS = {
     "ldflags",
     "rust_toolchain",
     "meson_cross_file",
+    "skip_emscripten_version_check",
+    "build_dependency_index_url",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -205,6 +210,8 @@ DEFAULT_CONFIG: dict[str, str] = {
     "rust_toolchain": "nightly-2024-01-29",
     # Other configuration
     "pyodide_jobs": "1",
+    "skip_emscripten_version_check": "0",
+    "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }

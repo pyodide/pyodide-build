@@ -61,9 +61,9 @@ def test_is_rust_package_1(exe):
 @pytest.mark.parametrize(
     "reqs",
     [
-        dict(),
-        dict(requirements={"host": ["rustc"]}),
-        dict(requirements={"executable": ["something_else"]}),
+        {},
+        {"requirements": {"host": ["rustc"]}},
+        {"requirements": {"executable": ["something_else"]}},
     ],
 )
 def test_is_rust_package_2(reqs):

@@ -66,7 +66,7 @@ class TestOutOfTree(TestInTree):
         build_vars = build_env.get_build_environment_vars(manager.pyodide_root)
 
         # extra variables that does not come from config files.
-        extra_vars = set(["PYODIDE", "PYODIDE_PACKAGE_ABI", "PYTHONPATH"])
+        extra_vars = {"PYODIDE", "PYODIDE_PACKAGE_ABI", "PYTHONPATH"}
 
         all_keys = set(BUILD_KEY_TO_VAR.values()) | extra_vars
         for var in build_vars:
@@ -165,6 +165,12 @@ clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b895
 """
     build_env.check_emscripten_version()
 
+    s = f"""\
+emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) {build_env.emscripten_version()}-git
+clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b8955821b8fdbd4f8f303e2)
+"""
+    build_env.check_emscripten_version()
+
     def get_emscripten_version_info():  # type: ignore[no-redef]
         raise FileNotFoundError()
 
@@ -177,6 +183,16 @@ clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b895
         match=f"No Emscripten compiler found. Need Emscripten version {needed_version}",
     ):
         build_env.check_emscripten_version()
+
+
+def test_check_emscripten_version_skip(dummy_xbuildenv, monkeypatch, reset_cache):
+    with pytest.raises(RuntimeError):
+        monkeypatch.setenv("SKIP_EMSCRIPTEN_VERSION_CHECK", "0")
+        build_env.check_emscripten_version()
+
+    reset_cache()
+    monkeypatch.setenv("SKIP_EMSCRIPTEN_VERSION_CHECK", "1")
+    build_env.check_emscripten_version()
 
 
 def test_wheel_paths(dummy_xbuildenv):

@@ -73,7 +73,7 @@ def parse_top_level_import_name(whlfile: Path) -> list[str] | None:
     whlzip = zipfile.Path(whlfile)
 
     def _valid_package_name(dirname: str) -> bool:
-        return all([invalid_chr not in dirname for invalid_chr in ".- "])
+        return all(invalid_chr not in dirname for invalid_chr in ".- ")
 
     def _has_python_file(subdir: zipfile.Path) -> bool:
         queue = deque([subdir])
@@ -440,3 +440,10 @@ def search_pyproject_toml(
             raise ValueError(f"Could not parse {pyproject_file}.") from e
 
     return None, None
+
+
+def to_bool(value: str) -> bool:
+    """
+    Convert a string to a boolean value. Useful for parsing environment variables.
+    """
+    return value.lower() not in {"", "0", "false", "no", "off"}
