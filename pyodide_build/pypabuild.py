@@ -4,7 +4,7 @@ import shutil
 import subprocess as sp
 import sys
 import traceback
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from itertools import chain
 from pathlib import Path
@@ -53,6 +53,8 @@ SYMLINK_ENV_VARS = {
     "strip": "STRIP",
     "gfortran": "FC",  # https://mesonbuild.com/Reference-tables.html#compiler-and-linker-selection-variables
 }
+
+HOST_ARCH = common.get_host_platform().replace('-', '_').replace('.', '_')
 
 
 def _gen_runner(
@@ -127,7 +129,8 @@ def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
     env.install(
         remove_avoided_requirements(
             reqs,
-            get_unisolated_packages() + AVOIDED_REQUIREMENTS,
+            # get_unisolated_packages() + AVOIDED_REQUIREMENTS,
+            AVOIDED_REQUIREMENTS,
         )
     )
 
@@ -153,8 +156,19 @@ def _build_in_isolated_env(
 
         # first install the build dependencies
         symlink_unisolated_packages(env)
-        install_reqs(env, builder.build_system_requires)
-        installed_requires_for_build = False
+        index_url_for_cross_build = get_build_flag("BUILD_DEPENDENCY_INDEX_URL")
+        installed_build_system_requires = False
+        with switch_index_url(index_url_for_cross_build):
+            try:
+                install_reqs(env, builder.build_system_requires)
+                installed_build_system_requires = True
+            except Exception:
+                print(f"Failed to install build dependencies from {index_url_for_cross_build}, falling back to default index url")
+
+        # Disabled for testing
+        # if not installed_build_system_requires:
+        #     install_reqs(env, builder.build_system_requires)
+
         try:
             build_reqs = builder.get_requires_for_build(
                 distribution,
@@ -240,6 +254,29 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
             env[SYMLINK_ENV_VARS[symlink]] = str(symlink_path)
 
     return env
+
+
+@contextmanager
+def switch_index_url(index_url: str) -> Generator[None, None, None]:
+    """
+    Switch index URL that pip locates the packages.
+    This function is expected to be used during the process of
+    installing package build dependencies.
+
+    Parameters
+    ----------
+    index_url: index URL to switch to
+    """
+
+    env = {
+        "PIP_INDEX_URL": index_url,
+        "PIP_PLATFORM": " ".join([
+            f"pyodide_{get_build_flag("PYODIDE_ABI_VERSION")}_wasm32",
+            HOST_ARCH,
+        ]),
+    }
+
+    return common.replace_env(env)
 
 
 @contextmanager
