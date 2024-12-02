@@ -12,8 +12,8 @@ import subprocess
 import sys
 from collections.abc import Iterator
 from datetime import datetime
-from functools import cache
 from email.message import Message
+from functools import cache
 from pathlib import Path
 from typing import Any, cast
 
@@ -460,6 +460,7 @@ class RecipeBuilder:
             # so pkg-config will not look in the default system directories
             "PKG_CONFIG_LIBDIR": str(self.library_install_prefix / "lib/pkgconfig"),
         }
+
 
 class RecipeBuilderPackage(RecipeBuilder):
     """
