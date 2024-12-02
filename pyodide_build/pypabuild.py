@@ -6,7 +6,6 @@ import sys
 import traceback
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal, cast
@@ -18,9 +17,7 @@ from packaging.requirements import Requirement
 from pyodide_build import _f2c_fixes, common, pywasmcross
 from pyodide_build.build_env import (
     get_build_flag,
-    get_hostsitepackages,
     get_pyversion,
-    get_unisolated_packages,
     platform,
 )
 from pyodide_build.io import _BuildSpecExports
@@ -54,7 +51,7 @@ SYMLINK_ENV_VARS = {
     "gfortran": "FC",  # https://mesonbuild.com/Reference-tables.html#compiler-and-linker-selection-variables
 }
 
-HOST_ARCH = common.get_host_platform().replace('-', '_').replace('.', '_')
+HOST_ARCH = common.get_host_platform().replace("-", "_").replace(".", "_")
 
 
 def _gen_runner(
@@ -155,7 +152,9 @@ def _build_in_isolated_env(
                 install_reqs(env, builder.build_system_requires)
                 installed_build_system_requires = True
             except Exception:
-                print(f"Failed to install build dependencies from {index_url_for_cross_build}, falling back to default index url")
+                print(
+                    f"Failed to install build dependencies from {index_url_for_cross_build}, falling back to default index url"
+                )
 
         # Disabled for testing
         # if not installed_build_system_requires:
@@ -262,10 +261,12 @@ def switch_index_url(index_url: str) -> Generator[None, None, None]:
 
     env = {
         "PIP_INDEX_URL": index_url,
-        "PIP_PLATFORM": " ".join([
-            f"pyodide_{get_build_flag("PYODIDE_ABI_VERSION")}_wasm32",
-            HOST_ARCH,
-        ]),
+        "PIP_PLATFORM": " ".join(
+            [
+                f"pyodide_{get_build_flag("PYODIDE_ABI_VERSION")}_wasm32",
+                HOST_ARCH,
+            ]
+        ),
     }
 
     yield common.replace_env(env)

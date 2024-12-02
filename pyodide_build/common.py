@@ -461,21 +461,23 @@ def get_host_platform():
     if "_PYTHON_HOST_PLATFORM" in os.environ:
         return os.environ["_PYTHON_HOST_PLATFORM"]
 
-
     # Try to distinguish various flavours of Unix
     (osname, host, release, version, machine) = os.uname()
 
     # Convert the OS name to lowercase, remove '/' characters, and translate
     # spaces (for "Power Macintosh")
-    osname = osname.lower().replace('/', '')
-    machine = machine.replace(' ', '_').replace('/', '-')
+    osname = osname.lower().replace("/", "")
+    machine = machine.replace(" ", "_").replace("/", "-")
 
-    if osname[:5] == 'linux':
+    if osname[:5] == "linux":
         return f"{osname}-{machine}"
-    elif osname[:6] == 'darwin':
+    elif osname[:6] == "darwin":
         import _osx_support
         import sysconfig
-        osname, release, machine = _osx_support.get_platform_osx(sysconfig.get_config_vars(), osname, release, machine)
+
+        osname, release, machine = _osx_support.get_platform_osx(
+            sysconfig.get_config_vars(), osname, release, machine
+        )
     else:
         raise ValueError(f"unsupported os: {osname}")
 
