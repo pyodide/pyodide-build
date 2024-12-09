@@ -83,11 +83,18 @@ def is_link_cmd(line: list[str]) -> bool:
     """
     Check if the command is a linker invocation.
     """
-    import re
-
-    SHAREDLIB_REGEX = re.compile(r"\.so(.\d+)*$")
     for arg in line:
-        if not arg.startswith("-") and SHAREDLIB_REGEX.search(arg):
+        parts = arg.split(".")
+        idx = len(parts) - 1
+
+        # response file
+        if parts[-1] == "rsp":
+            idx -= 1
+
+        while idx > 0 and parts[idx].isdigit():
+            idx -= 1
+
+        if idx > 0 and parts[idx] == "so":
             return True
 
     return False
