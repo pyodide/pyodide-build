@@ -339,6 +339,9 @@ def _calculate_object_exports_readobj_parse(output: str) -> list[str]:
 def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
     import shutil
 
+    # This works for bootstrapped Emscripten via GitHub sources.
+    # llvm-readobj might not be available this way with Homebrew
+    # or conda-forge distributions of Emscripten.
     which_emcc = shutil.which("emcc")
     assert which_emcc
     emcc = Path(which_emcc)
