@@ -13,6 +13,7 @@ import sys
 from collections.abc import Iterator
 from datetime import datetime
 from email.message import Message
+from functools import cache
 from pathlib import Path
 from typing import Any, cast
 
@@ -102,19 +103,20 @@ class RecipeBuilder:
             If True, continue a build from the middle. For debugging. Implies "force_rebuild".
         """
         recipe = Path(recipe).resolve()
-        self.pkg_root, self.recipe = self._load_recipe(recipe)
+        self.pkg_root, self.recipe = _load_recipe(recipe)
 
         self.name = self.recipe.package.name
         self.version = self.recipe.package.version
         self.fullname = f"{self.name}-{self.version}"
-        self.build_args = build_args
+
+        self.source_metadata = self.recipe.source
+        self.build_metadata = self.recipe.build
+        self.package_type = self.build_metadata.package_type
 
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
-
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
-
         self.src_extract_dir = (
             self.build_dir / self.fullname
         )  # where we extract the source
@@ -127,13 +129,34 @@ class RecipeBuilder:
         # where Pyodide will look for the built artifacts when building pyodide-lock.json.
         # after building packages, artifacts in src_dist_dir will be copied to dist_dir
         self.dist_dir = self.pkg_root / "dist"
-
-        self.source_metadata = self.recipe.source
-        self.build_metadata = self.recipe.build
-        self.package_type = self.build_metadata.package_type
-
+        self.build_args = build_args
         self.force_rebuild = force_rebuild or continue_
         self.continue_ = continue_
+
+    @classmethod
+    def get_builder(
+        cls,
+        recipe: str | Path,
+        build_args: BuildArgs,
+        build_dir: str | Path | None = None,
+        force_rebuild: bool = False,
+        continue_: bool = False,
+    ) -> "RecipeBuilder":
+        recipe = Path(recipe).resolve()
+        _, config = _load_recipe(recipe)
+        match config.build.package_type:
+            case "package":
+                builder = RecipeBuilderPackage
+            case "static_library":
+                builder = RecipeBuilderStaticLibrary
+            case "shared_library":
+                builder = RecipeBuilderSharedLibrary
+            case _:
+                raise ValueError(
+                    f"Unknown package type: {config.build_metadata.package_type}"
+                )
+
+        return builder(recipe, build_args, build_dir, force_rebuild, continue_)
 
     def build(self) -> None:
         """
@@ -166,6 +189,9 @@ class RecipeBuilder:
             else:
                 logger.error(msg)
 
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        raise NotImplementedError("Subclasses must implement this method")
+
     def _build(self) -> None:
         if not self.force_rebuild and not needs_rebuild(
             self.pkg_root, self.build_dir, self.source_metadata
@@ -188,70 +214,7 @@ class RecipeBuilder:
             chdir(self.pkg_root),
             get_bash_runner(self._get_helper_vars() | os.environ.copy()) as bash_runner,
         ):
-            if self.recipe.is_rust_package():
-                bash_runner.run(
-                    RUST_BUILD_PRELUDE,
-                    script_name="rust build prelude",
-                    cwd=self.src_extract_dir,
-                )
-
-            bash_runner.run(
-                self.build_metadata.script,
-                script_name="build script",
-                cwd=self.src_extract_dir,
-            )
-
-            # TODO: maybe subclass this for different package types?
-            if self.package_type == "static_library":
-                # Nothing needs to be done for a static library
-                pass
-
-            elif self.package_type == "shared_library":
-                # If shared library, we copy .so files to dist_dir
-                # and create a zip archive of the .so files
-                shutil.rmtree(self.dist_dir, ignore_errors=True)
-                self.dist_dir.mkdir(parents=True)
-                make_zip_archive(
-                    self.dist_dir / f"{self.fullname}.zip", self.src_dist_dir
-                )
-
-            else:  # wheel
-                url = self.source_metadata.url
-                prebuilt_wheel = url and url.endswith(".whl")
-                if not prebuilt_wheel:
-                    self._compile(bash_runner)
-
-                self._package_wheel(bash_runner)
-                shutil.rmtree(self.dist_dir, ignore_errors=True)
-                shutil.copytree(self.src_dist_dir, self.dist_dir)
-
-    def _load_recipe(self, package_dir: Path) -> tuple[Path, MetaConfig]:
-        """
-        Load the package configuration from the given directory.
-
-        Parameters
-        ----------
-        package_dir
-            The directory containing the package configuration, or the path to the
-            package configuration file.
-
-        Returns
-        -------
-        pkg_dir
-            The directory containing the package configuration.
-        pkg
-            The package configuration.
-        """
-        if not package_dir.exists():
-            raise FileNotFoundError(f"Package directory {package_dir} does not exist")
-
-        if package_dir.is_dir():
-            meta_file = package_dir / "meta.yaml"
-        else:
-            meta_file = package_dir
-            package_dir = meta_file.parent
-
-        return package_dir, MetaConfig.from_yaml(meta_file)
+            self._build_package(bash_runner)
 
     def _check_executables(self) -> None:
         """
@@ -424,78 +387,6 @@ class RecipeBuilder:
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings
             )
 
-    def _package_wheel(
-        self,
-        bash_runner: BashRunnerWithSharedEnvironment,
-    ) -> None:
-        """Package a wheel
-
-        This unpacks the wheel, unvendors tests if necessary, runs and "build.post"
-        script, and then repacks the wheel.
-
-        Parameters
-        ----------
-        bash_runner
-            The runner we will use to execute our bash commands. Preserves
-            environment variables from one invocation to the next.
-        """
-        wheel, *rest = find_matching_wheels(
-            self.src_dist_dir.glob("*.whl"), pyodide_tags()
-        )
-        if rest:
-            raise Exception(
-                f"Unexpected number of wheels {len(rest) + 1} when building {self.name}"
-            )
-
-        if "emscripten" in wheel.name:
-            # Retag platformed wheels to pyodide
-            wheel = retag_wheel(wheel, wheel_platform())
-
-        logger.info("Unpacking wheel to %s", str(wheel))
-
-        name, ver, _ = wheel.name.split("-", 2)
-
-        with modify_wheel(wheel) as wheel_dir:
-            # update so abi tags after build is complete but before running post script
-            # to maximize sanity.
-            replace_so_abi_tags(wheel_dir)
-            bash_runner.run(
-                self.build_metadata.post, script_name="post script", cwd=wheel_dir
-            )
-
-            if self.build_metadata.vendor_sharedlib:
-                lib_dir = self.library_install_prefix
-                copy_sharedlibs(wheel, wheel_dir, lib_dir)
-
-            python_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
-            host_site_packages = (
-                Path(self.build_args.host_install_dir)
-                / f"lib/{python_dir}/site-packages"
-            )
-            if self.build_metadata.cross_build_env:
-                subprocess.run(
-                    ["pip", "install", "-t", str(host_site_packages), f"{name}=={ver}"],
-                    check=True,
-                )
-
-            for cross_build_file in self.build_metadata.cross_build_files:
-                shutil.copy(
-                    (wheel_dir / cross_build_file),
-                    host_site_packages / cross_build_file,
-                )
-
-            try:
-                test_dir = self.src_dist_dir / "tests"
-                if self.build_metadata.unvendor_tests:
-                    nmoved = unvendor_tests(
-                        wheel_dir, test_dir, self.build_metadata.retain_test_patterns
-                    )
-                    if nmoved:
-                        with chdir(self.src_dist_dir):
-                            shutil.make_archive(f"{self.name}-tests", "tar", test_dir)
-            finally:
-                shutil.rmtree(test_dir, ignore_errors=True)
-
     def _patch(self) -> None:
         """
         Apply patches to the source.
@@ -569,6 +460,169 @@ class RecipeBuilder:
             # so pkg-config will not look in the default system directories
             "PKG_CONFIG_LIBDIR": str(self.library_install_prefix / "lib/pkgconfig"),
         }
+
+
+class RecipeBuilderPackage(RecipeBuilder):
+    """
+    Recipe builder for python packages.
+    """
+
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        if self.recipe.is_rust_package():
+            bash_runner.run(
+                RUST_BUILD_PRELUDE,
+                script_name="rust build prelude",
+                cwd=self.src_extract_dir,
+            )
+
+        bash_runner.run(
+            self.build_metadata.script,
+            script_name="build script",
+            cwd=self.src_extract_dir,
+        )
+
+        url = self.source_metadata.url
+        prebuilt_wheel = url and url.endswith(".whl")
+        if not prebuilt_wheel:
+            self._compile(bash_runner)
+
+        self._package_wheel(bash_runner)
+        shutil.rmtree(self.dist_dir, ignore_errors=True)
+        shutil.copytree(self.src_dist_dir, self.dist_dir)
+
+    def _package_wheel(
+        self,
+        bash_runner: BashRunnerWithSharedEnvironment,
+    ) -> None:
+        """Package a wheel
+
+        This unpacks the wheel, unvendors tests if necessary, runs and "build.post"
+        script, and then repacks the wheel.
+
+        Parameters
+        ----------
+        bash_runner
+            The runner we will use to execute our bash commands. Preserves
+            environment variables from one invocation to the next.
+        """
+        wheel, *rest = find_matching_wheels(
+            self.src_dist_dir.glob("*.whl"), pyodide_tags()
+        )
+        if rest:
+            raise Exception(
+                f"Unexpected number of wheels {len(rest) + 1} when building {self.name}"
+            )
+
+        if "emscripten" in wheel.name:
+            # Retag platformed wheels to pyodide
+            wheel = retag_wheel(wheel, wheel_platform())
+
+        logger.info("Unpacking wheel to %s", str(wheel))
+
+        name, ver, _ = wheel.name.split("-", 2)
+
+        with modify_wheel(wheel) as wheel_dir:
+            # update so abi tags after build is complete but before running post script
+            # to maximize sanity.
+            replace_so_abi_tags(wheel_dir)
+            bash_runner.run(
+                self.build_metadata.post, script_name="post script", cwd=wheel_dir
+            )
+
+            if self.build_metadata.vendor_sharedlib:
+                lib_dir = self.library_install_prefix
+                copy_sharedlibs(wheel, wheel_dir, lib_dir)
+
+            python_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
+            host_site_packages = (
+                Path(self.build_args.host_install_dir)
+                / f"lib/{python_dir}/site-packages"
+            )
+            if self.build_metadata.cross_build_env:
+                subprocess.run(
+                    ["pip", "install", "-t", str(host_site_packages), f"{name}=={ver}"],
+                    check=True,
+                )
+
+            for cross_build_file in self.build_metadata.cross_build_files:
+                shutil.copy(
+                    (wheel_dir / cross_build_file),
+                    host_site_packages / cross_build_file,
+                )
+
+            try:
+                test_dir = self.src_dist_dir / "tests"
+                if self.build_metadata.unvendor_tests:
+                    nmoved = unvendor_tests(
+                        wheel_dir, test_dir, self.build_metadata.retain_test_patterns
+                    )
+                    if nmoved:
+                        with chdir(self.src_dist_dir):
+                            shutil.make_archive(f"{self.name}-tests", "tar", test_dir)
+            finally:
+                shutil.rmtree(test_dir, ignore_errors=True)
+
+
+class RecipeBuilderStaticLibrary(RecipeBuilder):
+    """
+    Recipe builder for static libraries.
+    """
+
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        bash_runner.run(
+            self.build_metadata.script,
+            script_name="build script",
+            cwd=self.src_extract_dir,
+        )
+
+
+class RecipeBuilderSharedLibrary(RecipeBuilder):
+    """
+    Recipe builder for shared libraries.
+    """
+
+    def _build_package(self, bash_runner: BashRunnerWithSharedEnvironment) -> None:
+        bash_runner.run(
+            self.build_metadata.script,
+            script_name="build script",
+            cwd=self.src_extract_dir,
+        )
+
+        # copy .so files to dist_dir
+        # and create a zip archive of the .so files
+        shutil.rmtree(self.dist_dir, ignore_errors=True)
+        self.dist_dir.mkdir(parents=True)
+        make_zip_archive(self.dist_dir / f"{self.fullname}.zip", self.src_dist_dir)
+
+
+@cache
+def _load_recipe(package_dir: Path) -> tuple[Path, MetaConfig]:
+    """
+    Load the package configuration from the given directory.
+
+    Parameters
+    ----------
+    package_dir
+        The directory containing the package configuration, or the path to the
+        package configuration file.
+
+    Returns
+    -------
+    pkg_dir
+        The directory containing the package configuration.
+    pkg
+        The package configuration.
+    """
+    if not package_dir.exists():
+        raise FileNotFoundError(f"Package directory {package_dir} does not exist")
+
+    if package_dir.is_dir():
+        meta_file = package_dir / "meta.yaml"
+    else:
+        meta_file = package_dir
+        package_dir = meta_file.parent
+
+    return package_dir, MetaConfig.from_yaml(meta_file)
 
 
 def check_checksum(archive: Path, checksum: str) -> None:
