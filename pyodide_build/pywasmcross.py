@@ -339,12 +339,21 @@ def _calculate_object_exports_readobj_parse(output: str) -> list[str]:
 def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
     import shutil
 
-    readobj_path = shutil.which("llvm-readobj")
+    # This works for bootstrapped Emscripten via GitHub sources.
+    # llvm-readobj might not be available this way with Homebrew
+    # or conda-forge distributions of Emscripten.
+    which_emcc = shutil.which("emcc")
+    assert which_emcc
+    emcc = Path(which_emcc)
+    readobj = (emcc / "../../bin/llvm-readobj").resolve()
+    if readobj.exists():
+        readobj_path = str(readobj)
+    else:
+        readobj_path = shutil.which("llvm-readobj")
     if not readobj_path:
-        which_emcc = shutil.which("emcc")
-        assert which_emcc
-        emcc = Path(which_emcc)
-        readobj_path = str((emcc / "../../bin/llvm-readobj").resolve())
+        print("Failed to find llvm-readobj, quitting", file=sys.stdout)
+        sys.exit(1)
+
     args = [
         readobj_path,
         "--section-details",
