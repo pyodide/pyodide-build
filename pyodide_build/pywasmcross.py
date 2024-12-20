@@ -348,11 +348,6 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
     else:
         readobj_path = shutil.which("llvm-readobj")
     assert(readobj_path)
-    args = [
-        readobj_path,
-        "--section-details",
-        "-st",
-    ] + objects
 
     args = [
         readobj_path,
