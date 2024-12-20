@@ -350,7 +350,9 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
         readobj_path = str(readobj)
     else:
         readobj_path = shutil.which("llvm-readobj")
-    assert readobj_path
+    if not readobj_path:
+       print("Failed to find llvm-readobj, quitting", file=sys.stdout)
+       sys.exit(1)
 
     args = [
         readobj_path,
