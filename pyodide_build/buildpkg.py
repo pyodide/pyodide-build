@@ -145,7 +145,7 @@ class RecipeBuilder:
         recipe = Path(recipe).resolve()
         _, config = _load_recipe(recipe)
         match config.build.package_type:
-            case "package":
+            case "package" | "cpython_module":
                 builder = RecipeBuilderPackage
             case "static_library":
                 builder = RecipeBuilderStaticLibrary
@@ -153,7 +153,7 @@ class RecipeBuilder:
                 builder = RecipeBuilderSharedLibrary
             case _:
                 raise ValueError(
-                    f"Unknown package type: {config.build_metadata.package_type}"
+                    f"Unknown package type: {config.build.package_type}"
                 )
 
         return builder(recipe, build_args, build_dir, force_rebuild, continue_)
