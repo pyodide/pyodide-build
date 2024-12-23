@@ -6,6 +6,7 @@ This directory contains a few curated recipes to test the build process of pyodi
 - orjson: Tests rust extension modules.
 - zlib: Tests static libraries.
 - geos: Tests shared libraries.
+- pydoc_data: Unvendored cpython module
 
 ### For maintainers
 
