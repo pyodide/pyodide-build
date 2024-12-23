@@ -152,9 +152,7 @@ class RecipeBuilder:
             case "shared_library":
                 builder = RecipeBuilderSharedLibrary
             case _:
-                raise ValueError(
-                    f"Unknown package type: {config.build.package_type}"
-                )
+                raise ValueError(f"Unknown package type: {config.build.package_type}")
 
         return builder(recipe, build_args, build_dir, force_rebuild, continue_)
 
