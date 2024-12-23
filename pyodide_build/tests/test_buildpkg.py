@@ -9,7 +9,13 @@ import pytest
 
 from pyodide_build import buildpkg, common
 from pyodide_build.build_env import BuildArgs
-from pyodide_build.buildpkg import RecipeBuilder
+from pyodide_build.buildpkg import (
+    RecipeBuilder,
+    RecipeBuilderPackage,
+    RecipeBuilderSharedLibrary,
+    RecipeBuilderStaticLibrary,
+    _load_recipe,
+)
 from pyodide_build.io import _SourceSpec
 
 RECIPE_DIR = Path(__file__).parent / "_test_recipes"
@@ -18,8 +24,7 @@ WHEEL_DIR = Path(__file__).parent / "_test_wheels"
 
 @pytest.fixture
 def tmp_builder(tmp_path):
-    # Dummy builder to test other functions
-    builder = RecipeBuilder(
+    builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "pkg_1",
         build_args=BuildArgs(),
         build_dir=tmp_path,
@@ -31,7 +36,7 @@ def tmp_builder(tmp_path):
 
 
 def test_constructor(tmp_path):
-    builder = RecipeBuilder(
+    builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "beautifulsoup4",
         build_args=BuildArgs(),
         build_dir=tmp_path / "beautifulsoup4" / "build",
@@ -57,12 +62,47 @@ def test_constructor(tmp_path):
     assert builder.library_install_prefix == tmp_path / ".libs"
 
 
-def test_load_recipe(tmp_builder):
-    root, recipe = tmp_builder._load_recipe(RECIPE_DIR / "pkg_1")
+def test_get_builder(tmp_path):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_1",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+        force_rebuild=False,
+        continue_=False,
+    )
+
+    assert isinstance(builder, RecipeBuilder)
+    assert isinstance(builder, RecipeBuilderPackage)
+
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "libtest",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+        force_rebuild=False,
+        continue_=False,
+    )
+
+    assert isinstance(builder, RecipeBuilder)
+    assert isinstance(builder, RecipeBuilderStaticLibrary)
+
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "libtest_shared",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+        force_rebuild=False,
+        continue_=False,
+    )
+
+    assert isinstance(builder, RecipeBuilder)
+    assert isinstance(builder, RecipeBuilderSharedLibrary)
+
+
+def test_load_recipe():
+    root, recipe = _load_recipe(RECIPE_DIR / "pkg_1")
     assert root == RECIPE_DIR / "pkg_1"
     assert recipe.package.name == "pkg_1"
 
-    root, recipe = tmp_builder._load_recipe(RECIPE_DIR / "pkg_1" / "meta.yaml")
+    root, recipe = _load_recipe(RECIPE_DIR / "pkg_1" / "meta.yaml")
     assert root == RECIPE_DIR / "pkg_1"
     assert recipe.package.name == "pkg_1"
 
@@ -83,7 +123,7 @@ def test_prepare_source(monkeypatch, tmp_path):
     ]
 
     for pkg in test_pkgs:
-        builder = RecipeBuilder(
+        builder = RecipeBuilder.get_builder(
             recipe=pkg,
             build_args=BuildArgs(),
             build_dir=tmp_path,
@@ -93,7 +133,7 @@ def test_prepare_source(monkeypatch, tmp_path):
 
 
 def test_check_executables(tmp_path, monkeypatch):
-    builder = RecipeBuilder(
+    builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "pkg_test_executable",
         build_args=BuildArgs(),
         build_dir=tmp_path,
@@ -109,7 +149,7 @@ def test_check_executables(tmp_path, monkeypatch):
 
 
 def test_get_helper_vars(tmp_path):
-    builder = RecipeBuilder(
+    builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "pkg_1",
         build_args=BuildArgs(),
         build_dir=tmp_path / "pkg_1" / "build",

@@ -73,10 +73,5 @@ repos:
         files: ^(conftest.py|src/tests|pyodide-build/pyodide_build/tests)
         additional_dependencies: *mypy-deps
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: "v4.0.0-alpha.8"
-    hooks:
-      - id: prettier
-
 ci:
   autoupdate_schedule: "quarterly"
