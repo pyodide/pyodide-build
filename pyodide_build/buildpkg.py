@@ -537,7 +537,7 @@ class RecipeBuilderPackage(RecipeBuilder):
                 / f"lib/{python_dir}/site-packages"
             )
             if self.build_metadata.cross_build_env:
-                shutil.copy(
+                shutil.copytree(
                     wheel_dir,
                     host_site_packages,
                 )
