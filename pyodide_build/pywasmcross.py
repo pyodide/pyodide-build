@@ -542,6 +542,9 @@ def handle_command_generate_args(  # noqa: C901
     elif cmd == "strip":
         line[0] = "emstrip"
         return line
+    elif cmd == "cargo":
+        line.insert(1, "-Zbuild-std")
+        return line
     else:
         return line
 
