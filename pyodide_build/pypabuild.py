@@ -4,9 +4,8 @@ import shutil
 import subprocess as sp
 import sys
 import traceback
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal, cast
@@ -18,9 +17,7 @@ from packaging.requirements import Requirement
 from pyodide_build import _f2c_fixes, common, pywasmcross
 from pyodide_build.build_env import (
     get_build_flag,
-    get_hostsitepackages,
     get_pyversion,
-    get_unisolated_packages,
     platform,
 )
 from pyodide_build.io import _BuildSpecExports
@@ -53,6 +50,8 @@ SYMLINK_ENV_VARS = {
     "strip": "STRIP",
     "gfortran": "FC",  # https://mesonbuild.com/Reference-tables.html#compiler-and-linker-selection-variables
 }
+
+HOST_ARCH = common.get_host_platform().replace("-", "_").replace(".", "_")
 
 
 def _gen_runner(
@@ -103,13 +102,6 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
 
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
-    host_site_packages = Path(get_hostsitepackages())
-    for name in get_unisolated_packages():
-        for path in chain(
-            host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
-        ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
 
 
 def remove_avoided_requirements(
@@ -127,7 +119,7 @@ def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
     env.install(
         remove_avoided_requirements(
             reqs,
-            get_unisolated_packages() + AVOIDED_REQUIREMENTS,
+            AVOIDED_REQUIREMENTS,
         )
     )
 
@@ -153,8 +145,25 @@ def _build_in_isolated_env(
 
         # first install the build dependencies
         symlink_unisolated_packages(env)
-        install_reqs(env, builder.build_system_requires)
-        installed_requires_for_build = False
+        index_url_for_cross_build = get_build_flag("BUILD_DEPENDENCY_INDEX_URL")
+        installed_build_system_requires = False  # build depdency for in pyproject.toml
+        installed_backend_requires = (
+            False  # dependencies defined by the backend for a given distribution
+        )
+
+        with switch_index_url(index_url_for_cross_build):
+            try:
+                install_reqs(env, builder.build_system_requires)
+                installed_build_system_requires = True
+            except Exception:
+                print(
+                    f"Failed to install build dependencies from {index_url_for_cross_build}, falling back to default index url"
+                )
+
+        # Disabled for testing
+        # if not installed_build_system_requires:
+        #     install_reqs(env, builder.build_system_requires)
+
         try:
             build_reqs = builder.get_requires_for_build(
                 distribution,
@@ -163,10 +172,10 @@ def _build_in_isolated_env(
             pass
         else:
             install_reqs(env, build_reqs)
-            installed_requires_for_build = True
+            installed_backend_requires = True
 
         with common.replace_env(build_env):
-            if not installed_requires_for_build:
+            if not installed_backend_requires:
                 build_reqs = builder.get_requires_for_build(
                     distribution,
                     config_settings,
@@ -240,6 +249,31 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
             env[SYMLINK_ENV_VARS[symlink]] = str(symlink_path)
 
     return env
+
+
+@contextmanager
+def switch_index_url(index_url: str) -> Generator[None, None, None]:
+    """
+    Switch index URL that pip locates the packages.
+    This function is expected to be used during the process of
+    installing package build dependencies.
+
+    Parameters
+    ----------
+    index_url: index URL to switch to
+    """
+
+    env = {
+        "PIP_INDEX_URL": index_url,
+        "PIP_PLATFORM": " ".join(
+            [
+                f"pyodide_{get_build_flag("PYODIDE_ABI_VERSION")}_wasm32",
+                HOST_ARCH,
+            ]
+        ),
+    }
+
+    yield common.replace_env(env)
 
 
 @contextmanager
