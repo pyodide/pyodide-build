@@ -537,9 +537,15 @@ class RecipeBuilderPackage(RecipeBuilder):
                 / f"lib/{python_dir}/site-packages"
             )
             if self.build_metadata.cross_build_env:
-                shutil.copytree(
-                    wheel_dir,
-                    host_site_packages,
+                subprocess.run(
+                    ["pip", "install", "-t", str(host_site_packages), f"{name}=={ver}"],
+                    check=True,
+                )
+
+            for cross_build_file in self.build_metadata.cross_build_files:
+                shutil.copy(
+                    (wheel_dir / cross_build_file),
+                    host_site_packages / cross_build_file,
                 )
 
             try:
