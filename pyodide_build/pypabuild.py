@@ -156,13 +156,19 @@ def _build_in_isolated_env(
                 install_reqs(env, builder.build_system_requires)
                 installed_build_system_requires = True
             except Exception:
+                pass
+
+        # Disabled for testing
+        if not installed_build_system_requires:
+            if common.to_bool(get_build_flag("BUILD_DEPENDENCY_FALLBACK_TO_PYPI")):
                 print(
                     f"Failed to install build dependencies from {index_url_for_cross_build}, falling back to default index url"
                 )
-
-        # Disabled for testing
-        # if not installed_build_system_requires:
-        #     install_reqs(env, builder.build_system_requires)
+                install_reqs(env, builder.build_system_requires)
+            else:
+                print(
+                    f"Failed to install build dependencies from {index_url_for_cross_build}, proceeding the build, but it will fail."
+                )
 
         try:
             build_reqs = builder.get_requires_for_build(
