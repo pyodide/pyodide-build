@@ -273,7 +273,8 @@ def switch_index_url(index_url: str) -> Generator[None, None, None]:
         ),
     }
 
-    yield common.replace_env(env)
+    with common.replace_env(env) as replaced_env:
+        yield replaced_env
 
 
 @contextmanager
@@ -310,6 +311,7 @@ def get_build_env(
         env.update(make_command_wrapper_symlinks(symlink_dir))
 
         sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
+        host_pythonpath = Path(get_build_flag("PYTHONPATH"))
         args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
         args["orig__name__"] = __name__
         args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
@@ -324,7 +326,7 @@ def get_build_env(
 
         env["_PYTHON_HOST_PLATFORM"] = platform()
         env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
-        env["PYTHONPATH"] = str(sysconfig_dir)
+        env["PYTHONPATH"] = str(sysconfig_dir) + ":" + str(host_pythonpath)
         env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
 
         yield env
