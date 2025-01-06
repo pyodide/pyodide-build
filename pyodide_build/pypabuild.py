@@ -267,6 +267,7 @@ def switch_index_url(index_url: str) -> Generator[None, None, None]:
         "PIP_INDEX_URL": index_url,
     }
 
+    # For debugging: uncomment the lines below to see the pip error during the package installation
     # import build
     # build._ctx.VERBOSITY.set(1)
 
