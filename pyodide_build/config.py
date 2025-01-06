@@ -211,7 +211,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     # Other configuration
     "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
-    "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
+    "build_dependency_index_url": "https://pypi.anaconda.org/pyodide-build/simple",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }
