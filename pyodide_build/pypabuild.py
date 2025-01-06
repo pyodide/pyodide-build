@@ -265,13 +265,15 @@ def switch_index_url(index_url: str) -> Generator[None, None, None]:
 
     env = {
         "PIP_INDEX_URL": index_url,
-        "PIP_PLATFORM": " ".join(
-            [
-                f"pyodide_{get_build_flag("PYODIDE_ABI_VERSION")}_wasm32",
-                HOST_ARCH,
-            ]
-        ),
     }
+
+    # import build
+    # build._ctx.VERBOSITY.set(1)
+
+    # def log(msg, *args, **kwargs):
+    #     print(msg, str(kwargs))
+
+    # build._ctx.LOGGER.set(log)
 
     with common.replace_env(env) as replaced_env:
         yield replaced_env
