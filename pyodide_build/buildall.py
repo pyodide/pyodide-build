@@ -69,35 +69,6 @@ class BasePackage:
     install_dir: str = "site"
     _queue_idx: int | None = None
 
-    # We use this in the priority queue, which pops off the smallest element.
-    # So we want the smallest element to have the largest number of dependents
-    def __lt__(self, other: Any) -> bool:
-        return len(self.host_dependents) > len(other.host_dependents)
-
-    def __eq__(self, other: Any) -> bool:
-        return len(self.host_dependents) == len(other.host_dependents)
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.name})"
-
-    def build_path(self, build_dir: Path) -> Path:
-        return build_dir / self.name / "build"
-
-    def needs_rebuild(self, build_dir: Path) -> bool:
-        return needs_rebuild(self.pkgdir, self.build_path(build_dir), self.meta.source)
-
-    def build(self, build_args: BuildArgs, build_dir: Path) -> None:
-        raise NotImplementedError()
-
-    def dist_artifact_path(self) -> Path:
-        raise NotImplementedError()
-
-    def tests_path(self) -> Path | None:
-        return None
-
-
-@dataclasses.dataclass
-class Package(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig):
         self.pkgdir = pkgdir
         self.meta = config.model_copy(deep=True)
@@ -116,28 +87,38 @@ class Package(BasePackage):
         self.unbuilt_host_dependencies = set(self.host_dependencies)
         self.host_dependents = set()
 
-    def dist_artifact_path(self) -> Path:
-        dist_dir = self.pkgdir / "dist"
-        if self.package_type == "shared_library":
-            candidates = list(dist_dir.glob("*.zip"))
-        else:
-            candidates = list(
-                find_matching_wheels(dist_dir.glob("*.whl"), build_env.pyodide_tags())
-            )
+    @classmethod
+    def from_recipe(
+        cls,
+        pkgdir: Path,
+        config: MetaConfig,
+    ) -> "BasePackage":
+        match config.build.package_type:
+            case "package" | "cpython_module":
+                return PythonPackage(pkgdir, config)
+            case "shared_library":
+                return SharedLibrary(pkgdir, config)
+            case "static_library":
+                return StaticLibrary(pkgdir, config)
+            case _:
+                raise ValueError(f"Unknown package type: {config.build.package_type}")
 
-        if len(candidates) != 1:
-            raise RuntimeError(
-                f"Unexpected number of wheels/archives {len(candidates)} when building {self.name}"
-            )
+    # We use this in the priority queue, which pops off the smallest element.
+    # So we want the smallest element to have the largest number of dependents
+    def __lt__(self, other: Any) -> bool:
+        return len(self.host_dependents) > len(other.host_dependents)
 
-        return candidates[0]
+    def __eq__(self, other: Any) -> bool:
+        return len(self.host_dependents) == len(other.host_dependents)
 
-    def tests_path(self) -> Path | None:
-        tests = list((self.pkgdir / "dist").glob("*-tests.tar"))
-        assert len(tests) <= 1
-        if tests:
-            return tests[0]
-        return None
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.name})"
+
+    def build_path(self, build_dir: Path) -> Path:
+        return build_dir / self.name / "build"
+
+    def needs_rebuild(self, build_dir: Path) -> bool:
+        return needs_rebuild(self.pkgdir, self.build_path(build_dir), self.meta.source)
 
     def build(self, build_args: BuildArgs, build_dir: Path) -> None:
         p = subprocess.run(
@@ -174,6 +155,67 @@ class Package(BasePackage):
                 msg.append("ERROR: No build log found.")
             msg.append(f"ERROR: cancelling buildall due to error building {self.name}")
             raise BuildError(p.returncode, "\n".join(msg))
+
+    def dist_artifact_path(self) -> Path | None:
+        """
+        Return the path to the distribution artifact of the package.
+        """
+        raise NotImplementedError()
+
+    def tests_path(self) -> Path | None:
+        """
+        Return the path to the unvendored tests of the package.
+        """
+        raise NotImplementedError()
+
+
+@dataclasses.dataclass
+class PythonPackage(BasePackage):
+    def dist_artifact_path(self) -> Path | None:
+        dist_dir = self.pkgdir / "dist"
+        candidates = list(
+            find_matching_wheels(dist_dir.glob("*.whl"), build_env.pyodide_tags())
+        )
+
+        if len(candidates) != 1:
+            raise RuntimeError(
+                f"Unexpected number of wheels/archives {len(candidates)} when building {self.name}"
+            )
+
+        return candidates[0]
+
+    def tests_path(self) -> Path | None:
+        tests = list((self.pkgdir / "dist").glob("*-tests.tar"))
+        assert len(tests) <= 1
+        if tests:
+            return tests[0]
+        return None
+
+
+@dataclasses.dataclass
+class SharedLibrary(BasePackage):
+    def dist_artifact_path(self) -> Path | None:
+        dist_dir = self.pkgdir / "dist"
+        candidates = list(dist_dir.glob("*.zip"))
+
+        if len(candidates) != 1:
+            raise RuntimeError(
+                f"Unexpected number of wheels/archives {len(candidates)} when building {self.name}"
+            )
+
+        return candidates[0]
+
+    def tests_path(self) -> Path | None:
+        return None
+
+
+@dataclasses.dataclass
+class StaticLibrary(BasePackage):
+    def dist_artifact_path(self) -> Path | None:
+        return None
+
+    def tests_path(self) -> Path | None:
+        return None
 
 
 class PackageStatus:
@@ -385,7 +427,7 @@ def generate_dependency_graph(
                 f"No metadata file found for the following package: {pkgname}"
             )
 
-        pkg = Package(packages_dir / pkgname, all_recipes[pkgname])
+        pkg = BasePackage.from_recipe(packages_dir / pkgname, all_recipes[pkgname])
         pkg_map[pkgname] = pkg
         graph[pkgname] = pkg.dependencies
         for dep in pkg.dependencies:
@@ -790,10 +832,9 @@ def copy_packages_to_dist_dir(
     metadata_files: bool = False,
 ) -> None:
     for pkg in packages:
-        if pkg.package_type == "static_library":
-            continue
-
         dist_artifact_path = pkg.dist_artifact_path()
+        if not dist_artifact_path:
+            continue
 
         shutil.copy(dist_artifact_path, output_dir)
         repack_zip_archive(
@@ -827,8 +868,6 @@ def build_packages(
 
     build_from_graph(pkg_map, build_args, build_dir, n_jobs, force_rebuild)
     for pkg in pkg_map.values():
-        assert isinstance(pkg, Package)
-
         if pkg.package_type == "static_library":
             continue
 
