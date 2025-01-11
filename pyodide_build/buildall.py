@@ -171,6 +171,9 @@ class BasePackage:
 
 @dataclasses.dataclass
 class PythonPackage(BasePackage):
+    def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
+        super().__init__(pkgdir, config)
+
     def dist_artifact_path(self) -> Path | None:
         dist_dir = self.pkgdir / "dist"
         candidates = list(
@@ -194,6 +197,11 @@ class PythonPackage(BasePackage):
 
 @dataclasses.dataclass
 class SharedLibrary(BasePackage):
+    install_dir: str = "dylib"
+
+    def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
+        super().__init__(pkgdir, config)
+
     def dist_artifact_path(self) -> Path | None:
         dist_dir = self.pkgdir / "dist"
         candidates = list(dist_dir.glob("*.zip"))
@@ -211,6 +219,9 @@ class SharedLibrary(BasePackage):
 
 @dataclasses.dataclass
 class StaticLibrary(BasePackage):
+    def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
+        super().__init__(pkgdir, config)
+
     def dist_artifact_path(self) -> Path | None:
         return None
 
@@ -771,10 +782,6 @@ def generate_packagedata(
 
         update_package_sha256(pkg_entry, output_dir / pkg.file_name)
 
-        pkg_type = pkg.package_type
-        if pkg_type == "shared_library":
-            pkg_entry.install_dir = "dynlib"
-
         pkg_entry.depends = [x.lower() for x in pkg.run_dependencies]
 
         if pkg.package_type not in ("static_library", "shared_library"):
@@ -833,19 +840,17 @@ def copy_packages_to_dist_dir(
 ) -> None:
     for pkg in packages:
         dist_artifact_path = pkg.dist_artifact_path()
-        if not dist_artifact_path:
-            continue
-
-        shutil.copy(dist_artifact_path, output_dir)
-        repack_zip_archive(
-            output_dir / dist_artifact_path.name, compression_level=compression_level
-        )
-
-        if metadata_files and dist_artifact_path.suffix == ".whl":
-            extract_wheel_metadata_file(
-                dist_artifact_path,
-                output_dir / f"{dist_artifact_path.name}.metadata",
+        if dist_artifact_path:
+            shutil.copy(dist_artifact_path, output_dir)
+            repack_zip_archive(
+                output_dir / dist_artifact_path.name, compression_level=compression_level
             )
+
+            if metadata_files and dist_artifact_path.suffix == ".whl":
+                extract_wheel_metadata_file(
+                    dist_artifact_path,
+                    output_dir / f"{dist_artifact_path.name}.metadata",
+                )
 
         test_path = pkg.tests_path()
         if test_path:
@@ -868,11 +873,14 @@ def build_packages(
 
     build_from_graph(pkg_map, build_args, build_dir, n_jobs, force_rebuild)
     for pkg in pkg_map.values():
-        if pkg.package_type == "static_library":
-            continue
+        dist_path = pkg.dist_artifact_path()
+        test_path = pkg.tests_path()
 
-        pkg.file_name = pkg.dist_artifact_path().name
-        pkg.unvendored_tests = pkg.tests_path()
+        if dist_path:
+            pkg.file_name = dist_path.name
+
+        if test_path:
+            pkg.unvendored_tests = test_path
 
     return pkg_map
 
