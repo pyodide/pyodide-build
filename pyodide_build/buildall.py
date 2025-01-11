@@ -843,7 +843,8 @@ def copy_packages_to_dist_dir(
         if dist_artifact_path:
             shutil.copy(dist_artifact_path, output_dir)
             repack_zip_archive(
-                output_dir / dist_artifact_path.name, compression_level=compression_level
+                output_dir / dist_artifact_path.name,
+                compression_level=compression_level,
             )
 
             if metadata_files and dist_artifact_path.suffix == ".whl":
