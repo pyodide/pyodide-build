@@ -469,8 +469,8 @@ def _ensure_rust_toolchain():
     from .xbuildenv import download_and_unpack_archive
 
     download_and_unpack_archive(
-        f"http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc/{toolchain_version}",
-        toolchain_path,
+        f"http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc/{toolchain_version}.tar.bz2",
+        toolchain_path.parent,
     )
     result = subprocess.run(
         ["rustup", "toolchain", "link", toolchain_version, toolchain_path], check=False
