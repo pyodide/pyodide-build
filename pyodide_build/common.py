@@ -10,13 +10,15 @@ import subprocess
 import sys
 import textwrap
 import tomllib
+import warnings
 import zipfile
 from collections import deque
 from collections.abc import Generator, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any, NoReturn
+from urllib.request import urlopen
 from zipfile import ZipFile
 
 from packaging.tags import Tag
@@ -447,3 +449,45 @@ def to_bool(value: str) -> bool:
     Convert a string to a boolean value. Useful for parsing environment variables.
     """
     return value.lower() not in {"", "0", "false", "no", "off"}
+
+
+def download_and_unpack_archive(url: str, path: Path, descr: str) -> None:
+    """
+    Download the cross-build environment from the given URL and extract it to the given path.
+
+    Parameters
+    ----------
+    url
+        URL to download the cross-build environment from.
+    path
+        Path to extract the cross-build environment to.
+        If the path already exists, raise an error.
+    """
+    logger.info("Downloading %s from %s", descr, url)
+
+    if path.exists():
+        raise FileExistsError(f"Path {path} already exists")
+
+    try:
+        resp = urlopen(url)
+        data = resp.read()
+    except Exception as e:
+        raise ValueError(f"Failed to download {descr} from {url}") from e
+
+    # FIXME: requests makes a verbose output (see: https://github.com/pyodide/pyodide/issues/4810)
+    # r = requests.get(url)
+
+    # if r.status_code != 200:
+    #     raise ValueError(
+    #         f"Failed to download cross-build environment from {url} (status code: {r.status_code})"
+    #     )
+
+    with NamedTemporaryFile(suffix=".tar") as f:
+        f_path = Path(f.name)
+        f_path.write_bytes(data)
+        with warnings.catch_warnings():
+            # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
+            # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
+            # https://github.com/python/cpython/issues/112760
+            warnings.simplefilter("ignore")
+            shutil.unpack_archive(str(f_path), path)

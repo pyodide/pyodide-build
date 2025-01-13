@@ -30,9 +30,11 @@ from rich.spinner import Spinner
 from rich.table import Table
 
 from pyodide_build import build_env, recipe
-from pyodide_build.build_env import BuildArgs
+from pyodide_build.build_env import BuildArgs, get_pyodide_root
 from pyodide_build.buildpkg import needs_rebuild
 from pyodide_build.common import (
+    download_and_unpack_archive,
+    exit_with_stdio,
     extract_wheel_metadata_file,
     find_matching_wheels,
     find_missing_executables,
@@ -645,6 +647,25 @@ class _GraphBuilder:
                         self.build_queue.put((job_priority(dependent), dependent))
 
 
+def _ensure_rust_toolchain():
+    pyodide_root = get_pyodide_root()
+    toolchain_version = "emscripten_2025-01-13_052ba16"
+    toolchain_path = pyodide_root / ".rust-toolchain" / toolchain_version
+    if toolchain_path.exists():
+        return
+    download_and_unpack_archive(
+        f"http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc/{toolchain_version}.tar.bz2",
+        toolchain_path.parent,
+        "rust toolchain",
+    )
+    result = subprocess.run(
+        ["rustup", "toolchain", "link", toolchain_version, toolchain_path], check=False
+    )
+    if result.returncode != 0:
+        logger.error("ERROR: rustup toolchain install failed")
+        exit_with_stdio(result)
+
+
 def build_from_graph(
     pkg_map: dict[str, BasePackage],
     build_args: BuildArgs,
@@ -685,6 +706,12 @@ def build_from_graph(
     # the remaining ones
     for pkg_name in needs_build:
         pkg_map[pkg_name].unbuilt_host_dependencies.difference_update(already_built)
+
+    needs_rust = any(
+        pkg_map[pkg_name].meta.is_rust_package() for pkg_name in needs_rebuild
+    )
+    if needs_rust:
+        _ensure_rust_toolchain()
 
     if already_built:
         logger.info(
