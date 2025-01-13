@@ -464,12 +464,18 @@ def _ensure_rust_toolchain():
     return
     pyodide_root = get_pyodide_root()
     toolchain_version = "emscripten_2025-01-13_052ba16"
-    toolchain_path = (pyodide_root / ".rust-toolchain" / toolchain_version)
+    toolchain_path = pyodide_root / ".rust-toolchain" / toolchain_version
     if toolchain_path.exists():
         return
     from .xbuildenv import download_and_unpack_archive
-    download_and_unpack_archive("http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc/{toolchain_version}", toolchain_path)
-    result = subprocess.run(["rustup", "toolchain", "link", toolchain_version, toolchain_path], check = False)
+
+    download_and_unpack_archive(
+        "http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc/{toolchain_version}",
+        toolchain_path,
+    )
+    result = subprocess.run(
+        ["rustup", "toolchain", "link", toolchain_version, toolchain_path], check=False
+    )
     if result.returncode != 0:
         logger.error("ERROR: rustup toolchain install failed")
         exit_with_stdio(result)
