@@ -708,7 +708,7 @@ def build_from_graph(
         pkg_map[pkg_name].unbuilt_host_dependencies.difference_update(already_built)
 
     needs_rust = any(
-        pkg_map[pkg_name].meta.is_rust_package() for pkg_name in needs_rebuild
+        pkg_map[pkg_name].meta.is_rust_package() for pkg_name in needs_build
     )
     if needs_rust:
         _ensure_rust_toolchain()
