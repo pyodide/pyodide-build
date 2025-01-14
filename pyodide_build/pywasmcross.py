@@ -118,6 +118,9 @@ def replay_genargs_handle_dashl(arg: str, used_libs: set[str]) -> str | None:
     if arg == "-lgfortran":
         return None
 
+    if arg in ["-lfreetype", "-lpng"]:
+        arg += "-wasm-sjlj"
+
     # WASM link doesn't like libraries being included twice
     # skip second one
     if arg in used_libs:
