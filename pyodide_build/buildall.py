@@ -651,13 +651,12 @@ def _ensure_rust_toolchain():
     pyodide_root = get_pyodide_root()
     toolchain_version = "emscripten_2025-01-13_052ba16"
     toolchain_path = pyodide_root / ".rust-toolchain" / toolchain_version
-    if toolchain_path.exists():
-        return
-    download_and_unpack_archive(
-        f"http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc/{toolchain_version}.tar.bz2",
-        toolchain_path.parent,
-        "rust toolchain",
-    )
+    if not toolchain_path.exists():
+        download_and_unpack_archive(
+            f"http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc/{toolchain_version}.tar.bz2",
+            toolchain_path.parent,
+            "rust toolchain",
+        )
     result = subprocess.run(
         ["rustup", "toolchain", "link", toolchain_version, toolchain_path], check=False
     )
