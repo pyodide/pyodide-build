@@ -650,8 +650,8 @@ class _GraphBuilder:
 
 
 def _ensure_rust_toolchain():
+    toolchain_version = build_env.get_build_flag("RUST_TOOLCHAIN")
     pyodide_root = get_pyodide_root()
-    toolchain_version = "emscripten_2025-01-13_724fd8dedf1"
     toolchain_path = pyodide_root / ".rust-toolchain" / toolchain_version
     if not toolchain_path.exists():
         download_and_unpack_archive(
