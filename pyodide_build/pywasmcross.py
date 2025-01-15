@@ -77,6 +77,7 @@ class CrossCompileArgs(NamedTuple):
     target_install_dir: str = ""  # The path to the target Python installation
     pythoninclude: str = ""  # path to the cross-compiled Python include directory
     exports: Literal["whole_archive", "requested", "pyinit"] | list[str] = "pyinit"
+    abi: str = ""
 
 
 def is_link_cmd(line: list[str]) -> bool:
@@ -93,7 +94,7 @@ def is_link_cmd(line: list[str]) -> bool:
     return False
 
 
-def replay_genargs_handle_dashl(arg: str, used_libs: set[str]) -> str | None:
+def replay_genargs_handle_dashl(arg: str, used_libs: set[str], abi: str) -> str | None:
     """
     Figure out how to replace a `-lsomelib` argument.
 
@@ -118,7 +119,7 @@ def replay_genargs_handle_dashl(arg: str, used_libs: set[str]) -> str | None:
     if arg == "-lgfortran":
         return None
 
-    if arg in ["-lfreetype", "-lpng"]:
+    if abi > "2025" and arg in ["-lfreetype", "-lpng"]:
         arg += "-wasm-sjlj"
 
     # WASM link doesn't like libraries being included twice
@@ -558,7 +559,7 @@ def handle_command_generate_args(  # noqa: C901
             continue
 
         if arg.startswith("-l"):
-            result = replay_genargs_handle_dashl(arg, used_libs)
+            result = replay_genargs_handle_dashl(arg, used_libs, build_args.abi)
         elif arg.startswith("-I"):
             result = replay_genargs_handle_dashI(arg, build_args.target_install_dir)
         elif arg.startswith("-Wl"):
@@ -583,7 +584,7 @@ def handle_command_generate_args(  # noqa: C901
         new_args.append("-Wl,--fatal-warnings")
         for arg in build_args.ldflags.split():
             if arg.startswith("-l"):
-                arg = replay_genargs_handle_dashl(arg, used_libs)
+                arg = replay_genargs_handle_dashl(arg, used_libs, build_args.abi)
             new_args.append(arg)
         new_args.extend(get_export_flags(line, build_args.exports))
 
@@ -644,6 +645,7 @@ def compiler_main():
         target_install_dir=PYWASMCROSS_ARGS["target_install_dir"],
         pythoninclude=PYWASMCROSS_ARGS["pythoninclude"],
         exports=PYWASMCROSS_ARGS["exports"],
+        abi=PYWASMCROSS_ARGS["abi"],
     )
     basename = Path(sys.argv[0]).name
     args = list(sys.argv)
