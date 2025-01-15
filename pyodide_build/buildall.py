@@ -160,6 +160,8 @@ class Package(BasePackage):
                 # been updated and should be rebuilt even though its own
                 # files haven't been updated.
                 "--force-rebuild",
+                # We already did the rust setup in buildall
+                "--skip-rust-setup",
             ],
             check=False,
             stdout=subprocess.DEVNULL,
