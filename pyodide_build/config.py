@@ -177,6 +177,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
     "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
+    "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -193,6 +194,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "meson_cross_file",
     "skip_emscripten_version_check",
     "build_dependency_index_url",
+    "default_cross_build_env_url"
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -212,6 +214,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
     "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
+    "default_cross_build_env_url": "",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }

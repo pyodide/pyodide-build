@@ -170,7 +170,7 @@ class CrossBuildEnvManager:
             version = _url_to_version(url)
             download_url = url
         else:
-            version = version or self._find_latest_version()
+            version = version or self._get_default_version() or self._find_latest_version()
 
             local_versions = build_env.local_versions()
             release = self._find_remote_release(version)
