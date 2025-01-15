@@ -581,7 +581,10 @@ def handle_command_generate_args(  # noqa: C901
     # Better to fail at compile or link time.
     if is_link_cmd(line):
         new_args.append("-Wl,--fatal-warnings")
-        new_args.extend(build_args.ldflags.split())
+        for arg in build_args.ldflags.split():
+            if arg.startswith("-l"):
+                arg = replay_genargs_handle_dashl(arg, used_libs)
+            new_args.append(arg)
         new_args.extend(get_export_flags(line, build_args.exports))
 
     if "-c" in line:
