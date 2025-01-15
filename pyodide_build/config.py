@@ -209,7 +209,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT -Z link-native-libraries=no",
     "cargo_build_target": "wasm32-unknown-emscripten",
     "cargo_target_wasm32_unknown_emscripten_linker": "emcc",
-    "rust_toolchain": "emscripten_2025-01-13_724fd8dedf1",
+    "rust_toolchain": "nightly-2025-01-15",
     "rust_emscripten_target_url": "",
     # Other configuration
     "pyodide_jobs": "1",
