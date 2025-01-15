@@ -1,14 +1,12 @@
 import json
 import shutil
 import subprocess
-import warnings
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from urllib.request import urlopen
 
 from pyodide_lock import PyodideLockSpec
 
 from pyodide_build import build_env
+from pyodide_build.common import download_and_unpack_archive
 from pyodide_build.create_package_index import create_package_index
 from pyodide_build.logger import logger
 from pyodide_build.xbuildenv_releases import (
@@ -194,7 +192,9 @@ class CrossBuildEnvManager:
                 download_path,
             )
         else:
-            self._download(download_url, download_path)
+            download_and_unpack_archive(
+                download_url, download_path, "Pyodide cross-build environment"
+            )
 
         try:
             # there is an redundant directory "xbuildenv" inside the xbuildenv archive
@@ -239,49 +239,6 @@ class CrossBuildEnvManager:
             raise ValueError("No compatible cross-build environment found")
 
         return latest.version
-
-    def _download(self, url: str, path: Path) -> None:
-        """
-        Download the cross-build environment from the given URL and extract it to the given path.
-
-        Parameters
-        ----------
-        url
-            URL to download the cross-build environment from.
-        path
-            Path to extract the cross-build environment to.
-            If the path already exists, raise an error.
-        """
-        logger.info("Downloading Pyodide cross-build environment from %s", url)
-
-        if path.exists():
-            raise FileExistsError(f"Path {path} already exists")
-
-        try:
-            resp = urlopen(url)
-            data = resp.read()
-        except Exception as e:
-            raise ValueError(
-                f"Failed to download cross-build environment from {url}"
-            ) from e
-
-        # FIXME: requests makes a verbose output (see: https://github.com/pyodide/pyodide/issues/4810)
-        # r = requests.get(url)
-
-        # if r.status_code != 200:
-        #     raise ValueError(
-        #         f"Failed to download cross-build environment from {url} (status code: {r.status_code})"
-        #     )
-
-        with NamedTemporaryFile(suffix=".tar") as f:
-            f_path = Path(f.name)
-            f_path.write_bytes(data)
-            with warnings.catch_warnings():
-                # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
-                # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
-                # https://github.com/python/cpython/issues/112760
-                warnings.simplefilter("ignore")
-                shutil.unpack_archive(str(f_path), path)
 
     def _install_cross_build_packages(
         self, xbuildenv_root: Path, xbuildenv_pyodide_root: Path
