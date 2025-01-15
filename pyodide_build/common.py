@@ -451,7 +451,7 @@ def to_bool(value: str) -> bool:
     return value.lower() not in {"", "0", "false", "no", "off"}
 
 
-def download_and_unpack_archive(url: str, path: Path, descr: str) -> None:
+def download_and_unpack_archive(url: str, path: Path, descr: str, *, exists_ok: boolean = False) -> None:
     """
     Download the cross-build environment from the given URL and extract it to the given path.
 
@@ -465,7 +465,7 @@ def download_and_unpack_archive(url: str, path: Path, descr: str) -> None:
     """
     logger.info("Downloading %s from %s", descr, url)
 
-    if path.exists():
+    if not exists_ok and path.exists():
         raise FileExistsError(f"Path {path} already exists")
 
     try:
