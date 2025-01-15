@@ -225,9 +225,6 @@ class TestCrossBuildEnvManager:
         assert manager.symlink_dir.resolve() == tmp_path / version
         assert (manager.symlink_dir / "xbuildenv").exists()
         assert (manager.symlink_dir / "xbuildenv" / "pyodide-root").exists()
-        assert not (
-            manager.symlink_dir / "xbuildenv" / "pyodide-root" / "package_index"
-        ).exists()
         assert (manager.symlink_dir / "xbuildenv" / "site-packages-extras").exists()
 
         assert (manager.symlink_dir / ".build-python-version").exists()

@@ -60,7 +60,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         default_config = config_manager._load_default_config()
         assert default_config.keys() == DEFAULT_CONFIG.keys()
 
-    def test_makefile_envs(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+    def test_cross_build_envs(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
@@ -68,7 +68,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             pyodide_root=xbuildenv_manager.pyodide_root
         )
 
-        makefile_vars = config_manager._load_makefile_envs()
+        makefile_vars = config_manager._load_cross_build_envs()
 
         # It should contain information about the cpython and emscripten versions
         assert "pyversion" in makefile_vars
@@ -99,7 +99,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             pyodide_root=xbuildenv_manager.pyodide_root
         )
 
-        makefile_vars = config_manager._load_makefile_envs()
+        makefile_vars = config_manager._load_cross_build_envs()
 
         for k, v in DEFAULT_CONFIG_COMPUTED.items():
             assert k in makefile_vars

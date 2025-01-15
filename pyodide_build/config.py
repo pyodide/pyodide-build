@@ -34,7 +34,7 @@ class ConfigManager:
     def _load_default_config(self) -> Mapping[str, str]:
         return deepcopy(DEFAULT_CONFIG)
 
-    def _load_cross_build_envs() -> Mapping[str, str]:
+    def _load_cross_build_envs(self) -> Mapping[str, str]:
         """
         Load environment variables from the cross build environment.
         """
