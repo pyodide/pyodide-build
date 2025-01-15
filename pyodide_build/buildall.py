@@ -30,7 +30,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 
 from pyodide_build import build_env, recipe
-from pyodide_build.build_env import BuildArgs, get_pyodide_root
+from pyodide_build.build_env import BuildArgs
 from pyodide_build.buildpkg import needs_rebuild
 from pyodide_build.common import (
     download_and_unpack_archive,
@@ -650,12 +650,7 @@ class _GraphBuilder:
 
 
 def _run(cmd, *args, check=False, **kwargs):
-    result = subprocess.run(
-        cmd,
-        *args,
-        **kwargs,
-        check=check
-    )
+    result = subprocess.run(cmd, *args, **kwargs, check=check)
     if result.returncode != 0:
         logger.error("ERROR: command failed %s", " ".join(cmd))
         exit_with_stdio(result)
@@ -670,25 +665,33 @@ def _ensure_rust_toolchain():
     url = build_env.get_build_flag("RUST_EMSCRIPTEN_TARGET_URL")
     if not url:
         # Install target with rustup target add
-        _run([
-            "rustup",
-            "target",
-            "add",
-            "wasm32-unknown-emscripten",
-            "--toolchain",
-            rust_toolchain,
-        ])
+        _run(
+            [
+                "rustup",
+                "target",
+                "add",
+                "wasm32-unknown-emscripten",
+                "--toolchain",
+                rust_toolchain,
+            ]
+        )
         return
 
     # Install target from url
-    result = _run(["rustup", "which", "--toolchain", rust_toolchain, "rustc"], capture_output=True, text=True)
+    result = _run(
+        ["rustup", "which", "--toolchain", rust_toolchain, "rustc"],
+        capture_output=True,
+        text=True,
+    )
     toolchain_root = Path(result.stdout).parents[1]
     rustlib = toolchain_root / "lib/rustlib"
     install_token = rustlib / "wasm32-unknown-emscripten_install-url.txt"
     if install_token.exists() and install_token.read_text() == url:
         return
     shutil.rmtree(rustlib / "wasm32-unknown-emscripten", ignore_errors=True)
-    download_and_unpack_archive(url, rustlib, "wasm32-unknown-emscripten target", exists_ok=True)
+    download_and_unpack_archive(
+        url, rustlib, "wasm32-unknown-emscripten target", exists_ok=True
+    )
     install_token.write_text(url)
 
 
