@@ -209,7 +209,13 @@ class TestCrossBuildEnvManager:
         ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
 
     def test_install_url_default(
-        self, tmp_path, dummy_xbuildenv_url, monkeypatch, monkeypatch_subprocess_run_pip, reset_cache, reset_env_vars
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+        reset_cache,
+        reset_env_vars,
     ):
         manager = CrossBuildEnvManager(tmp_path)
 
