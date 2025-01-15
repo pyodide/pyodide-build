@@ -29,6 +29,7 @@ class Args:
         install_dir: Path | str | None = None,
         build_args: BuildArgs,
         force_rebuild: bool,
+        skip_rust_setup: bool,
         n_jobs: int | None = None,
     ):
         cwd = Path.cwd()
@@ -42,6 +43,7 @@ class Args:
         )
         self.build_args = build_args
         self.force_rebuild = force_rebuild
+        self.skip_rust_setup = skip_rust_setup
         self.n_jobs = n_jobs or get_num_cores()
         if not self.recipe_dir.is_dir():
             raise FileNotFoundError(f"Recipe directory {self.recipe_dir} not found")
