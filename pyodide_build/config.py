@@ -204,10 +204,10 @@ DEFAULT_CONFIG: dict[str, str] = {
     "cmake_toolchain_file": str(TOOLS_DIR / "cmake/Modules/Platform/Emscripten.cmake"),
     "meson_cross_file": str(TOOLS_DIR / "emscripten.meson.cross"),
     # Rust-specific configuration
-    "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT -Z link-native-libraries=no",
+    "rustflags": "-C link-arg=-sSIDE_MODULE=2",
     "cargo_build_target": "wasm32-unknown-emscripten",
     "cargo_target_wasm32_unknown_emscripten_linker": "emcc",
-    "rust_toolchain": "nightly-2024-01-29",
+    "rust_toolchain": "nightly-2025-01-15",
     # Other configuration
     "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
