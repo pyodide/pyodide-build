@@ -667,7 +667,7 @@ def _ensure_rust_toolchain():
     _run(["rustup", "toolchain", "install", rust_toolchain])
     _run(["rustup", "default", rust_toolchain])
 
-    url = f"http://pyodide-cache.s3-website-us-east-1.amazonaws.com/rustc-emscripten-target/{rust_toolchain}.tar.bz2"
+    url = build_env.get_build_flag("RUST_EMSCRIPTEN_TARGET_URL")
     if not url:
         # Install target with rustup target add
         _run([
