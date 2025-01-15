@@ -2,6 +2,7 @@ import sys
 
 import pytest
 
+from pyodide_build.common import download_and_unpack_archive
 from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
 
 
@@ -91,24 +92,20 @@ class TestCrossBuildEnvManager:
         assert manager.current_version == "0.25.0"
 
     def test_download(self, tmp_path, dummy_xbuildenv_url):
-        manager = CrossBuildEnvManager(tmp_path)
-
         download_path = tmp_path / "test"
-        manager._download(dummy_xbuildenv_url, download_path)
+        download_and_unpack_archive(dummy_xbuildenv_url, download_path, "")
 
         assert download_path.exists()
         assert (download_path / "xbuildenv").exists()
         assert (download_path / "xbuildenv" / "pyodide-root").exists()
 
     def test_download_path_exists(self, tmp_path):
-        manager = CrossBuildEnvManager(tmp_path)
-
         download_path = tmp_path / "test"
         download_path.mkdir()
 
         with pytest.raises(FileExistsError, match="Path .* already exists"):
-            manager._download(
-                "https://example.com/xbuildenv-0.25.0.tar.bz2", download_path
+            download_and_unpack_archive(
+                "https://example.com/xbuildenv-0.25.0.tar.bz2", download_path, ""
             )
 
     def test_find_latest_version(self, tmp_path, fake_xbuildenv_releases_compatible):
@@ -224,7 +221,7 @@ class TestCrossBuildEnvManager:
         manager = CrossBuildEnvManager(tmp_path)
 
         download_path = tmp_path / "test"
-        manager._download(dummy_xbuildenv_url, download_path)
+        download_and_unpack_archive(dummy_xbuildenv_url, download_path, "")
 
         xbuildenv_root = download_path / "xbuildenv"
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
@@ -248,7 +245,7 @@ class TestCrossBuildEnvManager:
         manager = CrossBuildEnvManager(tmp_path)
 
         download_path = tmp_path / "test"
-        manager._download(dummy_xbuildenv_url, download_path)
+        download_and_unpack_archive(dummy_xbuildenv_url, download_path, "")
 
         xbuildenv_root = download_path / "xbuildenv"
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
