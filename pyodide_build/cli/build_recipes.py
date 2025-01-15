@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build import build_env, buildall
+from pyodide_build import build_env, buildall, recipe
 from pyodide_build.build_env import BuildArgs, init_environment
 from pyodide_build.buildpkg import RecipeBuilder
 from pyodide_build.common import get_num_cores
@@ -17,6 +17,7 @@ class Args:
     build_dir: Path
     install_dir: Path
     build_args: BuildArgs
+    skip_rust_setup: bool
     force_rebuild: bool
     n_jobs: int
 
@@ -93,6 +94,11 @@ def build_recipes_no_deps(
         "--continue",
         help="Continue a build from the middle. For debugging. Implies '--force-rebuild'",
     ),
+    skip_rust_setup: bool = typer.Option(
+        False,
+        "--skip-rust-setup",
+        help="Don't setup rust environment when building a rust package",
+    ),
 ) -> None:
     """Build packages using yaml recipes but don't try to resolve dependencies"""
     init_environment()
@@ -113,15 +119,25 @@ def build_recipes_no_deps(
         build_dir=build_dir,
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
+        skip_rust_setup=skip_rust_setup,
     )
 
     return build_recipes_no_deps_impl(packages, args, continue_)
+
+
+def _rust_setup(recipe_dir: Path, packages: list[str]):
+    recipes = recipe.load_recipes(recipe_dir, packages, False)
+    if any(recipe.is_rust_package() for recipe in recipes.values()):
+        buildall._ensure_rust_toolchain()
 
 
 def build_recipes_no_deps_impl(
     packages: list[str], args: Args, continue_: bool
 ) -> None:
     # TODO: use multiprocessing?
+    if not args.skip_rust_setup:
+        _rust_setup(args.recipe_dir, packages)
+
     for package in packages:
         package_path = args.recipe_dir / package
         package_build_dir = args.build_dir / package / "build"
