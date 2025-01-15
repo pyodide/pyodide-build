@@ -29,7 +29,7 @@ class Args:
         install_dir: Path | str | None = None,
         build_args: BuildArgs,
         force_rebuild: bool,
-        skip_rust_setup: bool,
+        skip_rust_setup: bool = False,
         n_jobs: int | None = None,
     ):
         cwd = Path.cwd()
