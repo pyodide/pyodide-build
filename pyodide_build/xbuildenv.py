@@ -169,8 +169,12 @@ class CrossBuildEnvManager:
         if url:
             version = _url_to_version(url)
             download_url = url
+        # if default version is specified in the configuration, use that
+        elif not version and (default_url := self._get_default_xbuildenv_url()):
+            version = _url_to_version(default_url)
+            download_url = default_url
         else:
-            version = version or self._get_default_version() or self._find_latest_version()
+            version = version or self._find_latest_version()
 
             local_versions = build_env.local_versions()
             release = self._find_remote_release(version)
@@ -239,6 +243,12 @@ class CrossBuildEnvManager:
             raise ValueError("No compatible cross-build environment found")
 
         return latest.version
+
+    def _get_default_xbuildenv_url(self) -> str:
+        """
+        Get the default URL for the cross-build environment. If not specified, return empty string (no default).
+        """
+        return build_env.get_host_build_flag("DEFAULT_CROSS_BUILD_ENV_URL")
 
     def _install_cross_build_packages(
         self, xbuildenv_root: Path, xbuildenv_pyodide_root: Path
