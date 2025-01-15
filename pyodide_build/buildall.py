@@ -33,6 +33,7 @@ from pyodide_build import build_env, recipe
 from pyodide_build.build_env import BuildArgs
 from pyodide_build.buildpkg import needs_rebuild
 from pyodide_build.common import (
+    exit_with_stdio,
     extract_wheel_metadata_file,
     find_matching_wheels,
     find_missing_executables,
@@ -158,6 +159,8 @@ class Package(BasePackage):
                 # been updated and should be rebuilt even though its own
                 # files haven't been updated.
                 "--force-rebuild",
+                # We already did the rust setup in buildall
+                "--skip-rust-setup",
             ],
             check=False,
             stdout=subprocess.DEVNULL,
@@ -645,6 +648,28 @@ class _GraphBuilder:
                         self.build_queue.put((job_priority(dependent), dependent))
 
 
+def _ensure_rust_toolchain():
+    rust_toolchain = build_env.get_build_flag("RUST_TOOLCHAIN")
+    result = subprocess.run(
+        ["rustup", "toolchain", "install", rust_toolchain], check=False
+    )
+    if result.returncode == 0:
+        result = subprocess.run(
+            [
+                "rustup",
+                "target",
+                "add",
+                "wasm32-unknown-emscripten",
+                "--toolchain",
+                rust_toolchain,
+            ],
+            check=False,
+        )
+    if result.returncode != 0:
+        logger.error("ERROR: rustup toolchain install failed")
+        exit_with_stdio(result)
+
+
 def build_from_graph(
     pkg_map: dict[str, BasePackage],
     build_args: BuildArgs,
@@ -685,6 +710,12 @@ def build_from_graph(
     # the remaining ones
     for pkg_name in needs_build:
         pkg_map[pkg_name].unbuilt_host_dependencies.difference_update(already_built)
+
+    needs_rust = any(
+        pkg_map[pkg_name].meta.is_rust_package() for pkg_name in needs_build
+    )
+    if needs_rust:
+        _ensure_rust_toolchain()
 
     if already_built:
         logger.info(
