@@ -451,6 +451,41 @@ def to_bool(value: str) -> bool:
     return value.lower() not in {"", "0", "false", "no", "off"}
 
 
+def get_host_platform():
+    """
+    Return a string that identifies the current platform.
+    Simplified version of get_host_platform in pypa/distlib.
+    """
+    if os.name != "posix":
+        raise ValueError(f"only posix platforms are supported, got {os.name}")
+
+    # Set for cross builds explicitly
+    if "_PYTHON_HOST_PLATFORM" in os.environ:
+        return os.environ["_PYTHON_HOST_PLATFORM"]
+
+    # Try to distinguish various flavours of Unix
+    (osname, host, release, version, machine) = os.uname()
+
+    # Convert the OS name to lowercase, remove '/' characters, and translate
+    # spaces (for "Power Macintosh")
+    osname = osname.lower().replace("/", "")
+    machine = machine.replace(" ", "_").replace("/", "-")
+
+    if osname[:5] == "linux":
+        return f"{osname}-{machine}"
+    elif osname[:6] == "darwin":
+        import _osx_support
+        import sysconfig
+
+        osname, release, machine = _osx_support.get_platform_osx(
+            sysconfig.get_config_vars(), osname, release, machine
+        )
+    else:
+        raise ValueError(f"unsupported os: {osname}")
+
+    return f"{osname}-{release}-{machine}"
+
+
 def download_and_unpack_archive(url: str, path: Path, descr: str) -> None:
     """
     Download the cross-build environment from the given URL and extract it to the given path.

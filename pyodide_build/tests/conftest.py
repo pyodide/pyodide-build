@@ -62,7 +62,6 @@ def reset_cache():
     def _reset():
         build_env.get_pyodide_root.cache_clear()
         build_env.get_build_environment_vars.cache_clear()
-        build_env.get_unisolated_packages.cache_clear()
 
     _reset()
 

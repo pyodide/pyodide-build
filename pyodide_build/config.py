@@ -179,6 +179,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
+    "_build_dependency_fallback_to_pypi": "BUILD_DEPENDENCY_FALLBACK_TO_PYPI",
 }
 
 BUILD_VAR_TO_KEY = {v: k for k, v in BUILD_KEY_TO_VAR.items()}
@@ -195,6 +196,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "build_dependency_index_url",
     # maintainer only
     "_f2c_fixes_wrapper",
+    "_build_dependency_fallback_to_pypi",
 }
 
 # Default configuration values.
@@ -211,9 +213,10 @@ DEFAULT_CONFIG: dict[str, str] = {
     # Other configuration
     "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
-    "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
+    "build_dependency_index_url": "https://pypi.anaconda.org/pyodide-build/simple",
     # maintainer only
     "_f2c_fixes_wrapper": "",
+    "_build_dependency_fallback_to_pypi": "1",
 }
 
 # Default configs that are computed from other values (often from Makefile.envs)
