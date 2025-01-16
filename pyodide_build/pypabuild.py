@@ -146,7 +146,7 @@ def _build_in_isolated_env(
         # first install the build dependencies
         symlink_unisolated_packages(env)
         index_url_for_cross_build = get_build_flag("BUILD_DEPENDENCY_INDEX_URL")
-        installed_build_system_requires = False  # build depdency for in pyproject.toml
+        installed_build_system_requires = False  # build dependency for in pyproject.toml
         installed_backend_requires = (
             False  # dependencies defined by the backend for a given distribution
         )
