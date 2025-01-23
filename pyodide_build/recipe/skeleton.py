@@ -237,6 +237,9 @@ def update_package(
     if "url" not in yaml_content["source"]:
         raise MkpkgSkipped(f"{package} is a local package!")
 
+    if yaml_content["package"].get("pinned", False):
+        raise MkpkgSkipped(f"{package} is pinned!")
+
     if yaml_content["source"]["url"].endswith("whl"):
         old_fmt = "wheel"
     else:
