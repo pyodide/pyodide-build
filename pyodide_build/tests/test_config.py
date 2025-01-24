@@ -4,27 +4,71 @@ from pyodide_build.config import (
     DEFAULT_CONFIG,
     DEFAULT_CONFIG_COMPUTED,
     ConfigManager,
+    CrossBuildEnvConfigManager,
 )
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
-class TestConfigManager_OutOfTree:
+class TestConfigManager:
+    def test_default_config(self, reset_env_vars, reset_cache):
+        config_manager = ConfigManager()
+        default_config = config_manager._load_default_config()
+        assert default_config.keys() == DEFAULT_CONFIG.keys()
+
+    def test_load_config_from_env(self, reset_env_vars, reset_cache):
+        config_manager = ConfigManager()
+        env = {
+            "CMAKE_TOOLCHAIN_FILE": "/path/to/toolchain",
+            "MESON_CROSS_FILE": "/path/to/crossfile",
+        }
+
+        config = config_manager._load_config_from_env(env)
+        assert config["cmake_toolchain_file"] == "/path/to/toolchain"
+        assert config["meson_cross_file"] == "/path/to/crossfile"
+
+    def test_load_config_from_file(self, tmp_path, reset_env_vars, reset_cache):
+        pyproject_file = tmp_path / "pyproject.toml"
+
+        env = {
+            "MESON_CROSS_FILE": "/path/to/crossfile",
+        }
+
+        pyproject_file.write_text("""[tool.pyodide.build]
+                                  invalid_flags = "this_should_not_be_parsed"
+                                  skip_emscripten_version_check = "1"
+                                  """)
+
+        config_manager = ConfigManager()
+        config = config_manager._load_config_file(pyproject_file, env)
+
+        assert "invalid_flags" not in config
+        assert (
+            config["skip_emscripten_version_check"]
+            == "1"
+        )
+
+
+class TestCrossBuildEnvConfigManager_OutOfTree:
     def test_default_config(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
 
         default_config = config_manager._load_default_config()
         assert default_config.keys() == DEFAULT_CONFIG.keys()
 
-    def test_makefile_envs(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+    def test_cross_build_envs(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
 
-        makefile_vars = config_manager._load_makefile_envs()
+        makefile_vars = config_manager._load_cross_build_envs()
 
         # It should contain information about the cpython and emscripten versions
         assert "pyversion" in makefile_vars
@@ -41,7 +85,9 @@ class TestConfigManager_OutOfTree:
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
         make_vars = config_manager._get_make_environment_vars()
         assert make_vars["PYODIDE_ROOT"] == str(xbuildenv_manager.pyodide_root)
 
@@ -49,9 +95,11 @@ class TestConfigManager_OutOfTree:
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
 
-        makefile_vars = config_manager._load_makefile_envs()
+        makefile_vars = config_manager._load_cross_build_envs()
 
         for k, v in DEFAULT_CONFIG_COMPUTED.items():
             assert k in makefile_vars
@@ -62,7 +110,9 @@ class TestConfigManager_OutOfTree:
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
 
         env = {
             "CMAKE_TOOLCHAIN_FILE": "/path/to/toolchain",
@@ -95,7 +145,9 @@ class TestConfigManager_OutOfTree:
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
 
         config = config_manager._load_config_file(pyproject_file, env)
 
@@ -110,7 +162,9 @@ class TestConfigManager_OutOfTree:
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
         config = config_manager.config
 
         for key in BUILD_KEY_TO_VAR.keys():
@@ -120,7 +174,9 @@ class TestConfigManager_OutOfTree:
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
-        config_manager = ConfigManager(pyodide_root=xbuildenv_manager.pyodide_root)
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
         env = config_manager.to_env()
         for env_var in BUILD_KEY_TO_VAR.values():
             assert env_var in env
