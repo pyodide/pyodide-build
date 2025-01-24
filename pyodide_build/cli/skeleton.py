@@ -6,8 +6,9 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build import build_env, mkpkg
+from pyodide_build import build_env
 from pyodide_build.logger import logger
+from pyodide_build.recipe.loader import mkpkg
 
 app = typer.Typer()
 

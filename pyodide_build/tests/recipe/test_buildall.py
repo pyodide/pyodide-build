@@ -6,8 +6,9 @@ from typing import Any
 import pytest
 from pyodide_lock.spec import PackageSpec
 
-from pyodide_build import build_env, buildall
+from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs
+from pyodide_build.recipe.loader import buildall
 
 RECIPE_DIR = Path(__file__).parent / "_test_recipes"
 BUILD_DIR = RECIPE_DIR

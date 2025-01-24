@@ -7,9 +7,9 @@ from typing import Self
 import pydantic
 import pytest
 
-from pyodide_build import buildpkg, common
+from pyodide_build import common
 from pyodide_build.build_env import BuildArgs
-from pyodide_build.buildpkg import (
+from pyodide_build.recipe.buildpkg import (
     RecipeBuilder,
     RecipeBuilderPackage,
     RecipeBuilderSharedLibrary,
@@ -17,6 +17,7 @@ from pyodide_build.buildpkg import (
     _load_recipe,
 )
 from pyodide_build.io import _SourceSpec
+from pyodide_build.recipe.loader import buildpkg
 
 RECIPE_DIR = Path(__file__).parent / "_test_recipes"
 WHEEL_DIR = Path(__file__).parent / "_test_wheels"
