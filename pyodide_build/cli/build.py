@@ -15,7 +15,6 @@ from pyodide_build.build_env import (
     get_pyodide_root,
     init_environment,
 )
-from pyodide_build.io import _BuildSpecExports, _ExportTypes
 from pyodide_build.logger import logger
 from pyodide_build.out_of_tree import build
 from pyodide_build.out_of_tree.pypi import (
@@ -24,6 +23,7 @@ from pyodide_build.out_of_tree.pypi import (
     fetch_pypi_package,
 )
 from pyodide_build.pypabuild import parse_backend_flags
+from pyodide_build.spec import _BuildSpecExports, _ExportTypes
 
 
 def convert_exports(exports: str) -> _BuildSpecExports:

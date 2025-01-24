@@ -20,6 +20,8 @@ from pyodide_build.cli import (
 
 runner = CliRunner()
 
+RECIPE_DIR = Path(__file__).parent / "recipe" / "_test_recipes"
+
 
 def test_skeleton_pypi(tmp_path):
     test_pkg = "pytest-pyodide"
@@ -64,7 +66,6 @@ def test_skeleton_pypi(tmp_path):
 
 def test_build_recipe(tmp_path, dummy_xbuildenv, mock_emscripten):
     output_dir = tmp_path / "dist"
-    recipe_dir = Path(__file__).parent / "_test_recipes"
 
     pkgs = {
         "pkg_test_tag_always": {},
@@ -74,7 +75,7 @@ def test_build_recipe(tmp_path, dummy_xbuildenv, mock_emscripten):
 
     pkgs_to_build = pkgs.keys() | {p for v in pkgs.values() for p in v}
 
-    for build_dir in recipe_dir.rglob("build"):
+    for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
     app = typer.Typer()
@@ -85,7 +86,7 @@ def test_build_recipe(tmp_path, dummy_xbuildenv, mock_emscripten):
         [
             *pkgs.keys(),
             "--recipe-dir",
-            str(recipe_dir),
+            str(RECIPE_DIR),
             "--install",
             "--install-dir",
             str(output_dir),
@@ -102,9 +103,7 @@ def test_build_recipe(tmp_path, dummy_xbuildenv, mock_emscripten):
 
 
 def test_build_recipe_no_deps(tmp_path, dummy_xbuildenv, mock_emscripten):
-    recipe_dir = Path(__file__).parent / "_test_recipes"
-
-    for build_dir in recipe_dir.rglob("build"):
+    for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
     app = typer.Typer()
@@ -116,7 +115,7 @@ def test_build_recipe_no_deps(tmp_path, dummy_xbuildenv, mock_emscripten):
         [
             *pkgs_to_build,
             "--recipe-dir",
-            str(recipe_dir),
+            str(RECIPE_DIR),
         ],
     )
 
@@ -126,14 +125,12 @@ def test_build_recipe_no_deps(tmp_path, dummy_xbuildenv, mock_emscripten):
         assert f"Succeeded building package {pkg}" in result.stdout
 
     for pkg in pkgs_to_build:
-        dist_dir = recipe_dir / pkg / "dist"
+        dist_dir = RECIPE_DIR / pkg / "dist"
         assert len(list(dist_dir.glob("*.whl"))) == 1
 
 
 def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emscripten):
-    recipe_dir = Path(__file__).parent / "_test_recipes"
-
-    for build_dir in recipe_dir.rglob("build"):
+    for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
     app = typer.Typer()
@@ -145,7 +142,7 @@ def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emsc
         [
             pkg,
             "--recipe-dir",
-            str(recipe_dir),
+            str(RECIPE_DIR),
         ],
     )
 
@@ -156,7 +153,7 @@ def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emsc
         [
             pkg,
             "--recipe-dir",
-            str(recipe_dir),
+            str(RECIPE_DIR),
         ],
     )
 
@@ -169,7 +166,7 @@ def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emsc
         [
             pkg,
             "--recipe-dir",
-            str(recipe_dir),
+            str(RECIPE_DIR),
             "--force-rebuild",
         ],
     )
@@ -180,9 +177,7 @@ def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emsc
 
 
 def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripten):
-    recipe_dir = Path(__file__).parent / "_test_recipes"
-
-    for build_dir in recipe_dir.rglob("build"):
+    for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
     app = typer.Typer()
@@ -194,17 +189,17 @@ def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripte
         [
             pkg,
             "--recipe-dir",
-            str(recipe_dir),
+            str(RECIPE_DIR),
         ],
     )
 
     assert result.exit_code == 0, result.stdout
     assert f"Succeeded building package {pkg}" in result.stdout
 
-    for wheels in (recipe_dir / pkg / "build").rglob("*.whl"):
+    for wheels in (RECIPE_DIR / pkg / "build").rglob("*.whl"):
         wheels.unlink()
 
-    pyproject_toml = next((recipe_dir / pkg / "build").rglob("pyproject.toml"))
+    pyproject_toml = next((RECIPE_DIR / pkg / "build").rglob("pyproject.toml"))
 
     # Modify some metadata and check it is applied when rebuilt with --continue flag
     version = "99.99.99"
@@ -223,7 +218,7 @@ def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripte
         [
             pkg,
             "--recipe-dir",
-            str(recipe_dir),
+            str(RECIPE_DIR),
             "--continue",
         ],
     )

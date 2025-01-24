@@ -29,7 +29,6 @@ from rich.table import Table
 
 from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs
-from pyodide_build.recipe.buildpkg import needs_rebuild
 from pyodide_build.common import (
     exit_with_stdio,
     extract_wheel_metadata_file,
@@ -37,9 +36,10 @@ from pyodide_build.common import (
     find_missing_executables,
     repack_zip_archive,
 )
-from pyodide_build.io import MetaConfig, _BuildSpecTypes
 from pyodide_build.logger import console_stdout, logger
 from pyodide_build.recipe import loader
+from pyodide_build.recipe.builder import needs_rebuild
+from pyodide_build.recipe.spec import MetaConfig, _BuildSpecTypes
 
 
 class BuildError(Exception):

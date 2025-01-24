@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from pyodide_build import bash_runner
+from pyodide_build.recipe import bash_runner
 
 
 def test_subprocess_with_shared_env_1():

@@ -8,7 +8,7 @@ import typer
 
 from pyodide_build import build_env
 from pyodide_build.logger import logger
-from pyodide_build.recipe.loader import mkpkg
+from pyodide_build.recipe import skeleton
 
 app = typer.Typer()
 
@@ -73,20 +73,20 @@ def new_recipe_pypi(
 
     if update or update_patched:
         try:
-            mkpkg.update_package(
+            skeleton.update_package(
                 recipe_dir_,
                 name,
                 version,
                 source_fmt=source_format,  # type: ignore[arg-type]
                 update_patched=update_patched,
             )
-        except mkpkg.MkpkgFailedException as e:
+        except skeleton.MkpkgFailedException as e:
             logger.error("%s update failed: %s", name, e)
             sys.exit(1)
-        except mkpkg.MkpkgSkipped as e:
+        except skeleton.MkpkgSkipped as e:
             logger.warning("%s update skipped: %s", name, e)
         except Exception:
             print(name)
             raise
     else:
-        mkpkg.make_package(recipe_dir_, name, version, source_fmt=source_format)  # type: ignore[arg-type]
+        skeleton.make_package(recipe_dir_, name, version, source_fmt=source_format)  # type: ignore[arg-type]
