@@ -42,10 +42,7 @@ class TestConfigManager:
         config = config_manager._load_config_file(pyproject_file, env)
 
         assert "invalid_flags" not in config
-        assert (
-            config["skip_emscripten_version_check"]
-            == "1"
-        )
+        assert config["skip_emscripten_version_check"] == "1"
 
 
 class TestCrossBuildEnvConfigManager_OutOfTree:
