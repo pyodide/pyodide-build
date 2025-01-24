@@ -36,6 +36,7 @@ class TestConfigManager:
         pyproject_file.write_text("""[tool.pyodide.build]
                                   invalid_flags = "this_should_not_be_parsed"
                                   default_cross_build_env_url = "https://example.com/cross_build_env.tar.gz"
+                                  skip_emscripten_version_check = "1"
                                   """)
 
         config_manager = ConfigManager()
@@ -46,6 +47,7 @@ class TestConfigManager:
             config["default_cross_build_env_url"]
             == "https://example.com/cross_build_env.tar.gz"
         )
+        assert config["skip_emscripten_version_check"] == "1"
 
 
 class TestCrossBuildEnvConfigManager_OutOfTree:
