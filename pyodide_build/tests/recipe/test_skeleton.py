@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from packaging import version
 
-import pyodide_build.recipe.skeleton
+from pyodide_build.recipe import skeleton
 from pyodide_build.recipe.spec import MetaConfig
 
 # Following tests make real network calls to the PyPI JSON API.
@@ -16,7 +16,7 @@ from pyodide_build.recipe.spec import MetaConfig
 def test_mkpkg(tmpdir, capsys, source_fmt):
     base_dir = Path(str(tmpdir))
 
-    pyodide_build.recipe.skeleton.make_package(base_dir, "idna", None, source_fmt)
+    skeleton.make_package(base_dir, "idna", None, source_fmt)
     assert os.listdir(base_dir) == ["idna"]
     meta_path = base_dir / "idna" / "meta.yaml"
     assert meta_path.exists()
@@ -57,9 +57,7 @@ def test_mkpkg_update(tmpdir, old_dist_type, new_dist_type):
     source_fmt = new_dist_type
     if new_dist_type == "same":
         source_fmt = None
-    pyodide_build.recipe.skeleton.update_package(
-        base_dir, "idna", None, False, source_fmt
-    )
+    skeleton.update_package(base_dir, "idna", None, False, source_fmt)
 
     db = MetaConfig.from_yaml(meta_path)
     assert version.parse(db.package.version) > version.parse(db_init.package.version)
@@ -70,3 +68,23 @@ def test_mkpkg_update(tmpdir, old_dist_type, new_dist_type):
         assert db.source.url.endswith(".tar.gz")
     else:
         assert db.source.url.endswith(old_ext)
+
+
+def test_mkpkg_update_pinned(tmpdir):
+    base_dir = Path(str(tmpdir))
+
+    db_init = MetaConfig(
+        package={"name": "idna", "version": "2.0", "pinned": True},
+        source={
+            "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
+            "url": "https://<some>/idna-2.0.whl",
+        },
+        test={"imports": ["idna"]},
+    )
+
+    package_dir = base_dir / "idna"
+    package_dir.mkdir(parents=True)
+    meta_path = package_dir / "meta.yaml"
+    db_init.to_yaml(meta_path)
+    with pytest.raises(skeleton.MkpkgSkipped, match="pinned"):
+        skeleton.update_package(base_dir, "idna", None, False, None)
