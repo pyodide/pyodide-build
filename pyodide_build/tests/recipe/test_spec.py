@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from pyodide_build.io import MetaConfig, _BuildSpec, _SourceSpec
+from pyodide_build.recipe.spec import MetaConfig, _BuildSpec, _SourceSpec
 
 
 def test_wheel_and_host_deps():

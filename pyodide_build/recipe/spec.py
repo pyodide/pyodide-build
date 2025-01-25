@@ -4,6 +4,8 @@ from typing import Literal, Self
 import pydantic
 from pydantic import BaseModel, ConfigDict, Field
 
+from pyodide_build.spec import _BuildSpecExports
+
 
 class _PackageSpec(BaseModel):
     name: str
@@ -69,8 +71,6 @@ class _SourceSpec(BaseModel):
         return self
 
 
-_ExportTypes = Literal["pyinit", "requested", "whole_archive"]
-_BuildSpecExports = _ExportTypes | list[str]
 _BuildSpecTypes = Literal[
     "package", "static_library", "shared_library", "cpython_module"
 ]

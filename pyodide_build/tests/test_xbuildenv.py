@@ -1,7 +1,9 @@
+import os
 import sys
 
 import pytest
 
+from pyodide_build.common import download_and_unpack_archive
 from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
 
 
@@ -91,24 +93,20 @@ class TestCrossBuildEnvManager:
         assert manager.current_version == "0.25.0"
 
     def test_download(self, tmp_path, dummy_xbuildenv_url):
-        manager = CrossBuildEnvManager(tmp_path)
-
         download_path = tmp_path / "test"
-        manager._download(dummy_xbuildenv_url, download_path)
+        download_and_unpack_archive(dummy_xbuildenv_url, download_path, "")
 
         assert download_path.exists()
         assert (download_path / "xbuildenv").exists()
         assert (download_path / "xbuildenv" / "pyodide-root").exists()
 
     def test_download_path_exists(self, tmp_path):
-        manager = CrossBuildEnvManager(tmp_path)
-
         download_path = tmp_path / "test"
         download_path.mkdir()
 
         with pytest.raises(FileExistsError, match="Path .* already exists"):
-            manager._download(
-                "https://example.com/xbuildenv-0.25.0.tar.bz2", download_path
+            download_and_unpack_archive(
+                "https://example.com/xbuildenv-0.25.0.tar.bz2", download_path, ""
             )
 
     def test_find_latest_version(self, tmp_path, fake_xbuildenv_releases_compatible):
@@ -129,6 +127,24 @@ class TestCrossBuildEnvManager:
             ValueError, match="No compatible cross-build environment found"
         ):
             manager._find_latest_version()
+
+    def test_get_default_xbuildenv_url(
+        self, tmp_path, fake_xbuildenv_releases_compatible, reset_cache, reset_env_vars
+    ):
+        manager = CrossBuildEnvManager(
+            tmp_path, str(fake_xbuildenv_releases_compatible)
+        )
+        url = manager._get_default_xbuildenv_url()
+        assert url == ""
+
+        reset_cache()
+
+        os.environ["DEFAULT_CROSS_BUILD_ENV_URL"] = (
+            "https://example.com/xbuildenv-0.25.0.tar.bz2"
+        )
+
+        url = manager._get_default_xbuildenv_url()
+        assert url == "https://example.com/xbuildenv-0.25.0.tar.bz2"
 
     def test_install_version(
         self,
@@ -192,6 +208,36 @@ class TestCrossBuildEnvManager:
             manager.symlink_dir / ".build-python-version"
         ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
 
+    def test_install_url_default(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+        reset_cache,
+        reset_env_vars,
+    ):
+        manager = CrossBuildEnvManager(tmp_path)
+
+        os.environ["DEFAULT_CROSS_BUILD_ENV_URL"] = dummy_xbuildenv_url
+        manager.install(version=None)
+        version = _url_to_version(dummy_xbuildenv_url)
+
+        assert (tmp_path / version).exists()
+        assert (tmp_path / version / ".installed").exists()
+        assert manager.current_version == version
+
+        assert manager.symlink_dir.is_symlink()
+        assert manager.symlink_dir.resolve() == tmp_path / version
+        assert (manager.symlink_dir / "xbuildenv").exists()
+        assert (manager.symlink_dir / "xbuildenv" / "pyodide-root").exists()
+        assert (manager.symlink_dir / "xbuildenv" / "site-packages-extras").exists()
+
+        assert (manager.symlink_dir / ".build-python-version").exists()
+        assert (
+            manager.symlink_dir / ".build-python-version"
+        ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
+
     def test_install_force(
         self,
         tmp_path,
@@ -224,7 +270,7 @@ class TestCrossBuildEnvManager:
         manager = CrossBuildEnvManager(tmp_path)
 
         download_path = tmp_path / "test"
-        manager._download(dummy_xbuildenv_url, download_path)
+        download_and_unpack_archive(dummy_xbuildenv_url, download_path, "")
 
         xbuildenv_root = download_path / "xbuildenv"
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
@@ -248,7 +294,7 @@ class TestCrossBuildEnvManager:
         manager = CrossBuildEnvManager(tmp_path)
 
         download_path = tmp_path / "test"
-        manager._download(dummy_xbuildenv_url, download_path)
+        download_and_unpack_archive(dummy_xbuildenv_url, download_path, "")
 
         xbuildenv_root = download_path / "xbuildenv"
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"

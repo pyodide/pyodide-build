@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Builds a Pyodide package.
 """
@@ -20,7 +18,6 @@ from typing import Any, cast
 import requests
 
 from pyodide_build import common, pypabuild
-from pyodide_build.bash_runner import BashRunnerWithSharedEnvironment, get_bash_runner
 from pyodide_build.build_env import (
     RUST_BUILD_PRELUDE,
     BuildArgs,
@@ -40,8 +37,12 @@ from pyodide_build.common import (
     modify_wheel,
     retag_wheel,
 )
-from pyodide_build.io import MetaConfig, _SourceSpec
 from pyodide_build.logger import logger
+from pyodide_build.recipe.bash_runner import (
+    BashRunnerWithSharedEnvironment,
+    get_bash_runner,
+)
+from pyodide_build.recipe.spec import MetaConfig, _SourceSpec
 
 
 def _make_whlfile(

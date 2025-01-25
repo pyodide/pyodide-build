@@ -4,11 +4,12 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build import build_env, buildall
+from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs, init_environment
-from pyodide_build.buildpkg import RecipeBuilder
 from pyodide_build.common import get_num_cores
 from pyodide_build.logger import logger
+from pyodide_build.recipe import graph_builder, loader
+from pyodide_build.recipe.builder import RecipeBuilder
 
 
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
@@ -17,6 +18,7 @@ class Args:
     build_dir: Path
     install_dir: Path
     build_args: BuildArgs
+    skip_rust_setup: bool
     force_rebuild: bool
     n_jobs: int
 
@@ -28,6 +30,7 @@ class Args:
         install_dir: Path | str | None = None,
         build_args: BuildArgs,
         force_rebuild: bool,
+        skip_rust_setup: bool = False,
         n_jobs: int | None = None,
     ):
         cwd = Path.cwd()
@@ -41,6 +44,7 @@ class Args:
         )
         self.build_args = build_args
         self.force_rebuild = force_rebuild
+        self.skip_rust_setup = skip_rust_setup
         self.n_jobs = n_jobs or get_num_cores()
         if not self.recipe_dir.is_dir():
             raise FileNotFoundError(f"Recipe directory {self.recipe_dir} not found")
@@ -93,6 +97,11 @@ def build_recipes_no_deps(
         "--continue",
         help="Continue a build from the middle. For debugging. Implies '--force-rebuild'",
     ),
+    skip_rust_setup: bool = typer.Option(
+        False,
+        "--skip-rust-setup",
+        help="Don't setup rust environment when building a rust package",
+    ),
 ) -> None:
     """Build packages using yaml recipes but don't try to resolve dependencies"""
     init_environment()
@@ -107,21 +116,31 @@ def build_recipes_no_deps(
         target_install_dir=target_install_dir,
         host_install_dir=host_install_dir,
     )
-    build_args = buildall.set_default_build_args(build_args)
+    build_args = graph_builder.set_default_build_args(build_args)
     args = Args(
         build_args=build_args,
         build_dir=build_dir,
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
+        skip_rust_setup=skip_rust_setup,
     )
 
     return build_recipes_no_deps_impl(packages, args, continue_)
+
+
+def _rust_setup(recipe_dir: Path, packages: list[str]) -> None:
+    recipes = loader.load_recipes(recipe_dir, packages, False)
+    if any(recipe.is_rust_package() for recipe in recipes.values()):
+        graph_builder._ensure_rust_toolchain()
 
 
 def build_recipes_no_deps_impl(
     packages: list[str], args: Args, continue_: bool
 ) -> None:
     # TODO: use multiprocessing?
+    if not args.skip_rust_setup:
+        _rust_setup(args.recipe_dir, packages)
+
     for package in packages:
         package_path = args.recipe_dir / package
         package_build_dir = args.build_dir / package / "build"
@@ -229,7 +248,7 @@ def build_recipes(
         target_install_dir=target_install_dir,
         host_install_dir=host_install_dir,
     )
-    build_args = buildall.set_default_build_args(build_args)
+    build_args = graph_builder.set_default_build_args(build_args)
     args = Args(
         build_args=build_args,
         build_dir=build_dir,
@@ -255,7 +274,7 @@ def build_recipes_impl(
     else:
         targets = ",".join(packages)
 
-    pkg_map = buildall.build_packages(
+    pkg_map = graph_builder.build_packages(
         args.recipe_dir,
         targets=targets,
         build_args=args.build_args,
@@ -265,10 +284,10 @@ def build_recipes_impl(
     )
 
     if log_dir:
-        buildall.copy_logs(pkg_map, log_dir)
+        graph_builder.copy_logs(pkg_map, log_dir)
 
     if install_options:
-        buildall.install_packages(
+        graph_builder.install_packages(
             pkg_map,
             args.install_dir,
             compression_level=install_options.compression_level,

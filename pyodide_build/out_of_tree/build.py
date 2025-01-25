@@ -5,7 +5,7 @@ from build import ConfigSettingsType
 
 from pyodide_build import build_env, common, pypabuild
 from pyodide_build.build_env import get_pyodide_root, wheel_platform
-from pyodide_build.io import _BuildSpecExports
+from pyodide_build.spec import _BuildSpecExports
 
 
 def run(

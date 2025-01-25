@@ -6,8 +6,9 @@ from typing import Any
 import pytest
 from pyodide_lock.spec import PackageSpec
 
-from pyodide_build import build_env, buildall
+from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs
+from pyodide_build.recipe import graph_builder
 
 RECIPE_DIR = Path(__file__).parent / "_test_recipes"
 BUILD_DIR = RECIPE_DIR
@@ -15,7 +16,7 @@ BUILD_DIR = RECIPE_DIR
 
 def test_generate_dependency_graph():
     # beautifulsoup4 has a circular dependency on soupsieve
-    pkg_map = buildall.generate_dependency_graph(RECIPE_DIR, {"beautifulsoup4"})
+    pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"beautifulsoup4"})
     assert pkg_map["beautifulsoup4"].run_dependencies == ["soupsieve"]
     assert pkg_map["beautifulsoup4"].host_dependencies == []
     assert pkg_map["beautifulsoup4"].host_dependents == set()
@@ -34,22 +35,22 @@ def test_generate_dependency_graph():
     ],
 )
 def test_generate_dependency_graph2(requested, disabled, out):
-    pkg_map = buildall.generate_dependency_graph(RECIPE_DIR, requested, disabled)
+    pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, requested, disabled)
     assert set(pkg_map.keys()) == out
 
 
 def test_generate_dependency_graph_disabled():
-    pkg_map = buildall.generate_dependency_graph(
+    pkg_map = graph_builder.generate_dependency_graph(
         RECIPE_DIR, {"pkg_test_disabled_child"}
     )
     assert set(pkg_map.keys()) == set()
 
-    pkg_map = buildall.generate_dependency_graph(RECIPE_DIR, {"pkg_test_disabled"})
+    pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_test_disabled"})
     assert set(pkg_map.keys()) == set()
 
 
 def test_generate_lockfile(tmp_path, dummy_xbuildenv):
-    pkg_map = buildall.generate_dependency_graph(
+    pkg_map = graph_builder.generate_dependency_graph(
         RECIPE_DIR, {"pkg_1", "pkg_2", "libtest", "libtest_shared"}
     )
     hashes = {}
@@ -67,7 +68,7 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
         with open(tmp_path / pkg.file_name, "rb") as f:
             hashes[pkg.name] = hashlib.sha256(f.read()).hexdigest()
 
-    package_data = buildall.generate_lockfile(tmp_path, pkg_map)
+    package_data = graph_builder.generate_lockfile(tmp_path, pkg_map)
     assert package_data.info.arch == "wasm32"
     assert package_data.info.platform.startswith("emscripten")
     assert package_data.info.version == build_env.get_build_flag("PYODIDE_VERSION")
@@ -106,11 +107,11 @@ def test_build_dependencies(n_jobs, monkeypatch):
     def mock_build(self, args: Any, build_dir: Path) -> None:
         build_list.append(self.name)
 
-    monkeypatch.setattr(buildall.BasePackage, "build", mock_build)
+    monkeypatch.setattr(graph_builder.BasePackage, "build", mock_build)
 
-    pkg_map = buildall.generate_dependency_graph(RECIPE_DIR, {"pkg_1", "pkg_2"})
+    pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_1", "pkg_2"})
 
-    buildall.build_from_graph(
+    graph_builder.build_from_graph(
         pkg_map, BuildArgs(), BUILD_DIR, n_jobs=n_jobs, force_rebuild=True
     )
 
@@ -134,12 +135,12 @@ def test_build_error(n_jobs, monkeypatch):
     def mock_build(self, args: Any, build_dir: Path) -> None:
         raise ValueError("Failed build")
 
-    monkeypatch.setattr(buildall.BasePackage, "build", mock_build)
+    monkeypatch.setattr(graph_builder.BasePackage, "build", mock_build)
 
-    pkg_map = buildall.generate_dependency_graph(RECIPE_DIR, {"pkg_1"})
+    pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_1"})
 
     with pytest.raises(ValueError, match="Failed build"):
-        buildall.build_from_graph(
+        graph_builder.build_from_graph(
             pkg_map, BuildArgs(), BUILD_DIR, n_jobs=n_jobs, force_rebuild=True
         )
 
@@ -151,9 +152,9 @@ def test_requirements_executable(monkeypatch):
         m.setattr(shutil, "which", lambda exe: None)
 
         with pytest.raises(RuntimeError, match="missing in the host system"):
-            buildall.generate_dependency_graph(RECIPE_DIR, {"pkg_test_executable"})
+            graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_test_executable"})
 
     with monkeypatch.context() as m:
         m.setattr(shutil, "which", lambda exe: "/bin")
 
-        buildall.generate_dependency_graph(RECIPE_DIR, {"pkg_test_executable"})
+        graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_test_executable"})
