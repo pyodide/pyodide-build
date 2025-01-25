@@ -272,7 +272,9 @@ def get_build_env(
     env = env.copy()
 
     with TemporaryDirectory() as symlink_dir_str:
+        symlink_dir_str = str(Path("build/symlinks").absolute())
         symlink_dir = Path(symlink_dir_str)
+        symlink_dir.mkdir()
         env.update(make_command_wrapper_symlinks(symlink_dir))
 
         sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
