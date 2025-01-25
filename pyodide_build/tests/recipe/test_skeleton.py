@@ -57,7 +57,7 @@ def test_mkpkg_update(tmpdir, old_dist_type, new_dist_type):
     source_fmt = new_dist_type
     if new_dist_type == "same":
         source_fmt = None
-    skeleton.update_package(base_dir, "idna", None, False, source_fmt)
+    skeleton.update_package(base_dir, "idna", source_fmt=source_fmt)
 
     db = MetaConfig.from_yaml(meta_path)
     assert version.parse(db.package.version) > version.parse(db_init.package.version)
@@ -87,4 +87,5 @@ def test_mkpkg_update_pinned(tmpdir):
     meta_path = package_dir / "meta.yaml"
     db_init.to_yaml(meta_path)
     with pytest.raises(skeleton.MkpkgSkipped, match="pinned"):
-        skeleton.update_package(base_dir, "idna", None, False, None)
+        skeleton.update_package(base_dir, "idna")
+    skeleton.update_package(base_dir, "idna", update_pinned=True)
