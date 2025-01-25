@@ -355,7 +355,7 @@ def remove_comment_on_line(pkg: Any, line: int):
             if cmt and cmt.start_mark.line == line:
                 cmts[idx] = None
                 return
- 
+
 
 def enable_package(recipe_dir: Path, package: str) -> None:
     yaml = YAML()
@@ -374,10 +374,9 @@ def enable_package(recipe_dir: Path, package: str) -> None:
         return
     yaml_content = yaml.load(meta_path.read_bytes())
     pkg = yaml_content["package"]
-    if text_lines[idx-1].strip().startswith("#"):
+    if text_lines[idx - 1].strip().startswith("#"):
         # There's a comment to remove, we have to hunt it down...
         remove_comment_on_line(pkg, idx - 1)
     del pkg["_disabled"]
     yaml.dump(yaml_content, meta_path)
     run_prettier(meta_path)
-
