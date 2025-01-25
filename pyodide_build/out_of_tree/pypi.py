@@ -29,9 +29,9 @@ from unearth.finder import PackageFinder
 
 from pyodide_build import build_env
 from pyodide_build.common import repack_zip_archive
-from pyodide_build.io import _BuildSpecExports
 from pyodide_build.logger import logger
 from pyodide_build.out_of_tree import build
+from pyodide_build.spec import _BuildSpecExports
 
 _PYPI_INDEX = ["https://pypi.org/simple/"]
 _PYPI_TRUSTED_HOSTS = ["pypi.org"]

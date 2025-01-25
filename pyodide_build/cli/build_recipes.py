@@ -4,11 +4,12 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build import build_env, buildall, recipe
+from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs, init_environment
-from pyodide_build.buildpkg import RecipeBuilder
 from pyodide_build.common import get_num_cores
 from pyodide_build.logger import logger
+from pyodide_build.recipe import graph_builder, loader
+from pyodide_build.recipe.builder import RecipeBuilder
 
 
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
@@ -115,7 +116,7 @@ def build_recipes_no_deps(
         target_install_dir=target_install_dir,
         host_install_dir=host_install_dir,
     )
-    build_args = buildall.set_default_build_args(build_args)
+    build_args = graph_builder.set_default_build_args(build_args)
     args = Args(
         build_args=build_args,
         build_dir=build_dir,
@@ -127,10 +128,10 @@ def build_recipes_no_deps(
     return build_recipes_no_deps_impl(packages, args, continue_)
 
 
-def _rust_setup(recipe_dir: Path, packages: list[str]):
-    recipes = recipe.load_recipes(recipe_dir, packages, False)
+def _rust_setup(recipe_dir: Path, packages: list[str]) -> None:
+    recipes = loader.load_recipes(recipe_dir, packages, False)
     if any(recipe.is_rust_package() for recipe in recipes.values()):
-        buildall._ensure_rust_toolchain()
+        graph_builder._ensure_rust_toolchain()
 
 
 def build_recipes_no_deps_impl(
@@ -247,7 +248,7 @@ def build_recipes(
         target_install_dir=target_install_dir,
         host_install_dir=host_install_dir,
     )
-    build_args = buildall.set_default_build_args(build_args)
+    build_args = graph_builder.set_default_build_args(build_args)
     args = Args(
         build_args=build_args,
         build_dir=build_dir,
@@ -273,7 +274,7 @@ def build_recipes_impl(
     else:
         targets = ",".join(packages)
 
-    pkg_map = buildall.build_packages(
+    pkg_map = graph_builder.build_packages(
         args.recipe_dir,
         targets=targets,
         build_args=args.build_args,
@@ -283,10 +284,10 @@ def build_recipes_impl(
     )
 
     if log_dir:
-        buildall.copy_logs(pkg_map, log_dir)
+        graph_builder.copy_logs(pkg_map, log_dir)
 
     if install_options:
-        buildall.install_packages(
+        graph_builder.install_packages(
             pkg_map,
             args.install_dir,
             compression_level=install_options.compression_level,

@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from packaging import version
 
-import pyodide_build.mkpkg
-from pyodide_build.io import MetaConfig
+import pyodide_build.recipe.skeleton
+from pyodide_build.recipe.spec import MetaConfig
 
 # Following tests make real network calls to the PyPI JSON API.
 # Since the response is fully cached, and small, it is very fast and is
@@ -16,7 +16,7 @@ from pyodide_build.io import MetaConfig
 def test_mkpkg(tmpdir, capsys, source_fmt):
     base_dir = Path(str(tmpdir))
 
-    pyodide_build.mkpkg.make_package(base_dir, "idna", None, source_fmt)
+    pyodide_build.recipe.skeleton.make_package(base_dir, "idna", None, source_fmt)
     assert os.listdir(base_dir) == ["idna"]
     meta_path = base_dir / "idna" / "meta.yaml"
     assert meta_path.exists()
@@ -57,7 +57,9 @@ def test_mkpkg_update(tmpdir, old_dist_type, new_dist_type):
     source_fmt = new_dist_type
     if new_dist_type == "same":
         source_fmt = None
-    pyodide_build.mkpkg.update_package(base_dir, "idna", None, False, source_fmt)
+    pyodide_build.recipe.skeleton.update_package(
+        base_dir, "idna", None, False, source_fmt
+    )
 
     db = MetaConfig.from_yaml(meta_path)
     assert version.parse(db.package.version) > version.parse(db_init.package.version)

@@ -2,8 +2,8 @@ import functools
 from collections.abc import Iterable
 from pathlib import Path
 
-from pyodide_build.io import MetaConfig
 from pyodide_build.logger import logger
+from pyodide_build.recipe.spec import MetaConfig
 
 
 @functools.lru_cache(maxsize=1)
