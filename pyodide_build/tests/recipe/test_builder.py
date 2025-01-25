@@ -9,7 +9,7 @@ import pytest
 
 from pyodide_build import common
 from pyodide_build.build_env import BuildArgs
-from pyodide_build.recipe.spec import _SourceSpec
+from pyodide_build.recipe import builder as _builder
 from pyodide_build.recipe.builder import (
     RecipeBuilder,
     RecipeBuilderPackage,
@@ -17,7 +17,7 @@ from pyodide_build.recipe.builder import (
     RecipeBuilderStaticLibrary,
     _load_recipe,
 )
-from pyodide_build.recipe import builder as _builder
+from pyodide_build.recipe.spec import _SourceSpec
 
 RECIPE_DIR = Path(__file__).parent / "_test_recipes"
 WHEEL_DIR = Path(__file__).parent.parent / "_test_wheels"
