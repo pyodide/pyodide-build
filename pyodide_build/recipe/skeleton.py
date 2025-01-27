@@ -136,7 +136,12 @@ def _download_wheel(pypi_metadata: URLDict) -> Iterator[Path]:
 
 
 def run_prettier(meta_path: str | Path) -> None:
-    subprocess.run(["npx", "prettier", "-w", meta_path], check=True)
+    try:
+        subprocess.run(["npx", "prettier", "-w", meta_path], check=True)
+    except FileNotFoundError:
+        warnings.warn(
+            "'npx' executable missing, output has not been prettified.", stacklevel=1
+        )
 
 
 def make_package(
@@ -203,12 +208,7 @@ def make_package(
 
     yaml.representer.ignore_aliases = lambda *_: True
     yaml.dump(yaml_content, meta_path)
-    try:
-        run_prettier(meta_path)
-    except FileNotFoundError:
-        warnings.warn(
-            "'npx' executable missing, output has not been prettified.", stacklevel=1
-        )
+    run_prettier(meta_path)
 
     logger.success(f"Output written to {meta_path}")
 
@@ -325,3 +325,63 @@ def update_package(
     run_prettier(meta_path)
 
     logger.success(f"Updated {package} from {local_ver} to {pypi_ver}.")
+
+
+def disable_package(recipe_dir: Path, package: str, message: str) -> None:
+    yaml = YAML()
+
+    meta_path = recipe_dir / package / "meta.yaml"
+    if not meta_path.exists():
+        logger.error("%s does not exist", meta_path)
+        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
+
+    yaml_content = yaml.load(meta_path.read_bytes())
+    pkg = yaml_content["package"]
+    pkg_keys = list(pkg)
+    # Insert after the version key
+    version_idx = pkg_keys.index("version") + 1
+    pkg.insert(version_idx, "_disabled", True)
+    # Add message above it
+    if message:
+        pkg.yaml_set_comment_before_after_key("_disabled", before=message)
+    yaml.dump(yaml_content, meta_path)
+    run_prettier(meta_path)
+
+
+def remove_comment_on_line(pkg: Any, line: int):
+    # Search for comment on the right line. It's probably after the version key
+    # where we put it, but this will find it as long as it isn't directly after
+    # top_level (we don't traverse the tree to look for it).
+    if pkg.ca.comment and pkg.ca.comment.line == line:
+        pkg.ca.comment = None
+        return
+    for cmts in pkg.ca.items.values():
+        for idx, cmt in enumerate(cmts):
+            if cmt and cmt.start_mark.line == line:
+                cmts[idx] = None
+                return
+
+
+def enable_package(recipe_dir: Path, package: str) -> None:
+    yaml = YAML()
+
+    meta_path = recipe_dir / package / "meta.yaml"
+    if not meta_path.exists():
+        logger.error("%s does not exist", meta_path)
+        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
+
+    text_lines = meta_path.read_text().splitlines()
+    for idx, line in enumerate(text_lines):  # noqa: B007
+        if line.strip().startswith("_disabled"):
+            break
+    else:
+        # Not disabled, let's return
+        return
+    yaml_content = yaml.load(meta_path.read_bytes())
+    pkg = yaml_content["package"]
+    if text_lines[idx - 1].strip().startswith("#"):
+        # There's a comment to remove, we have to hunt it down...
+        remove_comment_on_line(pkg, idx - 1)
+    del pkg["_disabled"]
+    yaml.dump(yaml_content, meta_path)
+    run_prettier(meta_path)
