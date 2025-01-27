@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Build all of the packages in a given directory.
 """
@@ -29,9 +27,8 @@ from rich.progress import BarColumn, Progress, TimeElapsedColumn
 from rich.spinner import Spinner
 from rich.table import Table
 
-from pyodide_build import build_env, recipe
+from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs
-from pyodide_build.buildpkg import needs_rebuild
 from pyodide_build.common import (
     download_and_unpack_archive,
     exit_with_stdio,
@@ -40,8 +37,10 @@ from pyodide_build.common import (
     find_missing_executables,
     repack_zip_archive,
 )
-from pyodide_build.io import MetaConfig, _BuildSpecTypes
 from pyodide_build.logger import console_stdout, logger
+from pyodide_build.recipe import loader
+from pyodide_build.recipe.builder import needs_rebuild
+from pyodide_build.recipe.spec import MetaConfig, _BuildSpecTypes
 
 
 class BuildError(Exception):
@@ -376,7 +375,7 @@ def generate_dependency_graph(
     # On first pass add all dependencies regardless of whether
     # disabled since it might happen because of a transitive dependency
     graph = {}
-    all_recipes = recipe.load_all_recipes(packages_dir)
+    all_recipes = loader.load_all_recipes(packages_dir)
     no_numpy_dependents = "no-numpy-dependents" in requested
     requested.discard("no-numpy-dependents")
     packages = requested.copy()
@@ -876,7 +875,7 @@ def build_packages(
     force_rebuild: bool = False,
 ) -> dict[str, BasePackage]:
     requested, disabled = _parse_package_query(targets)
-    requested_packages = recipe.load_recipes(packages_dir, requested)
+    requested_packages = loader.load_recipes(packages_dir, requested)
     pkg_map = generate_dependency_graph(
         packages_dir, set(requested_packages.keys()), disabled
     )

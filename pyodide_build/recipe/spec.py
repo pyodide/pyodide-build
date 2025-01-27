@@ -4,6 +4,8 @@ from typing import Literal, Self
 import pydantic
 from pydantic import BaseModel, ConfigDict, Field
 
+from pyodide_build.spec import _BuildSpecExports
+
 
 class _PackageSpec(BaseModel):
     name: str
@@ -11,6 +13,7 @@ class _PackageSpec(BaseModel):
     top_level: list[str] = Field([], alias="top-level")
     tag: list[str] = Field([])
     disabled: bool = Field(False, alias="_disabled")
+    pinned: bool = Field(False, alias="pinned")
     model_config = ConfigDict(extra="forbid")
 
 
@@ -69,8 +72,6 @@ class _SourceSpec(BaseModel):
         return self
 
 
-_ExportTypes = Literal["pyinit", "requested", "whole_archive"]
-_BuildSpecExports = _ExportTypes | list[str]
 _BuildSpecTypes = Literal[
     "package", "static_library", "shared_library", "cpython_module"
 ]

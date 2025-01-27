@@ -15,8 +15,7 @@ from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
 from pyodide_build.common import search_pyproject_toml, to_bool, xbuildenv_dirname
-from pyodide_build.config import ConfigManager
-from pyodide_build.recipe import load_all_recipes
+from pyodide_build.config import ConfigManager, CrossBuildEnvConfigManager
 
 RUST_BUILD_PRELUDE = """
 rustup default ${RUST_TOOLCHAIN}
@@ -120,7 +119,7 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
     """
     Get common environment variables for the in-tree and out-of-tree build.
     """
-    config_manager = ConfigManager(pyodide_root)
+    config_manager = CrossBuildEnvConfigManager(pyodide_root)
     env = config_manager.to_env()
 
     env.update(
@@ -137,12 +136,29 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
     return env
 
 
+@functools.cache
+def get_host_build_environment_vars() -> dict[str, str]:
+    manager = ConfigManager()
+    return manager.to_env()
+
+
 def get_build_flag(name: str) -> str:
     """
     Get a value of a build flag.
     """
     pyodide_root = get_pyodide_root()
     build_vars = get_build_environment_vars(pyodide_root)
+    if name not in build_vars:
+        raise ValueError(f"Unknown build flag: {name}")
+
+    return build_vars[name]
+
+
+def get_host_build_flag(name: str) -> str:
+    """
+    Get a value of a build flag without accessing the cross-build environment.
+    """
+    build_vars = get_host_build_environment_vars()
     if name not in build_vars:
         raise ValueError(f"Unknown build flag: {name}")
 
@@ -171,6 +187,8 @@ def get_hostsitepackages() -> str:
 
 @functools.cache
 def get_unisolated_packages() -> list[str]:
+    # TODO: Remove this function (and use remote package index)
+    # https://github.com/pyodide/pyodide-build/issues/43
     PYODIDE_ROOT = get_pyodide_root()
 
     unisolated_file = PYODIDE_ROOT / "unisolated.txt"
@@ -178,6 +196,8 @@ def get_unisolated_packages() -> list[str]:
         # in xbuild env, read from file
         unisolated_packages = unisolated_file.read_text().splitlines()
     else:
+        from pyodide_build.recipe.loader import load_all_recipes
+
         unisolated_packages = []
         recipe_dir = PYODIDE_ROOT / "packages"
         recipes = load_all_recipes(recipe_dir)

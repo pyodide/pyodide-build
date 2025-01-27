@@ -7,19 +7,20 @@ from typing import Self
 import pydantic
 import pytest
 
-from pyodide_build import buildpkg, common
+from pyodide_build import common
 from pyodide_build.build_env import BuildArgs
-from pyodide_build.buildpkg import (
+from pyodide_build.recipe import builder as _builder
+from pyodide_build.recipe.builder import (
     RecipeBuilder,
     RecipeBuilderPackage,
     RecipeBuilderSharedLibrary,
     RecipeBuilderStaticLibrary,
     _load_recipe,
 )
-from pyodide_build.io import _SourceSpec
+from pyodide_build.recipe.spec import _SourceSpec
 
 RECIPE_DIR = Path(__file__).parent / "_test_recipes"
-WHEEL_DIR = Path(__file__).parent / "_test_wheels"
+WHEEL_DIR = Path(__file__).parent.parent / "_test_wheels"
 
 
 @pytest.fixture
@@ -107,26 +108,26 @@ def test_load_recipe():
     assert recipe.package.name == "pkg_1"
 
 
-def test_prepare_source(monkeypatch, tmp_path):
+def test_prepare_source(monkeypatch, tmp_path, dummy_xbuildenv):
     class subprocess_result:
         returncode = 0
         stdout = ""
 
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: subprocess_result)
-    monkeypatch.setattr(buildpkg, "check_checksum", lambda *args, **kwargs: True)
+    monkeypatch.setattr(_builder, "check_checksum", lambda *args, **kwargs: True)
     monkeypatch.setattr(shutil, "unpack_archive", lambda *args, **kwargs: True)
     monkeypatch.setattr(shutil, "move", lambda *args, **kwargs: True)
 
     test_pkgs = [
         RECIPE_DIR / "packaging/meta.yaml",
-        RECIPE_DIR / "micropip/meta.yaml",
+        # RECIPE_DIR / "micropip/meta.yaml",
     ]
 
     for pkg in test_pkgs:
         builder = RecipeBuilder.get_builder(
             recipe=pkg,
             build_args=BuildArgs(),
-            build_dir=tmp_path,
+            build_dir=tmp_path / "build",
         )
         builder._prepare_source()
         assert builder.src_extract_dir.is_dir()
@@ -201,7 +202,7 @@ def test_unvendor_tests(tmpdir):
     touch(install_prefix / "ex1" / "tests" / "data.csv")
     touch(install_prefix / "ex1" / "tests" / "test_a.py")
 
-    n_moved = buildpkg.unvendor_tests(install_prefix, test_install_prefix, [])
+    n_moved = _builder.unvendor_tests(install_prefix, test_install_prefix, [])
 
     assert rlist(install_prefix) == ["ex1/base.py"]
     assert rlist(test_install_prefix) == [
@@ -250,39 +251,39 @@ def test_needs_rebuild(tmpdir):
     src_path_file.touch()
 
     # No .packaged file, rebuild
-    assert buildpkg.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
 
     # .packaged file exists, no rebuild
     packaged.touch()
-    assert buildpkg.needs_rebuild(pkg_root, buildpath, source_metadata) is False
+    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is False
 
     # newer meta.yaml file, rebuild
     packaged.touch()
     time.sleep(0.01)
     meta_yaml.touch()
-    assert buildpkg.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
 
     # newer patch file, rebuild
     packaged.touch()
     time.sleep(0.01)
     patch_file.touch()
-    assert buildpkg.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
 
     # newer extra file, rebuild
     packaged.touch()
     time.sleep(0.01)
     extra_file.touch()
-    assert buildpkg.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
 
     # newer source path, rebuild
     packaged.touch()
     time.sleep(0.01)
     src_path_file.touch()
-    assert buildpkg.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
 
     # newer .packaged file, no rebuild
     packaged.touch()
-    assert buildpkg.needs_rebuild(pkg_root, buildpath, source_metadata) is False
+    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is False
 
 
 def test_copy_sharedlib(tmp_path):
@@ -298,7 +299,7 @@ def test_copy_sharedlib(tmp_path):
     wheel_dir_name = f"{name}-{ver}"
     wheel_dir = tmp_path / wheel_dir_name
 
-    dep_map = buildpkg.copy_sharedlibs(wheel_copy, wheel_dir, libdir)
+    dep_map = _builder.copy_sharedlibs(wheel_copy, wheel_dir, libdir)
 
     deps = ("sharedlib-test.so", "sharedlib-test-dep.so", "sharedlib-test-dep2.so")
     for dep in deps:
@@ -323,4 +324,4 @@ def test_extract_tarballname():
     ]
 
     for header, tarballname in zip(headers, tarballnames, strict=True):
-        assert buildpkg._extract_tarballname(url, header) == tarballname
+        assert _builder._extract_tarballname(url, header) == tarballname

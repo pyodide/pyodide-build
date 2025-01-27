@@ -1,6 +1,7 @@
 import os
 import subprocess
 from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
 from types import MappingProxyType
 
@@ -14,7 +15,80 @@ from pyodide_build.logger import logger
 
 class ConfigManager:
     """
+    Configuration manager for pyodide-build.
+    This class works "before" installing the cross build environment.
+    So it does not have access to the variables that are retrieved from the cross build environment.
+
+    Most of the times, use CrossBuildEnvConfigManager instead of this class.
+    But if you need to access the configuration without installing the cross build environment, use this class.
+    """
+
+    def __init__(self):
+        self._config = {
+            **self._load_default_config(),
+            **self._load_cross_build_envs(),
+            **self._load_config_file(Path.cwd(), os.environ),
+            **self._load_config_from_env(os.environ),
+        }
+
+    def _load_default_config(self) -> Mapping[str, str]:
+        return deepcopy(DEFAULT_CONFIG)
+
+    def _load_cross_build_envs(self) -> Mapping[str, str]:
+        """
+        Load environment variables from the cross build environment.
+        """
+
+        # This method should be implemented in the subclass.
+        return {}
+
+    def _load_config_from_env(self, env: Mapping[str, str]) -> Mapping[str, str]:
+        return {
+            BUILD_VAR_TO_KEY[key]: env[key] for key in env if key in BUILD_VAR_TO_KEY
+        }
+
+    def _load_config_file(
+        self, curdir: Path, env: Mapping[str, str]
+    ) -> Mapping[str, str]:
+        pyproject_path, configs = search_pyproject_toml(curdir)
+
+        if pyproject_path is None or configs is None:
+            return {}
+
+        if (
+            "tool" in configs
+            and "pyodide" in configs["tool"]
+            and "build" in configs["tool"]["pyodide"]
+        ):
+            build_config = {}
+            for key, v in configs["tool"]["pyodide"]["build"].items():
+                if key not in OVERRIDABLE_BUILD_KEYS:
+                    logger.warning(
+                        "WARNING: The provided build key %s is either invalid or not overridable, hence ignored.",
+                        key,
+                    )
+                    continue
+                build_config[key] = _environment_substitute_str(v, env)
+
+            return build_config
+        else:
+            return {}
+
+    @property
+    def config(self) -> Mapping[str, str]:
+        return MappingProxyType(self._config)
+
+    def to_env(self) -> dict[str, str]:
+        """
+        Export the configuration to environment variables.
+        """
+        return {BUILD_KEY_TO_VAR[k]: v for k, v in self.config.items()}
+
+
+class CrossBuildEnvConfigManager(ConfigManager):
+    """
     Configuration manager for Package build process.
+    This class works "after" installing the cross build environment.
 
     The configuration manager is responsible for loading configuration from various sources.
     The configuration can be loaded from the following sources (in order of precedence):
@@ -28,22 +102,9 @@ class ConfigManager:
 
     def __init__(self, pyodide_root: Path):
         self.pyodide_root = pyodide_root
-        self._config = {
-            **self._load_default_config(),
-            **self._load_makefile_envs(),
-            **self._load_config_file(Path.cwd(), os.environ),
-            **self._load_config_from_env(os.environ),
-        }
+        super().__init__()
 
-    def _load_default_config(self) -> Mapping[str, str]:
-        return {
-            k: _environment_substitute_str(
-                v, env={"PYODIDE_ROOT": str(self.pyodide_root)}
-            )
-            for k, v in DEFAULT_CONFIG.items()
-        }
-
-    def _load_makefile_envs(self) -> Mapping[str, str]:
+    def _load_cross_build_envs(self) -> Mapping[str, str]:
         makefile_vars = self._get_make_environment_vars()
         computed_vars = {
             k: _environment_substitute_str(v, env=makefile_vars)
@@ -88,48 +149,6 @@ class ConfigManager:
                 environment[varname] = value
 
         return environment
-
-    def _load_config_from_env(self, env: Mapping[str, str]) -> Mapping[str, str]:
-        return {
-            BUILD_VAR_TO_KEY[key]: env[key] for key in env if key in BUILD_VAR_TO_KEY
-        }
-
-    def _load_config_file(
-        self, curdir: Path, env: Mapping[str, str]
-    ) -> Mapping[str, str]:
-        pyproject_path, configs = search_pyproject_toml(curdir)
-
-        if pyproject_path is None or configs is None:
-            return {}
-
-        if (
-            "tool" in configs
-            and "pyodide" in configs["tool"]
-            and "build" in configs["tool"]["pyodide"]
-        ):
-            build_config = {}
-            for key, v in configs["tool"]["pyodide"]["build"].items():
-                if key not in OVERRIDABLE_BUILD_KEYS:
-                    logger.warning(
-                        "WARNING: The provided build key %s is either invalid or not overridable, hence ignored.",
-                        key,
-                    )
-                    continue
-                build_config[key] = _environment_substitute_str(v, env)
-
-            return build_config
-        else:
-            return {}
-
-    @property
-    def config(self) -> Mapping[str, str]:
-        return MappingProxyType(self._config)
-
-    def to_env(self) -> dict[str, str]:
-        """
-        Export the configuration to environment variables.
-        """
-        return {BUILD_KEY_TO_VAR[k]: v for k, v in self.config.items()}
 
 
 # Configuration variables and corresponding environment variables.
@@ -178,6 +197,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
     "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
+    "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -195,6 +215,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "meson_cross_file",
     "skip_emscripten_version_check",
     "build_dependency_index_url",
+    "default_cross_build_env_url",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -215,6 +236,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
     "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
+    "default_cross_build_env_url": "",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }

@@ -1,3 +1,4 @@
+import os
 import sys
 
 import pytest
@@ -127,6 +128,24 @@ class TestCrossBuildEnvManager:
         ):
             manager._find_latest_version()
 
+    def test_get_default_xbuildenv_url(
+        self, tmp_path, fake_xbuildenv_releases_compatible, reset_cache, reset_env_vars
+    ):
+        manager = CrossBuildEnvManager(
+            tmp_path, str(fake_xbuildenv_releases_compatible)
+        )
+        url = manager._get_default_xbuildenv_url()
+        assert url == ""
+
+        reset_cache()
+
+        os.environ["DEFAULT_CROSS_BUILD_ENV_URL"] = (
+            "https://example.com/xbuildenv-0.25.0.tar.bz2"
+        )
+
+        url = manager._get_default_xbuildenv_url()
+        assert url == "https://example.com/xbuildenv-0.25.0.tar.bz2"
+
     def test_install_version(
         self,
         tmp_path,
@@ -182,6 +201,36 @@ class TestCrossBuildEnvManager:
         assert not (
             manager.symlink_dir / "xbuildenv" / "pyodide-root" / "package_index"
         ).exists()
+        assert (manager.symlink_dir / "xbuildenv" / "site-packages-extras").exists()
+
+        assert (manager.symlink_dir / ".build-python-version").exists()
+        assert (
+            manager.symlink_dir / ".build-python-version"
+        ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
+
+    def test_install_url_default(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+        reset_cache,
+        reset_env_vars,
+    ):
+        manager = CrossBuildEnvManager(tmp_path)
+
+        os.environ["DEFAULT_CROSS_BUILD_ENV_URL"] = dummy_xbuildenv_url
+        manager.install(version=None)
+        version = _url_to_version(dummy_xbuildenv_url)
+
+        assert (tmp_path / version).exists()
+        assert (tmp_path / version / ".installed").exists()
+        assert manager.current_version == version
+
+        assert manager.symlink_dir.is_symlink()
+        assert manager.symlink_dir.resolve() == tmp_path / version
+        assert (manager.symlink_dir / "xbuildenv").exists()
+        assert (manager.symlink_dir / "xbuildenv" / "pyodide-root").exists()
         assert (manager.symlink_dir / "xbuildenv" / "site-packages-extras").exists()
 
         assert (manager.symlink_dir / ".build-python-version").exists()
