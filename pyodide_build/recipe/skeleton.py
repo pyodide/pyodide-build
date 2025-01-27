@@ -371,7 +371,7 @@ def enable_package(recipe_dir: Path, package: str) -> None:
         raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
 
     text_lines = meta_path.read_text().splitlines()
-    for idx, line in enumerate(text_lines):
+    for idx, line in enumerate(text_lines):  # noqa: B007
         if line.strip().startswith("_disabled"):
             break
     else:
