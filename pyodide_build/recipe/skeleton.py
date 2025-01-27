@@ -216,8 +216,10 @@ def make_package(
 def update_package(
     root: Path,
     package: str,
+    *,
     version: str | None = None,
-    update_patched: bool = True,
+    update_patched: bool = False,
+    update_pinned: bool = False,
     source_fmt: Literal["wheel", "sdist"] | None = None,
 ) -> None:
     yaml = YAML()
@@ -236,6 +238,9 @@ def update_package(
 
     if "url" not in yaml_content["source"]:
         raise MkpkgSkipped(f"{package} is a local package!")
+
+    if (not update_pinned) and yaml_content["package"].get("pinned", False):
+        raise MkpkgSkipped(f"{package} is pinned!")
 
     if yaml_content["source"]["url"].endswith("whl"):
         old_fmt = "wheel"

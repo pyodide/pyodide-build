@@ -58,7 +58,7 @@ def test_mkpkg_update(tmpdir, old_dist_type, new_dist_type):
     source_fmt = new_dist_type
     if new_dist_type == "same":
         source_fmt = None
-    skeleton.update_package(base_dir, "idna", None, False, source_fmt)
+    skeleton.update_package(base_dir, "idna", source_fmt=source_fmt)
 
     db = MetaConfig.from_yaml(meta_path)
     assert version.parse(db.package.version) > version.parse(db_init.package.version)
@@ -108,3 +108,24 @@ def test_enable_disable(tmpdir):
     assert meta_path.read_text().strip() == enabled
     skeleton.disable_package(base_dir, "jedi", "Here is some information")
     assert meta_path.read_text().strip() == disabled
+
+
+def test_mkpkg_update_pinned(tmpdir):
+    base_dir = Path(str(tmpdir))
+
+    db_init = MetaConfig(
+        package={"name": "idna", "version": "2.0", "pinned": True},
+        source={
+            "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
+            "url": "https://<some>/idna-2.0.whl",
+        },
+        test={"imports": ["idna"]},
+    )
+
+    package_dir = base_dir / "idna"
+    package_dir.mkdir(parents=True)
+    meta_path = package_dir / "meta.yaml"
+    db_init.to_yaml(meta_path)
+    with pytest.raises(skeleton.MkpkgSkipped, match="pinned"):
+        skeleton.update_package(base_dir, "idna")
+    skeleton.update_package(base_dir, "idna", update_pinned=True)

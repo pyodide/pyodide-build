@@ -97,6 +97,11 @@ def new_recipe_pypi(
         "--update-patched",
         help="Force update the package even if it contains patches.",
     ),
+    update_pinned: bool = typer.Option(
+        False,
+        "--update-pinned",
+        help="Force update the package even if is pinned.",
+    ),
     version: str = typer.Option(
         None,
         help="The version of the package, if not specified, latest version will be used.",
@@ -126,14 +131,15 @@ def new_recipe_pypi(
 
     recipe_dir_ = get_recipe_dir(recipe_dir)
 
-    if update or update_patched:
+    if update or update_patched or update_pinned:
         try:
             skeleton.update_package(
                 recipe_dir_,
                 name,
-                version,
+                version=version,
                 source_fmt=source_format,  # type: ignore[arg-type]
                 update_patched=update_patched,
+                update_pinned=update_pinned,
             )
         except skeleton.MkpkgFailedException as e:
             logger.error("%s update failed: %s", name, e)
