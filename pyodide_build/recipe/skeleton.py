@@ -136,7 +136,12 @@ def _download_wheel(pypi_metadata: URLDict) -> Iterator[Path]:
 
 
 def run_prettier(meta_path: str | Path) -> None:
-    subprocess.run(["npx", "prettier", "-w", meta_path], check=True)
+    try:
+        subprocess.run(["npx", "prettier", "-w", meta_path], check=True)
+    except FileNotFoundError:
+        warnings.warn(
+            "'npx' executable missing, output has not been prettified.", stacklevel=1
+        )
 
 
 def make_package(
@@ -203,12 +208,7 @@ def make_package(
 
     yaml.representer.ignore_aliases = lambda *_: True
     yaml.dump(yaml_content, meta_path)
-    try:
-        run_prettier(meta_path)
-    except FileNotFoundError:
-        warnings.warn(
-            "'npx' executable missing, output has not been prettified.", stacklevel=1
-        )
+    run_prettier(meta_path)
 
     logger.success(f"Output written to {meta_path}")
 
