@@ -48,8 +48,8 @@ def enable(
                 recipe_dir_,
                 name,
             )
-            status = -1
         except skeleton.MkpkgFailedException as e:
+            status = -1
             logger.error("%s update failed: %s", name, e)
         except Exception:
             print(name)
@@ -74,8 +74,8 @@ def disable(
     for name in names:
         try:
             skeleton.disable_package(recipe_dir_, name, message)
-            status = -1
         except skeleton.MkpkgFailedException as e:
+            status = -1
             logger.error("%s update failed: %s", name, e)
         except Exception:
             print(name)
