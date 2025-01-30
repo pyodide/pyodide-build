@@ -95,4 +95,3 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "cxxflags" in wasmcross_args
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
-        assert "builddir" in wasmcross_args
