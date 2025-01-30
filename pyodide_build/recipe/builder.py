@@ -367,6 +367,7 @@ class RecipeBuilder:
             ldflags=ldflags,
             target_install_dir=self.build_args.target_install_dir,
             exports=self.build_metadata.exports,
+            build_dir=self.build_dir,
         )
         config_settings = pypabuild.parse_backend_flags(
             self.build_metadata.backend_flags

@@ -243,6 +243,23 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
 
 
 @contextmanager
+def _create_symlink_dir(env: dict[str, str], build_dir: Path | None):
+    if build_dir:
+        # If we're running under build-recipes, leave the symlinks in
+        # the build directory. This helps with reproducing.
+        symlink_dir = build_dir / "pywasmcross_symlinks"
+        shutil.rmtree(symlink_dir, ignore_errors=True)
+        symlink_dir.mkdir()
+        yield symlink_dir
+        return
+
+    # Running from "pyodide build". Put symlinks in a temporary directory.
+    # TODO: Add a debug option to save the symlinks.
+    with TemporaryDirectory() as symlink_dir_str:
+        yield Path(symlink_dir_str)
+
+
+@contextmanager
 def get_build_env(
     env: dict[str, str],
     *,
@@ -252,6 +269,7 @@ def get_build_env(
     ldflags: str,
     target_install_dir: str,
     exports: _BuildSpecExports,
+    build_dir: Path | None = None,
 ) -> Iterator[dict[str, str]]:
     """
     Returns a dict of environment variables that should be used when building
@@ -267,14 +285,11 @@ def get_build_env(
     }
 
     args = common.environment_substitute_args(kwargs, env)
-    args["builddir"] = str(Path(".").absolute())
     args["exports"] = exports
     env = env.copy()
 
-    with TemporaryDirectory() as symlink_dir_str:
-        symlink_dir = Path(symlink_dir_str)
+    with _create_symlink_dir(env, build_dir) as symlink_dir:
         env.update(make_command_wrapper_symlinks(symlink_dir))
-
         sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
         args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
         args["orig__name__"] = __name__
