@@ -585,7 +585,8 @@ def handle_command_generate_args(  # noqa: C901
         for arg in build_args.ldflags.split():
             if arg.startswith("-l"):
                 arg = replay_genargs_handle_dashl(arg, used_libs, build_args.abi)
-            new_args.append(arg)
+            if arg:
+                new_args.append(arg)
         new_args.extend(get_export_flags(line, build_args.exports))
 
     if "-c" in line:
