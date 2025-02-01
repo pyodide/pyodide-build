@@ -336,7 +336,7 @@ class RecipeBuilder:
             extract_dir_name = trim_archive_extension(tarballname)
 
         shutil.move(self.build_dir / extract_dir_name, self.src_extract_dir)
-        self.src_dist_dir.mkdir(parents=True, exist_ok=True)\
+        self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
     def _override_constraints(self) -> str:
         """

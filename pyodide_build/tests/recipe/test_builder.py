@@ -218,7 +218,8 @@ def test_unvendor_tests(tmpdir):
 
 def test_override_constraints_no_override(tmp_path, dummy_xbuildenv):
     builder = RecipeBuilder.get_builder(
-        recipe=RECIPE_DIR / "pkg_test_executable",  # constraints not set, so no override
+        recipe=RECIPE_DIR
+        / "pkg_test_executable",  # constraints not set, so no override
         build_args=BuildArgs(),
         build_dir=tmp_path,
     )
@@ -238,11 +239,7 @@ def test_override_constraints_override(tmp_path, dummy_xbuildenv):
     assert path == str(tmp_path / "constraints.txt")
 
     data = Path(path).read_text().strip().split("\n")
-    assert data[-3:] == [
-        "numpy < 2.0",
-        "scipy > 1.0",
-        "pytest == 7.0"
-    ], data
+    assert data[-3:] == ["numpy < 2.0", "scipy > 1.0", "pytest == 7.0"], data
 
 
 class MockSourceSpec(_SourceSpec):
