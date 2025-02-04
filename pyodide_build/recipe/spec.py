@@ -13,6 +13,7 @@ class _PackageSpec(BaseModel):
     top_level: list[str] = Field([], alias="top-level")
     tag: list[str] = Field([])
     disabled: bool = Field(False, alias="_disabled")
+    pinned: bool = Field(False, alias="pinned")
     model_config = ConfigDict(extra="forbid")
 
 
@@ -123,6 +124,7 @@ class _RequirementsSpec(BaseModel):
     run: list[str] = []
     host: list[str] = []
     executable: list[str] = []
+    constraint: list[str] = []
     model_config = ConfigDict(extra="forbid")
 
 
