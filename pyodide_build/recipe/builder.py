@@ -338,9 +338,10 @@ class RecipeBuilder:
         shutil.move(self.build_dir / extract_dir_name, self.src_extract_dir)
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
-    def _override_constraints(self) -> str:
+    def _create_constraints_file(self) -> str:
         """
-        Override global constraints (PIP_CONSTRAINT) with constraints specific to this package.
+        Creates a pip constraints file by concatenating global constraints (PIP_CONSTRAINT)
+        with constraints specific to this package.
 
         returns the path to the new constraints file.
         """
@@ -411,7 +412,7 @@ class RecipeBuilder:
                     )
                     build_env = runner.env
 
-            build_env["PIP_CONSTRAINT"] = str(self._override_constraints())
+            build_env["PIP_CONSTRAINT"] = str(self._create_constraints_file())
 
             pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings

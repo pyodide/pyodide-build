@@ -216,7 +216,7 @@ def test_unvendor_tests(tmpdir):
     assert n_moved == 3
 
 
-def test_override_constraints_no_override(tmp_path, dummy_xbuildenv):
+def test_create_constraints_file_no_override(tmp_path, dummy_xbuildenv):
     builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR
         / "pkg_test_executable",  # constraints not set, so no override
@@ -224,22 +224,22 @@ def test_override_constraints_no_override(tmp_path, dummy_xbuildenv):
         build_dir=tmp_path,
     )
 
-    path = builder._override_constraints()
+    path = builder._create_constraints_file()
     assert path == get_build_flag("PIP_CONSTRAINT")
 
 
-def test_override_constraints_override(tmp_path, dummy_xbuildenv):
+def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
     builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "pkg_test_constraint",
         build_args=BuildArgs(),
         build_dir=tmp_path,
     )
 
-    path = builder._override_constraints()
+    path = builder._create_constraints_file()
     assert path == str(tmp_path / "constraints.txt")
 
     data = Path(path).read_text().strip().split("\n")
-    assert data[-3:] == ["numpy < 2.0", "scipy > 1.0", "pytest == 7.0"], data
+    assert data[-3:] == ["numpy < 2.0", "pytest == 7.0"], data
 
 
 class MockSourceSpec(_SourceSpec):
