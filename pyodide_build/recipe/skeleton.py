@@ -103,9 +103,7 @@ def _make_predictable_url(
     package_url_name = package.replace("-", "_")
 
     if source_type == "sdist":
-        return (
-            f"{host}/packages/source/{package[0]}/{package_url_name}/{package_url_name}-{version}.tar.gz"
-        )
+        return f"{host}/packages/source/{package[0]}/{package_url_name}/{package_url_name}-{version}.tar.gz"
 
     elif source_type == "wheel":
         # Extract relevant parts from the wheel filename
@@ -127,7 +125,9 @@ def _make_predictable_url(
             logger.warning(msg)
             return None
 
-        return f"{host}/packages/{python_tag}/{package[0]}/{package_url_name}/{filename}"
+        return (
+            f"{host}/packages/{python_tag}/{package[0]}/{package_url_name}/{filename}"
+        )
 
     return None
 
