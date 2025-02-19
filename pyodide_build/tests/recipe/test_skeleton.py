@@ -6,6 +6,12 @@ import pytest
 from packaging import version
 
 from pyodide_build.recipe import skeleton
+from pyodide_build.recipe.skeleton import (
+    MetadataDict,
+    URLDict,
+    _find_dist,
+    _make_predictable_url,
+)
 from pyodide_build.recipe.spec import MetaConfig
 
 # Following tests make real network calls to the PyPI JSON API.
@@ -129,3 +135,210 @@ def test_mkpkg_update_pinned(tmpdir):
     with pytest.raises(skeleton.MkpkgSkipped, match="pinned"):
         skeleton.update_package(base_dir, "idna")
     skeleton.update_package(base_dir, "idna", update_pinned=True)
+
+
+@pytest.mark.parametrize(
+    "package,version,source_type,filename,expected_url",
+    [
+        # test sdist case
+        (
+            "numpy",
+            "2.0.0",
+            "sdist",
+            "numpy-2.0.0.tar.gz",
+            "https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.0.0.tar.gz",
+        ),
+        # test wheel
+        (
+            "sympy",
+            "1.13.3",
+            "wheel",
+            "sympy-1.13.3-py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/py3/s/sympy/sympy-1.13.3-py3-none-any.whl",
+        ),
+        # test wheel with a build tag/number
+        (
+            "example",
+            "1.0.0",
+            "wheel",
+            "example-1.0.0-1-py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/py3/e/example/example-1.0.0-1-py3-none-any.whl",
+        ),
+        # test package with a dash in the name
+        (
+            "scikit-learn",
+            "1.6.1",
+            "sdist",
+            "scikit-learn-1.6.1.tar.gz",
+            "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit_learn-1.6.1.tar.gz",
+        ),
+    ],
+)
+def test_make_predictable_url(package, version, source_type, filename, expected_url):
+    """Test that predictable URLs are generated correctly for various package formats."""
+    result = _make_predictable_url(package, version, source_type, filename)
+    assert result == expected_url
+
+
+@pytest.mark.parametrize(
+    "package,version,source_type,filename,expected_url",
+    [
+        # test sdist case
+        (
+            "numpy",
+            "2.0.0",
+            "sdist",
+            "numpy-2.0.0.tar.gz",
+            "https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.0.0.tar.gz",
+        ),
+        # test wheel
+        (
+            "sympy",
+            "1.13.3",
+            "wheel",
+            "sympy-1.13.3-py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/py3/s/sympy/sympy-1.13.3-py3-none-any.whl",
+        ),
+        # test wheel with a build tag/number
+        (
+            "example",
+            "1.0.0",
+            "wheel",
+            "example-1.0.0-1-py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/py3/e/example/example-1.0.0-1-py3-none-any.whl",
+        ),
+        # test package with a dash in the name
+        (
+            "scikit-learn",
+            "1.6.1",
+            "sdist",
+            "scikit-learn-1.6.1.tar.gz",
+            "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit_learn-1.6.1.tar.gz",
+        ),
+    ],
+)
+def test_make_predictable_url(package, version, source_type, filename, expected_url):
+    """Test that predictable URLs are generated correctly for various package formats."""
+    result = _make_predictable_url(package, version, source_type, filename)
+    assert result == expected_url
+
+
+def test_make_predictable_url_invalid_wheel():
+    """Test that function returns None when wheel format can't be parsed."""
+    result = _make_predictable_url(
+        "invalid", "1.0.0", "wheel", "invalid-1.0.0-invalid-format.whl"
+    )
+    assert result is None
+
+
+@pytest.mark.parametrize(
+    "source_type,package,version,filename,original_url,predictable_url",
+    [
+        # sdist case
+        (
+            "sdist",
+            "numpy",
+            "2.0.0",
+            "numpy-2.0.0.tar.gz",
+            "https://files.pythonhosted.org/packages/05/35/fb1ada118002df3fe91b5c3b28bc0d90f879b881a5d8f68b1f9b79c44bfe/numpy-2.0.0.tar.gz",
+            "https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.0.0.tar.gz",
+        ),
+        # wheel case
+        (
+            "wheel",
+            "sympy",
+            "1.13.3",
+            "sympy-1.13.3-py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/99/ff/c87e0622b1dadea79d2fb0b25ade9ed98954c9033722eb707053d310d4f3/sympy-1.13.3-py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/py3/s/sympy/sympy-1.13.3-py3-none-any.whl",
+        ),
+    ],
+)
+def test_find_dist_uses_predictable_url(
+    monkeypatch, source_type, package, version, filename, original_url, predictable_url
+):
+    """Test that _find_dist correctly uses the predictable URL."""
+
+    mock_metadata = MetadataDict(
+        info={"name": package, "version": version},
+        urls=[],
+        releases={},
+        last_serial=0,
+        vulnerabilities=[],
+    )
+
+    packagetype = "sdist" if source_type == "sdist" else "bdist_wheel"
+
+    mock_entry = URLDict(
+        comment_text="",
+        digests={"sha256": "fakehash123"},
+        downloads=0,
+        filename=filename,
+        has_sig=False,
+        md5_digest="",
+        packagetype=packagetype,
+        python_version="",
+        requires_python="",
+        size=0,
+        upload_time="",
+        upload_time_iso_8601="",
+        url=original_url,
+        yanked=False,
+        yanked_reason=None,
+    )
+
+    if source_type == "sdist":
+        monkeypatch.setattr(
+            "pyodide_build.recipe.skeleton._find_sdist", lambda _: mock_entry
+        )
+        result = _find_dist(mock_metadata, ["sdist"])
+    else:
+        monkeypatch.setattr(
+            "pyodide_build.recipe.skeleton._find_wheel", lambda _: mock_entry
+        )
+        result = _find_dist(mock_metadata, ["wheel"])
+
+    assert result["url"] == predictable_url
+    assert result["filename"] == filename
+
+
+def test_find_dist_falls_back_to_original_url(monkeypatch):
+    mock_metadata = MetadataDict(
+        info={"name": "strange-pkg", "version": "1.0.0"},
+        urls=[],
+        releases={},
+        last_serial=0,
+        vulnerabilities=[],
+    )
+
+    original_url = (
+        "https://files.pythonhosted.org/packages/ab/cd/strange-pkg-1.0.0-invalid.whl"
+    )
+    mock_entry = URLDict(
+        filename="strange-pkg-1.0.0-invalid.whl",
+        url=original_url,
+        packagetype="bdist_wheel",
+        digests={"sha256": "fakehash123"},
+        has_sig=False,
+        comment_text="",
+        downloads=0,
+        md5_digest="",
+        python_version="",
+        requires_python="",
+        size=0,
+        upload_time="",
+        upload_time_iso_8601="",
+        yanked=False,
+        yanked_reason=None,
+    )
+
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._find_wheel", lambda _: mock_entry
+    )
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._make_predictable_url", lambda *args: None
+    )
+
+    result = _find_dist(mock_metadata, ["wheel"])
+
+    assert result["url"] == original_url
