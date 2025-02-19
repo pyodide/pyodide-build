@@ -36,7 +36,7 @@ def enable(
     names: list[str],
     recipe_dir: str | None = typer.Option(
         None,
-        help="The directory containing the recipe of packages."
+        help="The directory containing the recipe of packages. "
         "If not specified, the default is ``<cwd>/packages``.",
     ),
 ):
@@ -65,7 +65,7 @@ def disable(
     ),
     recipe_dir: str | None = typer.Option(
         None,
-        help="The directory containing the recipe of packages."
+        help="The directory containing the recipe of packages. "
         "If not specified, the default is ``<cwd>/packages``.",
     ),
 ) -> int:
@@ -90,7 +90,7 @@ def new_recipe_pypi(
         False,
         "--update",
         "-u",
-        help="Update an existing recipe instead of creating a new one",
+        help="Update an existing recipe instead of creating a new one.",
     ),
     update_patched: bool = typer.Option(
         False,
@@ -113,7 +113,7 @@ def new_recipe_pypi(
     ),
     recipe_dir: str | None = typer.Option(
         None,
-        help="The directory containing the recipe of packages."
+        help="The directory containing the recipe of packages. "
         "If not specified, the default is ``<cwd>/packages``.",
     ),
 ) -> None:
