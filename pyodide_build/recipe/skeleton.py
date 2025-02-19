@@ -82,6 +82,54 @@ def _find_wheel(pypi_metadata: MetadataDict, native: bool = False) -> URLDict | 
     return None
 
 
+def _make_predictable_url(
+    package: str, version: str, source_type: Literal["wheel", "sdist"], filename: str
+) -> str:
+    """
+    Create a predictable URL for a PyPI package based on PyPI's conventions,
+    documented in https://docs.pypi.org/api/#predictable-urls.
+
+    Args:
+        package: The package name
+        version: The package version
+        source_type: Either "wheel" or "sdist"
+        filename: The full filename (used for wheels to extract required tags)
+
+    Returns:
+        A predictable URL for the package
+    """
+    host = "https://files.pythonhosted.org"
+
+    if source_type == "sdist":
+        return (
+            f"{host}/packages/source/{package[0]}/{package}/{package}-{version}.tar.gz"
+        )
+
+    elif source_type == "wheel":
+        # Extract relevant parts from the wheel filename
+        # Filename format: {name}-{version}[-{build_tag}]-{python_tag}-{abi_tag}-{platform_tag}.whl
+        filename_base = filename.rsplit(".", 1)[0]  # Remove .whl extension
+        parts = filename_base.split("-")
+
+        # Extract python tag (like 'py3', 'cp39').
+        # It's the first part after version (and optional build tag)
+        python_tag = None
+        for _, part in enumerate(parts):
+            if part.startswith(("py", "cp")):
+                python_tag = part
+                break
+
+        if python_tag is None:
+            # If we can't parse the filename, try to fall back to the original URL method
+            msg = f"Could not parse python tag from wheel filename {filename}, falling back to API URL"
+            logger.warning(msg)
+            return None
+
+        return f"{host}/packages/{python_tag}/{package[0]}/{package}/{filename}"
+
+    return None
+
+
 def _find_dist(
     pypi_metadata: MetadataDict, source_types: list[Literal["wheel", "sdist"]]
 ) -> URLDict:
@@ -99,6 +147,17 @@ def _find_dist(
         if source == "sdist":
             result = _find_sdist(pypi_metadata)
         if result:
+            package_name = pypi_metadata["info"]["name"]
+            version = pypi_metadata["info"]["version"]
+            filename = result["filename"]
+
+            predictable_url = _make_predictable_url(
+                package_name, version, source, filename
+            )
+            if predictable_url:
+                result_copy = result.copy()
+                result_copy["url"] = predictable_url
+                return result_copy
             return result
 
     types_str = " or ".join(source_types)
