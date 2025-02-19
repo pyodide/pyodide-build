@@ -53,12 +53,16 @@ def _make_whlfile(
 
 
 shutil.register_archive_format("whl", _make_whlfile, description="Wheel file")
-shutil.register_unpack_format(
-    "whl",
-    [".whl", ".wheel"],
-    shutil._unpack_zipfile,  # type: ignore[attr-defined]
-    description="Wheel file",
-)
+try:
+    shutil.register_unpack_format(
+        "whl",
+        [".whl", ".wheel"],
+        shutil._unpack_zipfile,  # type: ignore[attr-defined]
+        description="Wheel file",
+    )
+except shutil.RegistryError:
+    # Error: .whl is already registered for "whl"
+    pass
 
 
 def _extract_tarballname(url: str, headers: dict) -> str:
