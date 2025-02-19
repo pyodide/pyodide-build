@@ -1,3 +1,5 @@
+# Note: when updating this file, also update the corresponding test in
+# pyodide_build/tests/recipe/test_builder.py::test_constructor accordingly.
 package:
   name: beautifulsoup4
   version: 4.13.3
