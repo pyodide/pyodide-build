@@ -84,7 +84,7 @@ def _find_wheel(pypi_metadata: MetadataDict, native: bool = False) -> URLDict | 
 
 def _make_predictable_url(
     package: str, version: str, source_type: Literal["wheel", "sdist"], filename: str
-) -> str:
+) -> str | None:
     """
     Create a predictable URL for a PyPI package based on PyPI's conventions,
     documented in https://docs.pypi.org/api/#predictable-urls.
