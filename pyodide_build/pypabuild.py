@@ -295,6 +295,7 @@ def get_build_env(
         args["orig__name__"] = __name__
         args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
         args["PATH"] = env["PATH"]
+        args["abi"] = get_build_flag("PYODIDE_ABI_VERSION")
 
         pywasmcross_env = json.dumps(args)
         # Store into environment variable and to disk. In most cases we will
