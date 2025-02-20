@@ -82,6 +82,68 @@ def _find_wheel(pypi_metadata: MetadataDict, native: bool = False) -> URLDict | 
     return None
 
 
+def _make_predictable_url(
+    package: str, version: str, source_type: Literal["wheel", "sdist"], filename: str
+) -> str | None:
+    """
+    Create a predictable URL for a PyPI package based on PyPI's conventions,
+    documented in https://docs.pypi.org/api/#predictable-urls.
+
+    Parameters
+    ----------
+    package
+        The package name
+    version
+        The package version
+    source_type
+        Either "wheel" or "sdist"
+    filename
+        The full filename (used for wheels to extract required tags)
+
+    Returns
+    -------
+    A predictable URL for the package file, or None if the URL could not be
+    constructed.
+    """
+    from packaging import utils as packaging_utils
+
+    host = "https://files.pythonhosted.org"
+
+    # convert hyphens to underscores for the package name, as
+    # PyPI uses underscores in the URL and packaging does not
+    # handle this.
+    package_name = packaging_utils.canonicalize_name(package)
+    package_url_name = package_name.replace("-", "_")
+
+    if source_type == "sdist":
+        return f"{host}/packages/source/{package_name[0]}/{package_url_name}/{package_url_name}-{version}.tar.gz"
+
+    elif source_type == "wheel":
+        try:
+            # extract Python tag
+            parts = filename.split("-")
+            none_idx = parts.index("none")
+            if none_idx <= 0:
+                msg = f"Invalid wheel filename format: {filename}"
+                logger.warning(msg)
+                return None
+
+            python_tag = parts[none_idx - 1]
+            if not python_tag.startswith("py"):
+                msg = f"Invalid Python tag in wheel: {python_tag}"
+                logger.warning(msg)
+                return None
+
+            return f"{host}/packages/{python_tag}/{package[0]}/{package_url_name}/{filename}"
+
+        except (ValueError, IndexError) as e:
+            msg = f"Error parsing wheel filename {filename}: {e}"
+            logger.warning(msg)
+            return None
+
+    return None
+
+
 def _find_dist(
     pypi_metadata: MetadataDict, source_types: list[Literal["wheel", "sdist"]]
 ) -> URLDict:
@@ -99,6 +161,17 @@ def _find_dist(
         if source == "sdist":
             result = _find_sdist(pypi_metadata)
         if result:
+            package_name = pypi_metadata["info"]["name"]
+            version = pypi_metadata["info"]["version"]
+            filename = result["filename"]
+
+            predictable_url = _make_predictable_url(
+                package_name, version, source, filename
+            )
+            if predictable_url:
+                result_copy = result.copy()
+                result_copy["url"] = predictable_url
+                return result_copy
             return result
 
     types_str = " or ".join(source_types)
