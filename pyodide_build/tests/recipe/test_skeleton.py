@@ -137,47 +137,7 @@ def test_mkpkg_update_pinned(tmpdir):
     skeleton.update_package(base_dir, "idna", update_pinned=True)
 
 
-@pytest.mark.parametrize(
-    "package,version,source_type,filename,expected_url",
-    [
-        # test sdist case
-        (
-            "numpy",
-            "2.0.0",
-            "sdist",
-            "numpy-2.0.0.tar.gz",
-            "https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.0.0.tar.gz",
-        ),
-        # test wheel
-        (
-            "sympy",
-            "1.13.3",
-            "wheel",
-            "sympy-1.13.3-py3-none-any.whl",
-            "https://files.pythonhosted.org/packages/py3/s/sympy/sympy-1.13.3-py3-none-any.whl",
-        ),
-        # test wheel with a build tag/number
-        (
-            "example",
-            "1.0.0",
-            "wheel",
-            "example-1.0.0-1-py3-none-any.whl",
-            "https://files.pythonhosted.org/packages/py3/e/example/example-1.0.0-1-py3-none-any.whl",
-        ),
-        # test package with a dash in the name
-        (
-            "scikit-learn",
-            "1.6.1",
-            "sdist",
-            "scikit-learn-1.6.1.tar.gz",
-            "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit_learn-1.6.1.tar.gz",
-        ),
-    ],
-)
-def test_make_predictable_url(package, version, source_type, filename, expected_url):
-    """Test that predictable URLs are generated correctly for various package formats."""
-    result = _make_predictable_url(package, version, source_type, filename)
-    assert result == expected_url
+####################################################################################################
 
 
 @pytest.mark.parametrize(
@@ -216,6 +176,7 @@ def test_make_predictable_url(package, version, source_type, filename, expected_
             "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit_learn-1.6.1.tar.gz",
         ),
     ],
+    ids=["numpy-sdist", "sympy-wheel", "example-wheel-build", "scikit-learn-sdist"],
 )
 def test_make_predictable_url(package, version, source_type, filename, expected_url):
     """Test that predictable URLs are generated correctly for various package formats."""

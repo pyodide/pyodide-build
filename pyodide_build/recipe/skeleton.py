@@ -89,45 +89,57 @@ def _make_predictable_url(
     Create a predictable URL for a PyPI package based on PyPI's conventions,
     documented in https://docs.pypi.org/api/#predictable-urls.
 
-    Args:
-        package: The package name
-        version: The package version
-        source_type: Either "wheel" or "sdist"
-        filename: The full filename (used for wheels to extract required tags)
+    Parameters
+    ----------
+    package
+        The package name
+    version
+        The package version
+    source_type
+        Either "wheel" or "sdist"
+    filename
+        The full filename (used for wheels to extract required tags)
 
-    Returns:
-        A predictable URL for the package
+    Returns
+    -------
+    A predictable URL for the package file, or None if the URL could not be
+    constructed.
     """
+    from packaging import utils as packaging_utils
+
     host = "https://files.pythonhosted.org"
 
-    package_url_name = package.replace("-", "_")
+    # convert hyphens to underscores for the package name, as
+    # PyPI uses underscores in the URL and packaging does not
+    # handle this.
+    package_name = packaging_utils.canonicalize_name(package)
+    package_url_name = package_name.replace("-", "_")
 
     if source_type == "sdist":
-        return f"{host}/packages/source/{package[0]}/{package_url_name}/{package_url_name}-{version}.tar.gz"
+        return f"{host}/packages/source/{package_name[0]}/{package_url_name}/{package_url_name}-{version}.tar.gz"
 
     elif source_type == "wheel":
-        # Extract relevant parts from the wheel filename
-        # Filename format: {name}-{version}[-{build_tag}]-{python_tag}-{abi_tag}-{platform_tag}.whl
-        filename_base = filename.rsplit(".", 1)[0]  # Remove .whl extension
-        parts = filename_base.split("-")
+        try:
+            # extract Python tag
+            parts = filename.split("-")
+            none_idx = parts.index("none")
+            if none_idx <= 0:
+                msg = f"Invalid wheel filename format: {filename}"
+                logger.warning(msg)
+                return None
 
-        # Extract python tag (like 'py3', 'cp39').
-        # It's the first part after version (and optional build tag)
-        python_tag = None
-        for _, part in enumerate(parts):
-            if part.startswith(("py", "cp")):
-                python_tag = part
-                break
+            python_tag = parts[none_idx - 1]
+            if not python_tag.startswith("py"):
+                msg = f"Invalid Python tag in wheel: {python_tag}"
+                logger.warning(msg)
+                return None
 
-        if python_tag is None:
-            # If we can't parse the filename, try to fall back to the original URL method
-            msg = f"Could not parse python tag from wheel filename {filename}, falling back to API URL"
+            return f"{host}/packages/{python_tag}/{package[0]}/{package_url_name}/{filename}"
+
+        except (ValueError, IndexError) as e:
+            msg = f"Error parsing wheel filename {filename}: {e}"
             logger.warning(msg)
             return None
-
-        return (
-            f"{host}/packages/{python_tag}/{package[0]}/{package_url_name}/{filename}"
-        )
 
     return None
 
