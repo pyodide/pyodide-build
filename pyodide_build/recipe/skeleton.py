@@ -105,14 +105,18 @@ def _make_predictable_url(
     A predictable URL for the package file, or None if the URL could not be
     constructed.
     """
-    from packaging import utils as packaging_utils
+    from packaging.utils import (
+        InvalidWheelFilename,
+        canonicalize_name,
+        parse_wheel_filename,
+    )
 
     host = "https://files.pythonhosted.org"
 
     # convert hyphens to underscores for the package name, as
     # PyPI uses underscores in the URL and packaging does not
     # handle this.
-    package_name = packaging_utils.canonicalize_name(package)
+    package_name = canonicalize_name(package)
     package_url_name = package_name.replace("-", "_")
 
     if source_type == "sdist":
@@ -120,23 +124,28 @@ def _make_predictable_url(
 
     elif source_type == "wheel":
         try:
-            # extract Python tag
-            parts = filename.split("-")
-            none_idx = parts.index("none")
-            if none_idx <= 0:
-                msg = f"Invalid wheel filename format: {filename}"
+            _, _, _, tags = parse_wheel_filename(filename)
+            python_tag = None
+            for tag in tags:
+                if (
+                    tag.interpreter.startswith("py")
+                    and tag.abi == "none"
+                    and tag.platform == "any"
+                ):
+                    python_tag = tag.interpreter
+                    break
+
+            if not python_tag:
+                msg = f"Not a pure Python wheel: {filename}"
                 logger.warning(msg)
                 return None
 
-            python_tag = parts[none_idx - 1]
-            if not python_tag.startswith("py"):
-                msg = f"Invalid Python tag in wheel: {python_tag}"
-                logger.warning(msg)
-                return None
+            return f"{host}/packages/{python_tag}/{package_url_name[0]}/{package_url_name}/{filename}"
 
-            return f"{host}/packages/{python_tag}/{package[0]}/{package_url_name}/{filename}"
-
-        except (ValueError, IndexError) as e:
+        except InvalidWheelFilename:
+            # Let invalid wheel filenames bubble up
+            raise
+        except Exception as e:
             msg = f"Error parsing wheel filename {filename}: {e}"
             logger.warning(msg)
             return None

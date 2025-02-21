@@ -137,7 +137,9 @@ def test_mkpkg_update_pinned(tmpdir):
     skeleton.update_package(base_dir, "idna", update_pinned=True)
 
 
-####################################################################################################
+# The following tests check for the behaviour of predictably generating URLs for dists,
+# e.g., wheels and sdists, based on the package name, version, and source type.
+# The tests are based on the implementation of the _make_predictable_url function.
 
 
 @pytest.mark.parametrize(
@@ -185,11 +187,13 @@ def test_make_predictable_url(package, version, source_type, filename, expected_
 
 
 def test_make_predictable_url_invalid_wheel():
-    """Test that function returns None when wheel format can't be parsed."""
-    result = _make_predictable_url(
-        "invalid", "1.0.0", "wheel", "invalid-1.0.0-invalid-format.whl"
-    )
-    assert result is None
+    """Test that function raises an InvalidWheelFilename for invalid wheel format."""
+    from packaging.utils import InvalidWheelFilename
+
+    with pytest.raises(InvalidWheelFilename):
+        _make_predictable_url(
+            "invalid", "1.0.0", "wheel", "invalid-1.0.0-invalid-format.whl"
+        )
 
 
 @pytest.mark.parametrize(
