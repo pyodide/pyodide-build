@@ -9,6 +9,9 @@ more information.
 
 ### Usage
 
+> [!TIP]
+> Currently, installing `pyodide-build` is preferred to running it.
+
 #### Install it
 
 ```bash
