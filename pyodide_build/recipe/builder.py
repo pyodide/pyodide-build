@@ -627,7 +627,24 @@ class RecipeBuilderPackage(RecipeBuilder):
                     )
                     if nmoved:
                         with chdir(self.src_dist_dir):
-                            shutil.make_archive(f"{self.name}-tests", "tar", test_dir)
+                            filetime = _get_source_epoch()
+                            make_archive_kwargs = {
+                                "root_dir": "tests",
+                                "owner": "root",
+                                "group": "root",
+                            }
+
+                            if "SOURCE_DATE_EPOCH" in os.environ:
+
+                                def _set_time(tarinfo):
+                                    tarinfo.mtime = filetime
+                                    return tarinfo
+
+                                make_archive_kwargs["filter"] = _set_time
+
+                            shutil.make_archive(
+                                f"{self.name}-tests", "tar", **make_archive_kwargs
+                            )
             finally:
                 shutil.rmtree(test_dir, ignore_errors=True)
 
