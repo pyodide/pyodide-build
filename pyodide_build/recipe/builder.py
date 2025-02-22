@@ -353,7 +353,9 @@ class RecipeBuilder:
                 _get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
             )
 
-            def reproducible_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo:
+            def reproducible_filter(
+                tarinfo: tarfile.TarInfo, path: str | Path | None = None
+            ) -> tarfile.TarInfo:
                 """Filter that preserves permissions but normalizes ownership and optionally
                 timestamps. This is similar to the "data" filter but injects SOURCE_DATE_EPOCH."""
 
