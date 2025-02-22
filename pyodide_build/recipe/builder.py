@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import time
 from collections.abc import Iterator
 from datetime import datetime
@@ -352,7 +353,7 @@ class RecipeBuilder:
                 _get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
             )
 
-            def reproducible_filter(tarinfo):
+            def reproducible_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo:
                 """Filter that preserves permissions but normalizes ownership and optionally
                 timestamps. This is similar to the "data" filter but injects SOURCE_DATE_EPOCH."""
 
