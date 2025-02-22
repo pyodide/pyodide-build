@@ -25,7 +25,7 @@ dependencies = [
     "packaging",
     "virtualenv",
     "requests",
-    "typer",
+    "typer>=0.13",
     "rich",
     # TODO: make this a extra dependency
     "resolvelib",
