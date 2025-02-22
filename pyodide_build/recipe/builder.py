@@ -345,11 +345,29 @@ class RecipeBuilder:
         # is too large for the chown() call. This behavior can lead to "Permission denied" errors
         # (missing x bit) or random strange `make` behavior (due to wrong mtime order) in the CI
         # pipeline.
-        shutil.unpack_archive(
-            tarballpath,
-            self.build_dir,
-            filter=None if tarballpath.suffix == ".zip" else "data",
-        )
+        if tarballpath.suffix == ".zip":
+            shutil.unpack_archive(tarballpath, self.build_dir, filter=None)
+        else:
+            filetime = (
+                _get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
+            )
+
+            def reproducible_filter(tarinfo):
+                """Filter that preserves permissions but normalizes ownership and optionally
+                timestamps. This is similar to the "data" filter but injects SOURCE_DATE_EPOCH."""
+
+                tarinfo.uid = tarinfo.gid = 0
+                tarinfo.uname = tarinfo.gname = "root"
+
+                # set timestamp from SOURCE_DATE_EPOCH if available
+                if filetime is not None:
+                    tarinfo.mtime = filetime
+
+                return tarinfo
+
+            shutil.unpack_archive(
+                tarballpath, self.build_dir, filter=reproducible_filter
+            )
 
         extract_dir_name = self.source_metadata.extract_dir
         if extract_dir_name is None:
