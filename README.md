@@ -38,8 +38,7 @@ pyodide build --help
 ```
 
 > [!NOTE]
-> If installing `pyodide-build` and its dependencies in virtual environments, we recommend
-using ones that are managed by `venv` or `virtualenv` at the moment; see #58.
+> Currently `pyodide-build` does not work well in environments managed by uv, see #58.
 
 ### or run it
 
