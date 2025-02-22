@@ -16,16 +16,12 @@ more information.
 
 ```bash
 pip install pyodide-build
-pyodide --help
-pyodide build --help
 ```
 
 #### Install it globally
 
 ```bash
 pipx install --include-deps pyodide-build
-pyodide --help
-pyodide build --help
 ```
 
 or, alternatively
@@ -33,8 +29,6 @@ or, alternatively
 ```bash
 pipx install pyodide-cli
 pipx inject pyodide-cli pyodide-build
-pyodide --help
-pyodide build --help
 ```
 
 > [!NOTE]
