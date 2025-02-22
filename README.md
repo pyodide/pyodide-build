@@ -10,31 +10,19 @@ more information.
 ### Usage
 
 > [!TIP]
-> Currently, installing `pyodide-build` is preferred to running it.
+> Currently, installing `pyodide-build` is the recommended to use it, instead of running it directly.
 
 #### Install it
 
 ```bash
-pip install pyodide-build
-```
-
-#### Install it globally
-
-```bash
-pipx install --include-deps pyodide-build
-```
-
-or, alternatively
-
-```bash
-pipx install pyodide-cli
-pipx inject pyodide-cli pyodide-build
+pip install pyodide-build  # in an environment
+pipx install --include-deps pyodide-build  # globally
 ```
 
 > [!NOTE]
-> Currently `pyodide-build` does not work well in environments managed by uv, see #58.
+> Currently `pyodide-build` does not work well in virtual environments managed by `uv`, see #58.
 
-### or run it
+#### or run it
 
 - with `uv`/`uvx`
 
