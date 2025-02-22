@@ -62,6 +62,9 @@ def _get_source_epoch() -> int:
 def _make_whlfile(
     *args: Any, owner: int | None = None, group: int | None = None, **kwargs: Any
 ) -> str:
+    filetime = _get_source_epoch()
+    # gtime() ensures UTC
+    kwargs["date_time"] = time.gmtime(filetime)[:6]
     return shutil._make_zipfile(*args, **kwargs)  # type: ignore[attr-defined]
 
 
