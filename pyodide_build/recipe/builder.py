@@ -547,7 +547,7 @@ class RecipeBuilderPackage(RecipeBuilder):
     ) -> None:
         """Package a wheel
 
-        This unpacks the wheel, unvendors tests if necessary, runs and "build.post"
+        This unpacks the wheel, unvendors tests if necessary, and runs the "build.post"
         script, and then repacks the wheel.
 
         Parameters
