@@ -104,11 +104,10 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
 def test_build_dependencies(n_jobs, monkeypatch):
     build_list = []
 
-    class MockPackage(graph_builder.Package):
-        def build(self, args: Any, build_dir: Path) -> None:
-            build_list.append(self.name)
+    def mock_build(self, args: Any, build_dir: Path) -> None:
+        build_list.append(self.name)
 
-    monkeypatch.setattr(graph_builder, "Package", MockPackage)
+    monkeypatch.setattr(graph_builder.BasePackage, "build", mock_build)
 
     pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_1", "pkg_2"})
 
@@ -133,11 +132,10 @@ def test_build_dependencies(n_jobs, monkeypatch):
 def test_build_error(n_jobs, monkeypatch):
     """Try building all the dependency graph, without the actual build operations"""
 
-    class MockPackage(graph_builder.Package):
-        def build(self, args: Any, build_dir: Path) -> None:
-            raise ValueError("Failed build")
+    def mock_build(self, args: Any, build_dir: Path) -> None:
+        raise ValueError("Failed build")
 
-    monkeypatch.setattr(graph_builder, "Package", MockPackage)
+    monkeypatch.setattr(graph_builder.BasePackage, "build", mock_build)
 
     pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_1"})
 

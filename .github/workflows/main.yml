@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_COLOR: 3
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -103,7 +106,13 @@ jobs:
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
 
+      - name: Get number of cores on the runner
+        id: get-cores
+        run: echo "CORES=$(nproc)" >> $GITHUB_OUTPUT
+
       - name: Run the integration tests (${{ matrix.task }})
+        env:
+          PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         run: |
           cd integration_tests
           make ${{ matrix.task }}
