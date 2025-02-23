@@ -22,6 +22,7 @@ from pyodide_build.build_env import (
     RUST_BUILD_PRELUDE,
     BuildArgs,
     get_build_environment_vars,
+    get_build_flag,
     get_pyodide_root,
     pyodide_tags,
     replace_so_abi_tags,
@@ -52,12 +53,16 @@ def _make_whlfile(
 
 
 shutil.register_archive_format("whl", _make_whlfile, description="Wheel file")
-shutil.register_unpack_format(
-    "whl",
-    [".whl", ".wheel"],
-    shutil._unpack_zipfile,  # type: ignore[attr-defined]
-    description="Wheel file",
-)
+try:
+    shutil.register_unpack_format(
+        "whl",
+        [".whl", ".wheel"],
+        shutil._unpack_zipfile,  # type: ignore[attr-defined]
+        description="Wheel file",
+    )
+except shutil.RegistryError:
+    # Error: .whl is already registered for "whl"
+    pass
 
 
 def _extract_tarballname(url: str, headers: dict) -> str:
@@ -337,6 +342,34 @@ class RecipeBuilder:
         shutil.move(self.build_dir / extract_dir_name, self.src_extract_dir)
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
+    def _create_constraints_file(self) -> str:
+        """
+        Creates a pip constraints file by concatenating global constraints (PIP_CONSTRAINT)
+        with constraints specific to this package.
+
+        returns the path to the new constraints file.
+        """
+        try:
+            host_constraints = get_build_flag("PIP_CONSTRAINT")
+        except ValueError:
+            host_constraints = ""
+
+        constraints = self.recipe.requirements.constraint
+        if not constraints:
+            # nothing to override
+            return host_constraints
+
+        host_constraints_file = Path(host_constraints)
+        new_constraints_file = self.build_dir / "constraints.txt"
+        if host_constraints_file.is_file():
+            shutil.copy(host_constraints_file, new_constraints_file)
+
+        with new_constraints_file.open("a") as f:
+            for constraint in constraints:
+                f.write(constraint + "\n")
+
+        return str(new_constraints_file)
+
     def _compile(
         self,
         bash_runner: BashRunnerWithSharedEnvironment,
@@ -382,6 +415,8 @@ class RecipeBuilder:
                         cwd=self.src_extract_dir,
                     )
                     build_env = runner.env
+
+            build_env["PIP_CONSTRAINT"] = str(self._create_constraints_file())
 
             pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings

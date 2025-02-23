@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- Fixed Pyodide venv `sys_platform` marker evaluation with pip >= 25.
+  [#108](https://github.com/pyodide/pyodide-build/pull/108)
+
+## [0.29.3] - 2025/02/04
+
 ### Added
 
 - Added new configuration variable `default_cross_build_env_url`.
   [#85](https://github.com/pyodide/pyodide-build/pull/85)
+
+- Added a new recipe key `requirement.constraint` to set the package-level constraints.
+  [#97](https://github.com/pyodide/pyodide-build/pull/97)
 
 ## [0.29.2] - 2024/11/29
 

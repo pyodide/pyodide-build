@@ -8,7 +8,7 @@ import pydantic
 import pytest
 
 from pyodide_build import common
-from pyodide_build.build_env import BuildArgs
+from pyodide_build.build_env import BuildArgs, get_build_flag
 from pyodide_build.recipe import builder as _builder
 from pyodide_build.recipe.builder import (
     RecipeBuilder,
@@ -46,18 +46,18 @@ def test_constructor(tmp_path):
     )
 
     assert builder.name == "beautifulsoup4"
-    assert builder.version == "4.10.0"
-    assert builder.fullname == "beautifulsoup4-4.10.0"
+    assert builder.version == "4.13.3"
+    assert builder.fullname == "beautifulsoup4-4.13.3"
 
     assert builder.pkg_root == RECIPE_DIR / "beautifulsoup4"
     assert builder.build_dir == tmp_path / "beautifulsoup4" / "build"
     assert (
         builder.src_extract_dir
-        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.10.0"
+        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.13.3"
     )
     assert (
         builder.src_dist_dir
-        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.10.0" / "dist"
+        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.13.3" / "dist"
     )
     assert builder.dist_dir == RECIPE_DIR / "beautifulsoup4" / "dist"
     assert builder.library_install_prefix == tmp_path / ".libs"
@@ -214,6 +214,32 @@ def test_unvendor_tests(tmpdir):
 
     # One test folder and two test file
     assert n_moved == 3
+
+
+def test_create_constraints_file_no_override(tmp_path, dummy_xbuildenv):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR
+        / "pkg_test_executable",  # constraints not set, so no override
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+    )
+
+    path = builder._create_constraints_file()
+    assert path == get_build_flag("PIP_CONSTRAINT")
+
+
+def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_test_constraint",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+    )
+
+    path = builder._create_constraints_file()
+    assert path == str(tmp_path / "constraints.txt")
+
+    data = Path(path).read_text().strip().split("\n")
+    assert data[-3:] == ["numpy < 2.0", "pytest == 7.0"], data
 
 
 class MockSourceSpec(_SourceSpec):

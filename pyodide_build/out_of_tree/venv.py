@@ -141,7 +141,6 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         f"""
         os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
         os.name = os_name
-        orig_platform = sys.platform
         sys.platform = sys_platform
         sys.platlibdir = "lib"
         sys.implementation._multiarch = multiarch
@@ -153,7 +152,6 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         import sysconfig
         sysconfig._init_config_vars()
         del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
-        sys.platform = orig_platform
         """
     )
 

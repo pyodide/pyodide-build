@@ -1,10 +1,10 @@
 package:
   name: scipy
-  version: 1.8.0
+  version: 1.15.2
 
 source:
-  url: https://files.pythonhosted.org/packages/b4/a2/4faa34bf0cdbefd5c706625f1234987795f368eb4e97bde9d6f46860843e/scipy-1.8.0.tar.gz
-  sha256: 31d4f2d6b724bc9a98e527b5849b8a7e589bf1ea630c33aa563eda912c9ff0bd
+  url: https://files.pythonhosted.org/packages/source/s/scipy/scipy-1.15.2.tar.gz
+  sha256: cd58a314d92838f7e6f755c8a2167ead4f27e1fd5c1251fd54289569ef3495ec
 
 requirements:
   run:

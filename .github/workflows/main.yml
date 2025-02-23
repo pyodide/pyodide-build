@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_COLOR: 3
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,7 +18,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
 
@@ -79,7 +82,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
 
@@ -103,7 +106,13 @@ jobs:
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
 
+      - name: Get number of cores on the runner
+        id: get-cores
+        run: echo "CORES=$(nproc)" >> $GITHUB_OUTPUT
+
       - name: Run the integration tests (${{ matrix.task }})
+        env:
+          PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         run: |
           cd integration_tests
           make ${{ matrix.task }}
