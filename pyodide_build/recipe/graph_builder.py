@@ -199,7 +199,7 @@ class PythonPackage(BasePackage):
 
 @dataclasses.dataclass
 class SharedLibrary(BasePackage):
-    install_dir: str = "dylib"
+    install_dir: str = "dynlib"
 
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)
