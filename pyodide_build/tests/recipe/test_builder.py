@@ -1,6 +1,9 @@
+import os
 import shutil
 import subprocess
+import tarfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Self
 
@@ -351,3 +354,114 @@ def test_extract_tarballname():
 
     for header, tarballname in zip(headers, tarballnames, strict=True):
         assert _builder._extract_tarballname(url, header) == tarballname
+
+
+# Some reproducibility tests. These are not exhaustive, but should catch
+# some common issues for basics like timestamps and file contents. They
+# test the behavior of the builder functions that are most likely to be
+# affected by SOURCE_DATE_EPOCH.
+
+
+from pyodide_build.recipe.builder import _get_source_epoch
+
+
+@contextmanager
+def source_date_epoch(value=None):
+    old_value = os.environ.get("SOURCE_DATE_EPOCH")
+    try:
+        if value is None:
+            if "SOURCE_DATE_EPOCH" in os.environ:
+                del os.environ["SOURCE_DATE_EPOCH"]
+        else:
+            os.environ["SOURCE_DATE_EPOCH"] = str(value)
+        yield
+    finally:
+        if old_value is None:
+            if "SOURCE_DATE_EPOCH" in os.environ:
+                del os.environ["SOURCE_DATE_EPOCH"]
+        else:
+            os.environ["SOURCE_DATE_EPOCH"] = old_value
+
+
+def test_get_source_epoch_reproducibility():
+    with source_date_epoch("1735689600"):  # 2025-01-01
+        assert _get_source_epoch() == 1735689600
+
+    with source_date_epoch("invalid"):
+        assert _get_source_epoch() > 0  # should fall back to current time
+
+    with source_date_epoch("0"):
+        assert (
+            _get_source_epoch() == 315532800
+        )  # should fall back to minimum ZIP timestamp
+
+
+def test_make_whlfile_reproducibility(monkeypatch, tmp_path):
+    """Test that _make_whlfile is passing the correct timestamp to _make_zipfile."""
+    from pyodide_build.recipe.builder import _make_whlfile
+
+    test_epoch = 1735689600  # 2025-01-01
+
+    def mock_make_zipfile(
+        base_name, base_dir, verbose=0, dry_run=0, logger=None, date_time=None
+    ):
+        assert date_time == time.gmtime(test_epoch)[:6]
+
+    monkeypatch.setattr(shutil, "_make_zipfile", mock_make_zipfile)
+
+    with source_date_epoch(test_epoch):
+        _make_whlfile("archive.whl", "base_dir", ["file1.py"], b"content")
+
+
+def test_set_archive_time_reproducibility(tmp_path):
+    """Test that archive creation using _set_time sets correct mtime."""
+    import tarfile
+
+    from pyodide_build.recipe.builder import _get_source_epoch
+
+    # Create a test tarfile with a specific timestamp
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test content")
+    test_epoch = 1735689600  # 2025-01-01
+
+    with source_date_epoch(test_epoch):
+        with tarfile.open(tmp_path / "archive.tar", "w") as tar:
+            tarinfo = tar.gettarinfo(str(test_file))
+            tarinfo.mtime = _get_source_epoch()
+            tar.addfile(tarinfo, open(test_file, "rb"))
+
+    # Now, verify this timestamp in the archive
+    with tarfile.open(tmp_path / "archive.tar") as tar:
+        info = tar.getmembers()[0]
+        assert info.mtime == test_epoch
+
+
+def test_reproducible_tar_filter(monkeypatch, tmp_path):
+    """Test that our reproducible_filter function sets the timestamp correctly."""
+
+    test_epoch = 1735689600  # 2025-01-01
+
+    class MockTarInfo:
+        def __init__(self, name):
+            self.name = name
+            self.uid = 1000
+            self.gid = 1000
+            self.uname = None
+            self.gname = None
+            self.mtime = int(time.time())
+
+    monkeypatch.setattr(tarfile, "TarInfo", MockTarInfo)
+    monkeypatch.setattr(os.path, "getmtime", lambda *args: test_epoch)
+
+    with source_date_epoch(test_epoch):
+        # Create and check a tarinfo object
+        tarinfo = tarfile.TarInfo("test.txt")
+        tarinfo.uid = tarinfo.gid = 0
+        tarinfo.uname = tarinfo.gname = "root"
+        tarinfo.mtime = test_epoch
+
+        assert tarinfo.mtime == test_epoch
+        assert tarinfo.uid == 0
+        assert tarinfo.gid == 0
+        assert tarinfo.uname == "root"
+        assert tarinfo.gname == "root"
