@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- Fixed Pyodide venv `sys_platform` marker evaluation with pip >= 25.
+  [#108](https://github.com/pyodide/pyodide-build/pull/108)
+
 ## [0.29.3] - 2025/02/04
 
 ### Added
