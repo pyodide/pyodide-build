@@ -36,6 +36,7 @@ from pyodide_build.common import (
     chdir,
     exit_with_stdio,
     find_matching_wheels,
+    get_source_epoch,
     make_zip_archive,
     modify_wheel,
     retag_wheel,
@@ -48,18 +49,6 @@ from pyodide_build.recipe.bash_runner import (
 from pyodide_build.recipe.spec import MetaConfig, _SourceSpec
 
 
-def _get_source_epoch() -> int:
-    """Get SOURCE_DATE_EPOCH from environment or fallback to current time.
-    Uses 315532800, i.e., 1980-01-01 00:00:00 UTC as minimum timestamp (as
-    this is the zipfile limit).
-    """
-    try:
-        source_epoch = int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))
-        return max(315532800, source_epoch)
-    except ValueError:
-        return int(time.time())
-
-
 def _update_recursive_timestamp(path: Path, timestamp: int | None = None) -> None:
     """Update timestamps recursively for all directories and files. If
     SOURCE_DATE_EPOCH is set, uses that, otherwise keeps original ones."""
@@ -68,7 +57,7 @@ def _update_recursive_timestamp(path: Path, timestamp: int | None = None) -> Non
         return
 
     if timestamp is None:
-        timestamp = _get_source_epoch()
+        timestamp = get_source_epoch()
 
     # Update directory, subdirectories, and files
     os.utime(path, (timestamp, timestamp))
@@ -80,7 +69,7 @@ def _update_recursive_timestamp(path: Path, timestamp: int | None = None) -> Non
 def _make_whlfile(
     *args: Any, owner: int | None = None, group: int | None = None, **kwargs: Any
 ) -> str:
-    filetime = _get_source_epoch()
+    filetime = get_source_epoch()
     # gtime() ensures UTC
     kwargs["date_time"] = time.gmtime(filetime)[:6]
     return shutil._make_zipfile(*args, **kwargs)  # type: ignore[attr-defined]
@@ -308,6 +297,7 @@ class RecipeBuilder:
 
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
     def _reproducible_filter(
         tarinfo: tarfile.TarInfo, path: str | Path | None = None
     ) -> tarfile.TarInfo:
@@ -315,7 +305,7 @@ class RecipeBuilder:
         timestamps. This is similar to the "data" filter but injects SOURCE_DATE_EPOCH."""
 
         # set timestamp from SOURCE_DATE_EPOCH if available
-        filetime = _get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
+        filetime = get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
 
         tarinfo.uid = tarinfo.gid = 0
         tarinfo.uname = tarinfo.gname = "root"
@@ -645,7 +635,7 @@ class RecipeBuilderPackage(RecipeBuilder):
                     )
                     if nmoved:
                         with chdir(self.src_dist_dir):
-                            filetime = _get_source_epoch()
+                            filetime = get_source_epoch()
                             shutil.make_archive(
                                 f"{self.name}-tests",
                                 format="tar",
@@ -826,7 +816,7 @@ def unvendor_tests(
     out_files = []
     shutil.rmtree(test_install_prefix, ignore_errors=True)
 
-    filetime = _get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
+    filetime = get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
 
     for root, _dirs, files in os.walk(install_prefix):
         root_rel = Path(root).relative_to(install_prefix)

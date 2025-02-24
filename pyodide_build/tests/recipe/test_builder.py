@@ -362,7 +362,7 @@ def test_extract_tarballname():
 # affected by SOURCE_DATE_EPOCH.
 
 
-from pyodide_build.recipe.builder import _get_source_epoch
+from pyodide_build.common import get_source_epoch
 
 
 @contextmanager
@@ -385,14 +385,14 @@ def source_date_epoch(value=None):
 
 def test_get_source_epoch_reproducibility():
     with source_date_epoch("1735689600"):  # 2025-01-01
-        assert _get_source_epoch() == 1735689600
+        assert get_source_epoch() == 1735689600
 
     with source_date_epoch("invalid"):
-        assert _get_source_epoch() > 0  # should fall back to current time
+        assert get_source_epoch() > 0  # should fall back to current time
 
     with source_date_epoch("0"):
         assert (
-            _get_source_epoch() == 315532800
+            get_source_epoch() == 315532800
         )  # should fall back to minimum ZIP timestamp
 
 
@@ -417,8 +417,6 @@ def test_set_archive_time_reproducibility(tmp_path):
     """Test that archive creation using _set_time sets correct mtime."""
     import tarfile
 
-    from pyodide_build.recipe.builder import _get_source_epoch
-
     # Create a test tarfile with a specific timestamp
     test_file = tmp_path / "test.txt"
     test_file.write_text("test content")
@@ -427,7 +425,7 @@ def test_set_archive_time_reproducibility(tmp_path):
     with source_date_epoch(test_epoch):
         with tarfile.open(tmp_path / "archive.tar", "w") as tar:
             tarinfo = tar.gettarinfo(str(test_file))
-            tarinfo.mtime = _get_source_epoch()
+            tarinfo.mtime = get_source_epoch()
             tar.addfile(tarinfo, open(test_file, "rb"))
 
     # Now, verify this timestamp in the archive

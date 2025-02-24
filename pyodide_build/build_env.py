@@ -14,7 +14,12 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import search_pyproject_toml, to_bool, xbuildenv_dirname
+from pyodide_build.common import (
+    get_source_epoch,
+    search_pyproject_toml,
+    to_bool,
+    xbuildenv_dirname,
+)
 from pyodide_build.config import ConfigManager, CrossBuildEnvConfigManager
 
 RUST_BUILD_PRELUDE = """
@@ -35,6 +40,11 @@ class BuildArgs:
     target_install_dir: str = ""  # The path to the target Python installation
     host_install_dir: str = ""  # Directory for installing built host packages.
     builddir: str = ""  # The path to run pypa/build
+    env: dict[str, str] | None = None
+
+    def __post_init__(self) -> None:
+        self.env = self.env or {}
+        self.env["SOURCE_DATE_EPOCH"] = str(get_source_epoch())
 
 
 def init_environment(*, quiet: bool = False) -> None:
