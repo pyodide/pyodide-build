@@ -193,6 +193,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "ldflags_base": "LDFLAGS_BASE",
     "home": "HOME",
     "path": "PATH",
+    "source_date_epoch": "SOURCE_DATE_EPOCH",
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
     "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
