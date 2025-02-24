@@ -308,6 +308,23 @@ class RecipeBuilder:
 
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
+    def _reproducible_filter(
+        tarinfo: tarfile.TarInfo, path: str | Path | None = None
+    ) -> tarfile.TarInfo:
+        """Filter that preserves permissions but normalizes ownership and optionally
+        timestamps. This is similar to the "data" filter but injects SOURCE_DATE_EPOCH."""
+
+        # set timestamp from SOURCE_DATE_EPOCH if available
+        filetime = _get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
+
+        tarinfo.uid = tarinfo.gid = 0
+        tarinfo.uname = tarinfo.gname = "root"
+
+        if filetime is not None:
+            tarinfo.mtime = filetime
+
+        return tarinfo
+
     def _download_and_extract(self) -> None:
         """
         Download the source from specified in the package metadata,
@@ -366,27 +383,8 @@ class RecipeBuilder:
         if tarballpath.suffix == ".zip":
             shutil.unpack_archive(tarballpath, self.build_dir, filter=None)
         else:
-            filetime = (
-                _get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
-            )
-
-            def reproducible_filter(
-                tarinfo: tarfile.TarInfo, path: str | Path | None = None
-            ) -> tarfile.TarInfo:
-                """Filter that preserves permissions but normalizes ownership and optionally
-                timestamps. This is similar to the "data" filter but injects SOURCE_DATE_EPOCH."""
-
-                tarinfo.uid = tarinfo.gid = 0
-                tarinfo.uname = tarinfo.gname = "root"
-
-                # set timestamp from SOURCE_DATE_EPOCH if available
-                if filetime is not None:
-                    tarinfo.mtime = filetime
-
-                return tarinfo
-
             shutil.unpack_archive(
-                tarballpath, self.build_dir, filter=reproducible_filter
+                tarballpath, self.build_dir, filter=self._reproducible_filter
             )
 
         extract_dir_name = self.source_metadata.extract_dir
