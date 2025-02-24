@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The Rust toolchain version has been updated to `nightly-2025-01-18`.
+- The Rust toolchain version has been updated to `nightly-2025-02-01`.
   [#103](https://github.com/pyodide/pyodide-build/pull/103)
 
 ### Fixed
