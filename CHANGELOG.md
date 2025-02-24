@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Pyodide venv `sys_platform` marker evaluation with pip >= 25.
   [#108](https://github.com/pyodide/pyodide-build/pull/108)
 
+- `pyodide-build` now respects `SOURCE_DATE_EPOCH` to enable reproducible
+  builds on a best-effort basis.
+  [#109](https://github.com/pyodide/pyodide-build/pull/109)
+
 ## [0.29.3] - 2025/02/04
 
 ### Added
