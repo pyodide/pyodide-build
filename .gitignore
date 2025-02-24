@@ -34,3 +34,4 @@ venv/
 # integration tests
 integration_tests/**/build.log
 integration_tests/**/.libs
+/integration_tests/recipes-installed
