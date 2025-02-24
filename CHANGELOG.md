@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- The Rust toolchain version has been updated to `nightly-2025-01-18`.
+  [#103](https://github.com/pyodide/pyodide-build/pull/103)
+
+### Fixed
+
+- Fixed Pyodide venv `sys_platform` marker evaluation with pip >= 25.
+  [#108](https://github.com/pyodide/pyodide-build/pull/108)
+
 ## [0.29.3] - 2025/02/04
 
 ### Added
