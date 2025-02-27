@@ -118,7 +118,7 @@ def remove_avoided_requirements(
     for reqstr in list(requires):
         req = Requirement(reqstr)
         for avoid_name in set(avoided_requirements):
-            if avoid_name in req.name.lower():
+            if avoid_name == req.name.lower():
                 requires.remove(reqstr)
     return requires
 
