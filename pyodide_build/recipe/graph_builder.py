@@ -729,12 +729,16 @@ def _ensure_rust_toolchain():
         )
         return
 
-    # Install target from url
+    # Now we are going to delete the normal wasm32-unknown-emscripten sysroot
+    # and replace it with our wasm-eh version.
+    # We place the "install_token" to indicate that our custom sysroot has been
+    # installed and which URL we got it from.
     result = _run(
         ["rustup", "which", "--toolchain", rust_toolchain, "rustc"],
         capture_output=True,
         text=True,
     )
+
     toolchain_root = Path(result.stdout).parents[1]
     rustlib = toolchain_root / "lib/rustlib"
     install_token = rustlib / "wasm32-unknown-emscripten_install-url.txt"

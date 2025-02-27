@@ -77,6 +77,8 @@ class CrossCompileArgs(NamedTuple):
     target_install_dir: str = ""  # The path to the target Python installation
     pythoninclude: str = ""  # path to the cross-compiled Python include directory
     exports: Literal["whole_archive", "requested", "pyinit"] | list[str] = "pyinit"
+    # Pyodide abi, e.g., 2025_0
+    # Sometimes we have to inject compile flags only for certain abis.
     abi: str = ""
 
 
@@ -119,6 +121,10 @@ def replay_genargs_handle_dashl(arg: str, used_libs: set[str], abi: str) -> str 
     if arg == "-lgfortran":
         return None
 
+    # Some Emscripten libraries that use setjmp/longjmp.
+    # The Emscripten linker should automatically know to use these variants so
+    # this shouldn't be necessary.
+    # This suffix will need to change soon to `-legacysjlj`.
     if abi > "2025" and arg in ["-lfreetype", "-lpng"]:
         arg += "-wasm-sjlj"
 
