@@ -77,6 +77,9 @@ class CrossCompileArgs(NamedTuple):
     target_install_dir: str = ""  # The path to the target Python installation
     pythoninclude: str = ""  # path to the cross-compiled Python include directory
     exports: Literal["whole_archive", "requested", "pyinit"] | list[str] = "pyinit"
+    # Pyodide abi, e.g., 2025_0
+    # Sometimes we have to inject compile flags only for certain abis.
+    abi: str = ""
 
 
 def is_link_cmd(line: list[str]) -> bool:
@@ -93,7 +96,7 @@ def is_link_cmd(line: list[str]) -> bool:
     return False
 
 
-def replay_genargs_handle_dashl(arg: str, used_libs: set[str]) -> str | None:
+def replay_genargs_handle_dashl(arg: str, used_libs: set[str], abi: str) -> str | None:
     """
     Figure out how to replace a `-lsomelib` argument.
 
@@ -117,6 +120,13 @@ def replay_genargs_handle_dashl(arg: str, used_libs: set[str]) -> str | None:
 
     if arg == "-lgfortran":
         return None
+
+    # Some Emscripten libraries that use setjmp/longjmp.
+    # The Emscripten linker should automatically know to use these variants so
+    # this shouldn't be necessary.
+    # This suffix will need to change soon to `-legacysjlj`.
+    if abi > "2025" and arg in ["-lfreetype", "-lpng"]:
+        arg += "-wasm-sjlj"
 
     # WASM link doesn't like libraries being included twice
     # skip second one
@@ -555,7 +565,7 @@ def handle_command_generate_args(  # noqa: C901
             continue
 
         if arg.startswith("-l"):
-            result = replay_genargs_handle_dashl(arg, used_libs)
+            result = replay_genargs_handle_dashl(arg, used_libs, build_args.abi)
         elif arg.startswith("-I"):
             result = replay_genargs_handle_dashI(arg, build_args.target_install_dir)
         elif arg.startswith("-Wl"):
@@ -638,6 +648,7 @@ def compiler_main():
         target_install_dir=PYWASMCROSS_ARGS["target_install_dir"],
         pythoninclude=PYWASMCROSS_ARGS["pythoninclude"],
         exports=PYWASMCROSS_ARGS["exports"],
+        abi=PYWASMCROSS_ARGS["abi"],
     )
     basename = Path(sys.argv[0]).name
     args = list(sys.argv)

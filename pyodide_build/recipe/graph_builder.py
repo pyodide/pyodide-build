@@ -30,6 +30,7 @@ from rich.table import Table
 from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs
 from pyodide_build.common import (
+    download_and_unpack_archive,
     exit_with_stdio,
     extract_wheel_metadata_file,
     find_matching_wheels,
@@ -700,13 +701,23 @@ class _GraphBuilder:
                         self.build_queue.put((job_priority(dependent), dependent))
 
 
+def _run(cmd, *args, check=False, **kwargs):
+    result = subprocess.run(cmd, *args, **kwargs, check=check)
+    if result.returncode != 0:
+        logger.error("ERROR: command failed %s", " ".join(cmd))
+        exit_with_stdio(result)
+    return result
+
+
 def _ensure_rust_toolchain():
     rust_toolchain = build_env.get_build_flag("RUST_TOOLCHAIN")
-    result = subprocess.run(
-        ["rustup", "toolchain", "install", rust_toolchain], check=False
-    )
-    if result.returncode == 0:
-        result = subprocess.run(
+    _run(["rustup", "toolchain", "install", rust_toolchain])
+    _run(["rustup", "default", rust_toolchain])
+
+    url = build_env.get_build_flag("RUST_EMSCRIPTEN_TARGET_URL")
+    if not url:
+        # Install target with rustup target add
+        _run(
             [
                 "rustup",
                 "target",
@@ -714,12 +725,30 @@ def _ensure_rust_toolchain():
                 "wasm32-unknown-emscripten",
                 "--toolchain",
                 rust_toolchain,
-            ],
-            check=False,
+            ]
         )
-    if result.returncode != 0:
-        logger.error("ERROR: rustup toolchain install failed")
-        exit_with_stdio(result)
+        return
+
+    # Now we are going to delete the normal wasm32-unknown-emscripten sysroot
+    # and replace it with our wasm-eh version.
+    # We place the "install_token" to indicate that our custom sysroot has been
+    # installed and which URL we got it from.
+    result = _run(
+        ["rustup", "which", "--toolchain", rust_toolchain, "rustc"],
+        capture_output=True,
+        text=True,
+    )
+
+    toolchain_root = Path(result.stdout).parents[1]
+    rustlib = toolchain_root / "lib/rustlib"
+    install_token = rustlib / "wasm32-unknown-emscripten_install-url.txt"
+    if install_token.exists() and install_token.read_text() == url:
+        return
+    shutil.rmtree(rustlib / "wasm32-unknown-emscripten", ignore_errors=True)
+    download_and_unpack_archive(
+        url, rustlib, "wasm32-unknown-emscripten target", exists_ok=True
+    )
+    install_token.write_text(url)
 
 
 def build_from_graph(

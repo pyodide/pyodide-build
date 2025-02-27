@@ -179,6 +179,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "cpythoninstall": "CPYTHONINSTALL",
     "rustflags": "RUSTFLAGS",
     "rust_toolchain": "RUST_TOOLCHAIN",
+    "rust_emscripten_target_url": "RUST_EMSCRIPTEN_TARGET_URL",
     "cflags": "SIDE_MODULE_CFLAGS",
     "cxxflags": "SIDE_MODULE_CXXFLAGS",
     "ldflags": "SIDE_MODULE_LDFLAGS",
@@ -210,6 +211,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "cxxflags",
     "ldflags",
     "rust_toolchain",
+    "rust_emscripten_target_url",
     "meson_cross_file",
     "skip_emscripten_version_check",
     "build_dependency_index_url",
@@ -229,6 +231,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "cargo_build_target": "wasm32-unknown-emscripten",
     "cargo_target_wasm32_unknown_emscripten_linker": "emcc",
     "rust_toolchain": "nightly-2025-02-01",
+    "rust_emscripten_target_url": "",
     # Other configuration
     "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
