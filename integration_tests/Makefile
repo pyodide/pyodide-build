@@ -1,3 +1,5 @@
+export SOURCE_DATE_EPOCH=1735689600
+
 all:
 	@echo "Please specify a target"
 	@exit 1
@@ -6,7 +8,7 @@ all:
 test-recipe: check
 	@echo "... Running integration tests for building recipes"
 
-	pyodide build-recipes --recipe-dir=recipes --force-rebuild "*"
+	pyodide build-recipes --recipe-dir=recipes --force-rebuild "*" --install --install-dir=recipes-installed
 
 	@echo "... Passed"
 
