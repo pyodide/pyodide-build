@@ -813,7 +813,9 @@ def generate_packagedata(
 
         if not pkg.file_name or pkg.package_type == "static_library":
             continue
-        if not Path(output_dir, pkg.file_name).exists():
+
+        wheel_file = output_dir / pkg.file_name
+        if not wheel_file.exists():
             continue
         pkg_entry = PackageLockSpec(
             name=name,
@@ -833,7 +835,6 @@ def generate_packagedata(
         packages[normalized_name] = pkg_entry
 
         if pkg.unvendor_tests:
-            wheel_file = output_dir / pkg.file_name
             unvendored_test_file = unvendor.unvendor_tests_in_wheel(wheel_file)
             if unvendored_test_file:
                 packages[normalized_name].unvendored_tests = True
@@ -846,7 +847,7 @@ def generate_packagedata(
                 )
                 update_package_sha256(test_file_entry, unvendored_test_file)
 
-            packages[normalized_name + "-tests"] = pkg_entry
+                packages[normalized_name + "-tests"] = pkg_entry
 
         update_package_sha256(pkg_entry, wheel_file)
 

@@ -33,13 +33,14 @@ def unvendor_tests_in_wheel(wheel: Path, retain_patterns: list[str] | None = Non
     """
     retain_patterns = retain_patterns or []
 
-    name = parse_wheel_filename(wheel)[0]
+    name = parse_wheel_filename(wheel.name)[0]
     file_format = "tar"
     basename = f"{name}-tests"
     fullname = f"{basename}.{file_format}"
     destination = wheel.parent / fullname
 
-    with TemporaryDirectory() as tmpdir:
+    with TemporaryDirectory() as _tmpdir:
+        tmpdir = Path(_tmpdir)
         test_dir = tmpdir / "tests"
         with modify_wheel(wheel) as wheel_extract_dir:
             nmoved = unvendor_tests(
@@ -49,9 +50,9 @@ def unvendor_tests_in_wheel(wheel: Path, retain_patterns: list[str] | None = Non
                 return None
 
             with chdir(tmpdir):
-                shutil.make_archive(basename, file_format, test_dir)
+                generated_file = shutil.make_archive(basename, file_format, test_dir)
+                shutil.move(tmpdir / generated_file, destination)
 
-    shutil.move(tmpdir / fullname, destination)
     return destination
 
 
