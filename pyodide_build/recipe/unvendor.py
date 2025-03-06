@@ -12,7 +12,9 @@ from pyodide_build.common import (
 )
 
 
-def unvendor_tests_in_wheel(wheel: Path, retain_patterns: list[str] | None = None) -> Path | None:
+def unvendor_tests_in_wheel(
+    wheel: Path, retain_patterns: list[str] | None = None
+) -> Path | None:
     """
     Unvendor tests from a wheel file.
 
@@ -44,7 +46,9 @@ def unvendor_tests_in_wheel(wheel: Path, retain_patterns: list[str] | None = Non
         test_dir = tmpdir / "tests"
         with modify_wheel(wheel) as wheel_extract_dir:
             nmoved = unvendor_tests(
-                wheel_extract_dir, test_dir, retain_patterns,
+                wheel_extract_dir,
+                test_dir,
+                retain_patterns,
             )
             if not nmoved:
                 return None

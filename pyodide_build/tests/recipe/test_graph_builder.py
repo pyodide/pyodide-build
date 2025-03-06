@@ -64,20 +64,35 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
         # Write dummy package file for SHA-256 hash verification
         with zipfile.ZipFile(tmp_path / pkg.file_name, "w") as whlzip:
             if pkg.package_type == "package":
-            # Make a proper .dist-info directory to make `python -m wheel pack/unpack` happy
+                # Make a proper .dist-info directory to make `python -m wheel pack/unpack` happy
                 dist_info_dir = f"{pkg.name}-{pkg.version}.dist-info"
                 metadata_content = f"name: {pkg.name}\nversion: {pkg.version}\n"
-                metadata_shasum = base64.urlsafe_b64encode(hashlib.sha256(metadata_content.encode()).digest()).decode().rstrip("=")
+                metadata_shasum = (
+                    base64.urlsafe_b64encode(
+                        hashlib.sha256(metadata_content.encode()).digest()
+                    )
+                    .decode()
+                    .rstrip("=")
+                )
                 wheel_content = "Wheel-Version: 1.0\nTag: py3-none-any\n"
-                wheel_shasum = base64.urlsafe_b64encode(hashlib.sha256(wheel_content.encode()).digest()).decode().rstrip("=")
+                wheel_shasum = (
+                    base64.urlsafe_b64encode(
+                        hashlib.sha256(wheel_content.encode()).digest()
+                    )
+                    .decode()
+                    .rstrip("=")
+                )
 
                 whlzip.writestr(f"{dist_info_dir}/METADATA", metadata_content)
                 whlzip.writestr(f"{dist_info_dir}/WHEEL", wheel_content)
-                whlzip.writestr(f"{dist_info_dir}/RECORD", (
-                    f"{dist_info_dir}/METADATA,sha256={metadata_shasum},{len(metadata_content)}\n"
-                    f"{dist_info_dir}/WHEEL,sha256={wheel_shasum},{len(wheel_content)}\n"
-                    f"{dist_info_dir}/RECORD,,\n"
-                ))
+                whlzip.writestr(
+                    f"{dist_info_dir}/RECORD",
+                    (
+                        f"{dist_info_dir}/METADATA,sha256={metadata_shasum},{len(metadata_content)}\n"
+                        f"{dist_info_dir}/WHEEL,sha256={wheel_shasum},{len(wheel_content)}\n"
+                        f"{dist_info_dir}/RECORD,,\n"
+                    ),
+                )
 
     package_data = graph_builder.generate_lockfile(tmp_path, pkg_map)
     assert package_data.info.arch == "wasm32"

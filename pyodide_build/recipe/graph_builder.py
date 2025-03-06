@@ -35,7 +35,6 @@ from pyodide_build.common import (
     extract_wheel_metadata_file,
     find_matching_wheels,
     find_missing_executables,
-    modify_wheel,
     repack_zip_archive,
 )
 from pyodide_build.logger import console_stdout, logger

@@ -5,8 +5,10 @@ from pyodide_build.recipe import unvendor
 
 
 def test_unvendor_tests_in_wheel(tmp_path):
-    test_wheel_file =  "package_with_bunch_of_test_directories-0.1.0-py3-none-any.whl"
-    test_wheel_path_orig = Path(__file__).parent.parent / "_test_wheels" / "wheel" / test_wheel_file
+    test_wheel_file = "package_with_bunch_of_test_directories-0.1.0-py3-none-any.whl"
+    test_wheel_path_orig = (
+        Path(__file__).parent.parent / "_test_wheels" / "wheel" / test_wheel_file
+    )
     shutil.copy(test_wheel_path_orig, tmp_path)
 
     test_wheel_path = tmp_path / test_wheel_file
@@ -34,15 +36,20 @@ def test_unvendor_tests_in_wheel(tmp_path):
 
 
 def test_unvendor_tests_in_wheel_retain(tmp_path):
-    test_wheel_file =  "package_with_bunch_of_test_directories-0.1.0-py3-none-any.whl"
-    test_wheel_path_orig = Path(__file__).parent.parent / "_test_wheels" / "wheel" / test_wheel_file
+    test_wheel_file = "package_with_bunch_of_test_directories-0.1.0-py3-none-any.whl"
+    test_wheel_path_orig = (
+        Path(__file__).parent.parent / "_test_wheels" / "wheel" / test_wheel_file
+    )
     shutil.copy(test_wheel_path_orig, tmp_path)
 
     test_wheel_path = tmp_path / test_wheel_file
-    test_tar_path = unvendor.unvendor_tests_in_wheel(test_wheel_path, [
-        "*test_example.py",
-        "*keep_this_test.py",
-    ])
+    test_tar_path = unvendor.unvendor_tests_in_wheel(
+        test_wheel_path,
+        [
+            "*test_example.py",
+            "*keep_this_test.py",
+        ],
+    )
 
     assert test_tar_path.exists()
     assert test_tar_path.name == "package-with-bunch-of-test-directories-tests.tar"
