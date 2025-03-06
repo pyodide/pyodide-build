@@ -35,10 +35,11 @@ from pyodide_build.common import (
     extract_wheel_metadata_file,
     find_matching_wheels,
     find_missing_executables,
+    modify_wheel,
     repack_zip_archive,
 )
 from pyodide_build.logger import console_stdout, logger
-from pyodide_build.recipe import loader
+from pyodide_build.recipe import loader, unvendor
 from pyodide_build.recipe.builder import needs_rebuild
 from pyodide_build.recipe.spec import MetaConfig, _BuildSpecTypes
 
@@ -65,7 +66,7 @@ class BasePackage:
     dependencies: set[str]  # run + host dependencies
     unbuilt_host_dependencies: set[str]
     host_dependents: set[str]
-    unvendored_tests: Path | None = None
+    unvendor_tests: bool = False
     file_name: str | None = None
     install_dir: str = "site"
     _queue_idx: int | None = None
@@ -165,17 +166,13 @@ class BasePackage:
         """
         raise NotImplementedError()
 
-    def tests_path(self) -> Path | None:
-        """
-        Return the path to the unvendored tests of the package.
-        """
-        raise NotImplementedError()
-
 
 @dataclasses.dataclass
 class PythonPackage(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)
+
+        self.unvendor_tests = self.meta.build.unvendor_tests
 
     def dist_artifact_path(self) -> Path | None:
         dist_dir = self.pkgdir / "dist"
@@ -189,13 +186,6 @@ class PythonPackage(BasePackage):
             )
 
         return candidates[0]
-
-    def tests_path(self) -> Path | None:
-        tests = list((self.pkgdir / "dist").glob("*-tests.tar"))
-        assert len(tests) <= 1
-        if tests:
-            return tests[0]
-        return None
 
 
 @dataclasses.dataclass
@@ -216,9 +206,6 @@ class SharedLibrary(BasePackage):
 
         return candidates[0]
 
-    def tests_path(self) -> Path | None:
-        return None
-
 
 @dataclasses.dataclass
 class StaticLibrary(BasePackage):
@@ -226,9 +213,6 @@ class StaticLibrary(BasePackage):
         super().__init__(pkgdir, config)
 
     def dist_artifact_path(self) -> Path | None:
-        return None
-
-    def tests_path(self) -> Path | None:
         return None
 
 
@@ -839,8 +823,6 @@ def generate_packagedata(
             package_type=pkg.package_type,
         )
 
-        update_package_sha256(pkg_entry, output_dir / pkg.file_name)
-
         pkg_entry.depends = [x.lower() for x in pkg.run_dependencies]
 
         if pkg.package_type not in ("static_library", "shared_library"):
@@ -848,23 +830,25 @@ def generate_packagedata(
                 pkg.meta.package.top_level if pkg.meta.package.top_level else [name]
             )
 
-        packages[normalized_name.lower()] = pkg_entry
+        packages[normalized_name] = pkg_entry
 
-        if pkg.unvendored_tests:
-            packages[normalized_name.lower()].unvendored_tests = True
+        if pkg.unvendor_tests:
+            wheel_file = output_dir / pkg.file_name
+            unvendored_test_file = unvendor.unvendor_tests_in_wheel(wheel_file)
+            if unvendored_test_file:
+                packages[normalized_name].unvendored_tests = True
+                test_file_entry = PackageLockSpec(
+                    name=f"{name}-tests",
+                    version=pkg.version,
+                    depends=[name],
+                    file_name=unvendored_test_file.name,
+                    install_dir=pkg.install_dir,
+                )
+                update_package_sha256(test_file_entry, unvendored_test_file)
 
-            # Create the test package if necessary
-            pkg_entry = PackageLockSpec(
-                name=name + "-tests",
-                version=pkg.version,
-                depends=[name.lower()],
-                file_name=pkg.unvendored_tests.name,
-                install_dir=pkg.install_dir,
-            )
+            packages[normalized_name + "-tests"] = pkg_entry
 
-            update_package_sha256(pkg_entry, output_dir / pkg.unvendored_tests.name)
-
-            packages[normalized_name.lower() + "-tests"] = pkg_entry
+        update_package_sha256(pkg_entry, wheel_file)
 
     # sort packages by name
     packages = dict(sorted(packages.items()))
@@ -912,10 +896,6 @@ def copy_packages_to_dist_dir(
                     output_dir / f"{dist_artifact_path.name}.metadata",
                 )
 
-        test_path = pkg.tests_path()
-        if test_path:
-            shutil.copy(test_path, output_dir)
-
 
 def build_packages(
     packages_dir: Path,
@@ -934,13 +914,9 @@ def build_packages(
     build_from_graph(pkg_map, build_args, build_dir, n_jobs, force_rebuild)
     for pkg in pkg_map.values():
         dist_path = pkg.dist_artifact_path()
-        test_path = pkg.tests_path()
 
         if dist_path:
             pkg.file_name = dist_path.name
-
-        if test_path:
-            pkg.unvendored_tests = test_path
 
     return pkg_map
 

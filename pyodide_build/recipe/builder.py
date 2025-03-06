@@ -531,7 +531,7 @@ class RecipeBuilderPackage(RecipeBuilder):
     ) -> None:
         """Package a wheel
 
-        This unpacks the wheel, unvendors tests if necessary, runs and "build.post"
+        This unpacks the wheel, runs and "build.post"
         script, and then repacks the wheel.
 
         Parameters
@@ -584,18 +584,6 @@ class RecipeBuilderPackage(RecipeBuilder):
                     (wheel_dir / cross_build_file),
                     host_site_packages / cross_build_file,
                 )
-
-            try:
-                test_dir = self.src_dist_dir / "tests"
-                if self.build_metadata.unvendor_tests:
-                    nmoved = unvendor_tests(
-                        wheel_dir, test_dir, self.build_metadata.retain_test_patterns
-                    )
-                    if nmoved:
-                        with chdir(self.src_dist_dir):
-                            shutil.make_archive(f"{self.name}-tests", "tar", test_dir)
-            finally:
-                shutil.rmtree(test_dir, ignore_errors=True)
 
 
 class RecipeBuilderStaticLibrary(RecipeBuilder):
@@ -722,60 +710,6 @@ def copy_sharedlibs(
         return dep_map_new
 
     return {}
-
-
-def unvendor_tests(
-    install_prefix: Path, test_install_prefix: Path, retain_test_patterns: list[str]
-) -> int:
-    """Unvendor test files and folders
-
-    This function recursively walks through install_prefix and moves anything
-    that looks like a test folder under test_install_prefix.
-
-
-    Parameters
-    ----------
-    install_prefix
-        the folder where the package was installed
-    test_install_prefix
-        the folder where to move the tests. If it doesn't exist, it will be
-        created.
-
-    Returns
-    -------
-    n_moved
-        number of files or folders moved
-    """
-    n_moved = 0
-    out_files = []
-    shutil.rmtree(test_install_prefix, ignore_errors=True)
-    for root, _dirs, files in os.walk(install_prefix):
-        root_rel = Path(root).relative_to(install_prefix)
-        if root_rel.name == "__pycache__" or root_rel.name.endswith(".egg_info"):
-            continue
-        if root_rel.name in ["test", "tests"]:
-            # This is a test folder
-            (test_install_prefix / root_rel).parent.mkdir(exist_ok=True, parents=True)
-            shutil.move(install_prefix / root_rel, test_install_prefix / root_rel)
-            n_moved += 1
-            continue
-        out_files.append(root)
-        for fpath in files:
-            if (
-                fnmatch.fnmatchcase(fpath, "test_*.py")
-                or fnmatch.fnmatchcase(fpath, "*_test.py")
-                or fpath == "conftest.py"
-            ):
-                if any(fnmatch.fnmatchcase(fpath, pat) for pat in retain_test_patterns):
-                    continue
-                (test_install_prefix / root_rel).mkdir(exist_ok=True, parents=True)
-                shutil.move(
-                    install_prefix / root_rel / fpath,
-                    test_install_prefix / root_rel / fpath,
-                )
-                n_moved += 1
-
-    return n_moved
 
 
 # TODO: move this to common.py or somewhere else
