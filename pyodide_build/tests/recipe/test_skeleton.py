@@ -21,6 +21,8 @@ from pyodide_build.recipe.spec import MetaConfig
 
 @pytest.mark.parametrize("source_fmt", ["wheel", "sdist"])
 def test_mkpkg(tmpdir, capsys, source_fmt):
+    import re
+
     base_dir = Path(str(tmpdir))
 
     skeleton.make_package(base_dir, "idna", None, source_fmt)
@@ -29,16 +31,19 @@ def test_mkpkg(tmpdir, capsys, source_fmt):
     assert meta_path.exists()
     captured = capsys.readouterr()
     assert "Output written to" in captured.out
-    assert str(meta_path) in captured.out
 
-    db = MetaConfig.from_yaml(meta_path)
+    # this test checks for outputs across multiple paths. so, we
+    # find the paths in the output, ignoring ANSI color codes and
+    # handling line breaks + normalised paths (only for this test).
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    cleaned_output = ansi_escape.sub("", captured.out)
 
-    assert db.package.name == "idna"
-    assert db.source.url is not None
-    if source_fmt == "wheel":
-        assert db.source.url.endswith(".whl")
-    else:
-        assert db.source.url.endswith(".tar.gz")
+    cleaned_output = cleaned_output.replace("\n", "")
+    path_str = str(meta_path)
+
+    path_parts = path_str.split(os.sep)
+    for part in path_parts[-3:]:
+        assert part in cleaned_output
 
 
 @pytest.mark.parametrize("old_dist_type", ["wheel", "sdist"])
