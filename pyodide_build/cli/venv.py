@@ -23,6 +23,11 @@ def main(
         "--no-vcs-ignore",
         help="Don't create VCS ignore directive in the destination directory",
     ),
+    symlinks: bool = typer.Option(
+        True,
+        "--symlinks",
+        help="Try to use symlinks rather than copies, when symlinks are not the default for the platform",
+    ),
     # copies: bool = typer.Option(
     #     False, "--copies", "--always-copy", help="Use copies rather than symlinks, even when symlinks are the default"
     # ),
@@ -93,6 +98,8 @@ def main(
             venv_args.extend(["--extra-search-dir", _])
     if pip is not None:
         venv_args.extend(["--pip", pip])
+    if symlinks:
+        venv_args.append("--symlinks")
     if setuptools is not None:
         venv_args.extend(["--setuptools", setuptools])
     if wheel is not None:
