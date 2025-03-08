@@ -9,6 +9,29 @@ from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuilde
 from pyodide_build.common import exit_with_stdio
 from pyodide_build.logger import logger
 
+# A subset of supported virtualenv options that make sense in Pyodide's context.
+# Our aim will not be to support all of them, and some of them will never be in
+# the list, for example, --no-pip and so on. We provide these on a best-effort
+# basis as they should work and are easy to test.
+SUPPORTED_VIRTUALENV_OPTIONS = [
+    "--clear",
+    "--no-clear",
+    "--no-vcs-ignore",
+    "--symlinks",
+    # "--copies", "--always-copy", FIXME: node fails to invoke Pyodide
+    # "--symlink-app-data", FIXME: node fails to invoke Pyodide
+    "--no-download",
+    "--never-download",
+    "--download",
+    "--extra-search-dir",
+    "--pip",
+    "--setuptools",
+    "--no-setuptools",
+    "--wheel",
+    "--no-wheel",
+    "--no-periodic-update",
+]
+
 
 def check_result(result: subprocess.CompletedProcess[str], msg: str) -> None:
     """Abort if the process returns a nonzero error code"""
