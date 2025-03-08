@@ -185,11 +185,24 @@ def create_pip_script(venv_bin):
     # Python in the shebang. Use whichever Python was used to invoke
     # pyodide venv.
     host_python_path = venv_bin / f"python{get_pyversion()}-host"
+
+    # To support the "--clear" and "--no-clear" args, we need to remove
+    # the existing symlinks before creating new ones.
+    if host_python_path.exists():
+        host_python_path.unlink()
+    if (venv_bin / "python-host").exists():
+        (venv_bin / "python-host").unlink()
+
     host_python_path.symlink_to(sys.executable)
     # in case someone needs a Python-version-agnostic way to refer to python-host
     (venv_bin / "python-host").symlink_to(sys.executable)
 
-    (venv_bin / "pip").write_text(
+    pip_path = venv_bin / "pip"
+
+    if pip_path.exists():
+        pip_path.unlink()
+
+    pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
         f"#!{host_python_path} -s\n"
@@ -205,7 +218,7 @@ def create_pip_script(venv_bin):
             """
         )
     )
-    (venv_bin / "pip").chmod(0o777)
+    pip_path.chmod(0o777)
 
     pyversion = get_pyversion()
     other_pips = [
@@ -215,8 +228,9 @@ def create_pip_script(venv_bin):
     ]
 
     for pip in other_pips:
-        pip.unlink()
-        pip.symlink_to(venv_bin / "pip")
+        if pip.exists():
+            pip.unlink()
+        pip.symlink_to(pip_path)
 
 
 def create_pyodide_script(venv_bin: Path) -> None:
@@ -278,10 +292,6 @@ def create_pyodide_venv(dest: Path) -> None:
     """Create a Pyodide virtualenv and store it into dest"""
     logger.info("Creating Pyodide virtualenv at %s", dest)
     from virtualenv import session_via_cli
-
-    if dest.exists():
-        logger.error("ERROR: dest directory '%s' already exists", dest)
-        sys.exit(1)
 
     interp_path = pyodide_dist_dir() / "python"
     session = session_via_cli(["--no-wheel", "-p", str(interp_path), str(dest)])
