@@ -6,13 +6,33 @@ import pytest
 from pyodide_build.out_of_tree import venv
 
 
+@pytest.fixture(scope="session")
+def base_test_dir(tmp_path_factory):
+    """Create a session-wide directory that persists for all tests."""
+    base_dir = tmp_path_factory.getbasetemp() / "pyodide_test_base"
+    base_dir.mkdir(exist_ok=True)
+    yield base_dir
+    # Don't clean up the base directory at the end so the xbuildenv can
+    # be reused even between pytest runs if preferred
+
+
 @pytest.fixture
-def temp_venv_path(tmp_path):
-    """Create a temporary directory for the venv and clean up afterward."""
-    venv_path = tmp_path / "test_venv"
-    yield venv_path
+def persistent_xbuildenv(base_test_dir):
+    """Create a clean venv directory for each test while preserving the xbuildenv."""
+    # Use a fixed venv path that will be reused between tests
+    venv_path = base_test_dir / "test_venv"
+
     if venv_path.exists():
-        shutil.rmtree(venv_path)
+        for item in venv_path.iterdir():
+            if not str(item.name).startswith(".pyodide-xbuildenv"):
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+    else:
+        venv_path.mkdir(parents=True)
+
+    yield venv_path
 
 
 @pytest.mark.parametrize(
@@ -30,9 +50,10 @@ def temp_venv_path(tmp_path):
         # (["--copies"], ["--copies"]),
     ],
 )
-def test_venv_cli_args(monkeypatch, options, expected_calls, temp_venv_path):
+def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
     """Test that CLI options are correctly passed to virtualenv."""
     captured_args = None
+    temp_venv_path = tmp_path / "test_venv"
 
     def mock_session_via_cli(args):
         nonlocal captured_args
@@ -111,7 +132,6 @@ def test_supported_virtualenv_options():
     assert set(supported_options) == set(expected_options)
 
 
-@pytest.mark.skipif(True, reason="Requiring full Pyodide environment")
 @pytest.mark.parametrize(
     "options,check_function",
     [
@@ -130,20 +150,19 @@ def test_supported_virtualenv_options():
     ],
     ids=["default", "clear", "no-vcs-ignore", "no-setuptools", "no-wheel"],
 )
-def test_integration_venv_creation(temp_venv_path, options, check_function):
+def test_venv_creation(persistent_xbuildenv, options, check_function):
     try:
-        venv.create_pyodide_venv(temp_venv_path, options)
-        assert temp_venv_path.exists()
-        assert (temp_venv_path / "bin" / "python").exists()
-        assert (temp_venv_path / "bin" / "pyodide").exists()
-        assert (temp_venv_path / "pip.conf").exists()
-        assert check_function(temp_venv_path)
+        venv.create_pyodide_venv(persistent_xbuildenv, options)
+        assert (persistent_xbuildenv / "pyvenv.cfg").exists()
+        assert (persistent_xbuildenv / "bin" / "python").exists()
+        assert (persistent_xbuildenv / "bin" / "pyodide").exists()
+        assert (persistent_xbuildenv / "pip.conf").exists()
+        assert check_function(persistent_xbuildenv)
 
     except Exception as e:
         pytest.fail(f"Failed to create virtual environment: {e}")
 
 
-@pytest.mark.skipif(True, reason="Integration test requiring full Pyodide environment")
 @pytest.mark.parametrize(
     "package,version",
     [
@@ -152,13 +171,13 @@ def test_integration_venv_creation(temp_venv_path, options, check_function):
         ("wheel", "0.40.0"),
     ],
 )
-def test_integration_package_versions(temp_venv_path, package, version):
-    """Test installing specific package versions."""
+def test_installation_of_seed_package_versions(persistent_xbuildenv, package, version):
+    """Test installing specific seed package versions."""
     try:
-        venv.create_pyodide_venv(temp_venv_path, [f"--{package}", version])
-
-        # Check that the package is installed with the specified version
-        dist_info_dirs = list(temp_venv_path.glob(f"**/{package}-{version}*.dist-info"))
+        venv.create_pyodide_venv(persistent_xbuildenv, [f"--{package}", version])
+        dist_info_dirs = list(
+            persistent_xbuildenv.glob(f"**/{package}-{version}*.dist-info")
+        )
         assert len(dist_info_dirs) > 0, f"{package} {version} not found in the venv"
 
     except Exception as e:
@@ -167,20 +186,20 @@ def test_integration_package_versions(temp_venv_path, package, version):
         )
 
 
-@pytest.mark.skipif(True, reason="Integration test requiring full Pyodide environment")
 @pytest.mark.parametrize(
     "packages",
     [
-        ["six"],  # simple
+        ["six"],  # pure
         ["numpy"],  # compiled
         ["six", "numpy"],  # mixed
     ],
+    ids=["pure", "compiled", "both-pure-and-compiled"],
 )
-def test_pip_install(temp_venv_path, packages):
+def test_pip_install(persistent_xbuildenv, packages):
     """Test that our monkeypatched pip can install packages into the venv"""
     try:
-        venv.create_pyodide_venv(temp_venv_path, [])
-        pip_path = temp_venv_path / "bin" / "pip"
+        venv.create_pyodide_venv(persistent_xbuildenv, [])
+        pip_path = persistent_xbuildenv / "bin" / "pip"
         assert pip_path.exists(), "pip wasn't found in the virtual environment"
 
         for package in packages:
@@ -196,14 +215,14 @@ def test_pip_install(temp_venv_path, packages):
 
             # Verify package is installed by checking dist-info directory
             dist_info_dirs = list(
-                temp_venv_path.glob(f"**/{package.replace("-", "_")}-*.dist-info")
+                persistent_xbuildenv.glob(f"**/{package.replace('-', '_')}-*.dist-info")
             )
             assert len(dist_info_dirs) > 0, f"{package} not found in the venv"
 
         # Verify that the installed packages can be imported. It's overkill
         # but it's a good sanity check as this is an integration test, and
         # the import isn't the slow part here.
-        python_path = temp_venv_path / "bin" / "python"
+        python_path = persistent_xbuildenv / "bin" / "python"
         for package in packages:
             import_name = package.replace("-", "_")
             result = subprocess.run(
