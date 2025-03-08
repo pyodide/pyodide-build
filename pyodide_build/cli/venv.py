@@ -47,10 +47,10 @@ def main(
         "--extra-search-dir",
         help="A path containing wheels to extend the internal wheel list",
     ),
-    pip: str | None = typer.Option(
-        None,
+    pip: str = typer.Option(
+        "bundle",
         "--pip",
-        help="Version of pip to install as seed: embed, bundle, none or exact version",
+        help="Version of pip to install as seed: embed, bundle, or exact version.",
     ),
     setuptools: str | None = typer.Option(
         None,
@@ -75,7 +75,7 @@ def main(
     #     False, "--symlink-app-data/--no-symlink-app-data", help="Symlink the python packages from the app-data folder"
     # ),
 ) -> None:
-    """Create a Pyodide virtual environment. Supports a subset of the arguments that `virtualenv` supports."""
+    """Create a Pyodide virtual environment. Supports a subset of the arguments that `virtualenv` supports, with some minor differences for Pyodide compatibility."""
     init_environment()
 
     venv_args = []
@@ -96,7 +96,7 @@ def main(
     if extra_search_dir:
         for _ in extra_search_dir:
             venv_args.extend(["--extra-search-dir", _])
-    if pip is not None:
+    if pip:
         venv_args.extend(["--pip", pip])
     if symlinks:
         venv_args.append("--symlinks")
