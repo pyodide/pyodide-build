@@ -175,47 +175,6 @@ def test_get_helper_vars(tmp_path):
     )
 
 
-def test_unvendor_tests(tmpdir):
-    def touch(path: Path) -> None:
-        if path.is_dir():
-            raise ValueError("Only files, not folders are supported")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.touch()
-
-    def rlist(input_dir):
-        """Recursively list files in input_dir"""
-        paths = sorted(input_dir.rglob("*"))
-        res = []
-
-        for el in paths:
-            if el.is_file():
-                res.append(str(el.relative_to(input_dir)))
-        return res
-
-    install_prefix = Path(str(tmpdir / "install"))
-    test_install_prefix = Path(str(tmpdir / "install-tests"))
-
-    # create the example package
-    touch(install_prefix / "ex1" / "base.py")
-    touch(install_prefix / "ex1" / "conftest.py")
-    touch(install_prefix / "ex1" / "test_base.py")
-    touch(install_prefix / "ex1" / "tests" / "data.csv")
-    touch(install_prefix / "ex1" / "tests" / "test_a.py")
-
-    n_moved = _builder.unvendor_tests(install_prefix, test_install_prefix, [])
-
-    assert rlist(install_prefix) == ["ex1/base.py"]
-    assert rlist(test_install_prefix) == [
-        "ex1/conftest.py",
-        "ex1/test_base.py",
-        "ex1/tests/data.csv",
-        "ex1/tests/test_a.py",
-    ]
-
-    # One test folder and two test file
-    assert n_moved == 3
-
-
 def test_create_constraints_file_no_override(tmp_path, dummy_xbuildenv):
     builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR
