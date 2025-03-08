@@ -288,13 +288,27 @@ def install_stdlib(venv_bin: Path) -> None:
     check_result(result, "ERROR: failed to install unvendored stdlib modules")
 
 
-def create_pyodide_venv(dest: Path) -> None:
+def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
     """Create a Pyodide virtualenv and store it into dest"""
     logger.info("Creating Pyodide virtualenv at %s", dest)
     from virtualenv import session_via_cli
 
     interp_path = pyodide_dist_dir() / "python"
-    session = session_via_cli(["--no-wheel", "-p", str(interp_path), str(dest)])
+
+    cli_args = ["--python", str(interp_path)]
+
+    if virtualenv_args:
+        for arg in virtualenv_args:
+            if arg.startswith("--"):
+                # Check if the argument (or its prefix form) is supported.
+                arg_name = arg.split("=")[0] if "=" in arg else arg
+                if arg_name not in SUPPORTED_VIRTUALENV_OPTIONS:
+                    msg = f"Unsupported virtualenv option: {arg_name}"
+                    logger.warning(msg)
+
+        cli_args.extend(virtualenv_args)
+
+    session = session_via_cli(cli_args + [str(dest)])
     check_host_python_version(session)
 
     try:
