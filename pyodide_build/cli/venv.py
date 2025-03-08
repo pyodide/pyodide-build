@@ -70,7 +70,7 @@ def main(
     #     False, "--symlink-app-data/--no-symlink-app-data", help="Symlink the python packages from the app-data folder"
     # ),
 ) -> None:
-    """Create a Pyodide virtual environment"""
+    """Create a Pyodide virtual environment. Supports a subset of the arguments that `virtualenv` supports."""
     init_environment()
 
     venv_args = []
