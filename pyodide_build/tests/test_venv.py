@@ -1,9 +1,11 @@
+import os
 import shutil
 import subprocess
 
 import pytest
 
 from pyodide_build.out_of_tree import venv
+from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
 @pytest.fixture(scope="session")
@@ -11,28 +13,31 @@ def base_test_dir(tmp_path_factory):
     """Create a session-wide directory that persists for all tests."""
     base_dir = tmp_path_factory.getbasetemp() / "pyodide_test_base"
     base_dir.mkdir(exist_ok=True)
-    yield base_dir
-    # Don't clean up the base directory at the end so the xbuildenv can
-    # be reused even between pytest runs if preferred
 
+    venv_path = base_dir / "test_venv"
+    venv_path.mkdir(exist_ok=True)
 
-@pytest.fixture
-def persistent_xbuildenv(base_test_dir):
-    """Create a clean venv directory for each test while preserving the xbuildenv."""
-    # Use a fixed venv path that will be reused between tests
-    venv_path = base_test_dir / "test_venv"
+    cwd = os.getcwd()
+    os.chdir(str(base_dir))
 
+    xbuildenv_test_name = ".pyodide-xbuildenv-for-testing"
+
+    manager = CrossBuildEnvManager(xbuildenv_test_name)
+    manager.install()
+
+    os.chdir(cwd)
+
+    # Clean the venv before yielding, but preserve the xbuildenv
+    # as we can reuse it between the tests
     if venv_path.exists():
         for item in venv_path.iterdir():
-            if not str(item.name).startswith(".pyodide-xbuildenv"):
+            if not str(item.name).startswith(xbuildenv_test_name):
                 if item.is_dir():
                     shutil.rmtree(item)
                 else:
                     item.unlink()
-    else:
-        venv_path.mkdir(parents=True)
-
-    yield venv_path
+    yield base_dir
+    shutil.rmtree(base_dir)
 
 
 @pytest.mark.parametrize(
@@ -150,17 +155,14 @@ def test_supported_virtualenv_options():
     ],
     ids=["default", "clear", "no-vcs-ignore", "no-setuptools", "no-wheel"],
 )
-def test_venv_creation(persistent_xbuildenv, options, check_function):
-    try:
-        venv.create_pyodide_venv(persistent_xbuildenv, options)
-        assert (persistent_xbuildenv / "pyvenv.cfg").exists()
-        assert (persistent_xbuildenv / "bin" / "python").exists()
-        assert (persistent_xbuildenv / "bin" / "pyodide").exists()
-        assert (persistent_xbuildenv / "pip.conf").exists()
-        assert check_function(persistent_xbuildenv)
-
-    except Exception as e:
-        pytest.fail(f"Failed to create virtual environment: {e}")
+def test_venv_creation(base_test_dir, options, check_function):
+    venv_path = base_test_dir / "test_venv"
+    venv.create_pyodide_venv(venv_path, options)
+    assert (venv_path / "pyvenv.cfg").exists()
+    assert (venv_path / "bin" / "python").exists()
+    assert (venv_path / "bin" / "pyodide").exists()
+    assert (venv_path / "pip.conf").exists()
+    assert check_function(venv_path)
 
 
 @pytest.mark.parametrize(
@@ -171,19 +173,12 @@ def test_venv_creation(persistent_xbuildenv, options, check_function):
         ("wheel", "0.40.0"),
     ],
 )
-def test_installation_of_seed_package_versions(persistent_xbuildenv, package, version):
+def test_installation_of_seed_package_versions(base_test_dir, package, version):
     """Test installing specific seed package versions."""
-    try:
-        venv.create_pyodide_venv(persistent_xbuildenv, [f"--{package}", version])
-        dist_info_dirs = list(
-            persistent_xbuildenv.glob(f"**/{package}-{version}*.dist-info")
-        )
-        assert len(dist_info_dirs) > 0, f"{package} {version} not found in the venv"
-
-    except Exception as e:
-        pytest.fail(
-            f"Failed to create virtual environment with {package}={version}: {e}"
-        )
+    venv_path = base_test_dir / "test_venv"
+    venv.create_pyodide_venv(venv_path, [f"--{package}", version])
+    dist_info_dirs = list(venv_path.glob(f"**/{package}-{version}*.dist-info"))
+    assert len(dist_info_dirs) > 0, f"{package} {version} not found in the venv"
 
 
 @pytest.mark.parametrize(
@@ -195,50 +190,44 @@ def test_installation_of_seed_package_versions(persistent_xbuildenv, package, ve
     ],
     ids=["pure", "compiled", "both-pure-and-compiled"],
 )
-def test_pip_install(persistent_xbuildenv, packages):
+def test_pip_install(base_test_dir, packages):
     """Test that our monkeypatched pip can install packages into the venv"""
-    try:
-        venv.create_pyodide_venv(persistent_xbuildenv, [])
-        pip_path = persistent_xbuildenv / "bin" / "pip"
-        assert pip_path.exists(), "pip wasn't found in the virtual environment"
+    venv_path = base_test_dir / "test_venv"
 
-        for package in packages:
-            result = subprocess.run(
-                [str(pip_path), "install", package],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            assert (
-                result.returncode == 0
-            ), f"Failed to install {package}: {result.stderr}"
+    venv.create_pyodide_venv(venv_path, [])
+    pip_path = venv_path / "bin" / "pip"
+    assert pip_path.exists(), "pip wasn't found in the virtual environment"
 
-            # Verify package is installed by checking dist-info directory
-            dist_info_dirs = list(
-                persistent_xbuildenv.glob(f"**/{package.replace('-', '_')}-*.dist-info")
-            )
-            assert len(dist_info_dirs) > 0, f"{package} not found in the venv"
+    for package in packages:
+        result = subprocess.run(
+            [str(pip_path), "install", package],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f"Failed to install {package}: {result.stderr}"
 
-        # Verify that the installed packages can be imported. It's overkill
-        # but it's a good sanity check as this is an integration test, and
-        # the import isn't the slow part here.
-        python_path = persistent_xbuildenv / "bin" / "python"
-        for package in packages:
-            import_name = package.replace("-", "_")
-            result = subprocess.run(
-                [
-                    str(python_path),
-                    "-c",
-                    f"import {import_name}; print({import_name}.__version__)",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            assert (
-                result.returncode == 0
-            ), f"Failed to import {package}: {result.stderr}"
-            assert result.stdout.strip(), f"No version found for {package}"
+        # Verify package is installed by checking dist-info directory
+        dist_info_dirs = list(
+            venv_path.glob(f"**/{package.replace('-', '_')}-*.dist-info")
+        )
+        assert len(dist_info_dirs) > 0, f"{package} not found in the venv"
 
-    except Exception as e:
-        pytest.fail(f"Failed to test pip functionality: {e}")
+    # Verify that the installed packages can be imported. It's overkill
+    # but it's a good sanity check as this is an integration test, and
+    # the import isn't the slow part here.
+    python_path = venv_path / "bin" / "python"
+    for package in packages:
+        import_name = package.replace("-", "_")
+        result = subprocess.run(
+            [
+                str(python_path),
+                "-c",
+                f"import {import_name}; print({import_name}.__version__)",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f"Failed to import {package}: {result.stderr}"
+        assert result.stdout.strip(), f"No version found for {package}"
