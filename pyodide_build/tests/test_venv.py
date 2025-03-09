@@ -198,9 +198,11 @@ def test_pip_install(base_test_dir, packages):
     pip_path = venv_path / "bin" / "pip"
     assert pip_path.exists(), "pip wasn't found in the virtual environment"
 
+    python_path = venv_path / "bin" / "python"
+
     for package in packages:
         result = subprocess.run(
-            [str(pip_path), "install", package],
+            [str(python_path), "-m", "pip", "install", package, "-v"],
             capture_output=True,
             text=True,
             check=False,
