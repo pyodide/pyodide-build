@@ -225,6 +225,8 @@ def test_pip_install(base_test_dir, packages):
                 text=True,
                 check=False,
             )
+            print("AGRIYA DEBUG POINT 0")
+            print(result.stdout)
             assert (
                 result.returncode == 0
             ), f"Failed to install {package}: {result.stderr}"
@@ -243,6 +245,14 @@ def test_pip_install(base_test_dir, packages):
         import_name = package.replace("-", "_")
 
         with virtual_environment_activator(venv_path):
+            result1 = subprocess.run(
+                [str(python_path), "-c", "import sys; print(sys.platform)"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            print("AGRIYA DEBUG POINT 1")
+            print(result1.stdout)
             result = subprocess.run(
                 [
                     str(python_path),
@@ -253,6 +263,9 @@ def test_pip_install(base_test_dir, packages):
                 text=True,
                 check=False,
             )
+            print("AGRIYA DEBUG POINT 2")
+            print(result.stdout)
+            print(result.stderr)
             assert (
                 result.returncode == 0
             ), f"Failed to import {package}: {result.stderr}"
