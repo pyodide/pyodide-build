@@ -38,7 +38,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[test]"
 
-          pytest -svra \
+          pytest -v \
             --junitxml=test-results/junit.xml \
             --cov=pyodide-build \
             pyodide_build
