@@ -1,4 +1,3 @@
-import contextlib
 import os
 import shutil
 import subprocess
@@ -39,22 +38,6 @@ def base_test_dir(tmp_path_factory):
                     item.unlink()
     yield base_dir
     shutil.rmtree(base_dir)
-
-
-# FIXME: drop after https://github.com/pyodide/pyodide/pull/5448 is
-# released, as it won't be needed anymore
-@contextlib.contextmanager
-def virtual_environment_activator(venv_path):
-    """Context manager to activate a Pyodide virtual environment."""
-    original_path = os.environ["PATH"]
-    import runpy
-
-    activate_venv_script = venv_path / "bin" / "activate_this.py"
-    runpy.run_path(str(activate_venv_script))
-
-    yield
-
-    os.environ["PATH"] = original_path
 
 
 @pytest.mark.parametrize(
@@ -217,43 +200,36 @@ def test_pip_install(base_test_dir, packages):
 
     python_path = venv_path / "bin" / "python"
 
-    with virtual_environment_activator(venv_path):
-        for package in packages:
-            result = subprocess.run(
-                [str(python_path), "-m", "pip", "install", package, "-v"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            assert (
-                result.returncode == 0
-            ), f"Failed to install {package}: {result.stderr}"
+    for package in packages:
+        result = subprocess.run(
+            [str(python_path), "-m", "pip", "install", package, "-v"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f"Failed to install {package}: {result.stderr}"
 
-            # Verify package is installed by checking dist-info directory
-            dist_info_dirs = list(
-                venv_path.glob(f"**/{package.replace('-', '_')}-*.dist-info")
-            )
-            assert len(dist_info_dirs) > 0, f"{package} wasn't found in the venv"
+        # Verify package is installed by checking dist-info directory
+        dist_info_dirs = list(
+            venv_path.glob(f"**/{package.replace('-', '_')}-*.dist-info")
+        )
+        assert len(dist_info_dirs) > 0, f"{package} not found in the venv"
 
     # Verify that the installed packages can be imported. It's overkill
     # but it's a good sanity check as this is an integration test, and
     # the import isn't the slow part here.
-
+    python_path = venv_path / "bin" / "python"
     for package in packages:
         import_name = package.replace("-", "_")
-
-        with virtual_environment_activator(venv_path):
-            result = subprocess.run(
-                [
-                    str(python_path),
-                    "-c",
-                    f"import {import_name}; print({import_name}.__version__)",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            assert (
-                result.returncode == 0
-            ), f"Failed to import {package}: {result.stderr}"
-            assert result.stdout.strip(), f"No version found for {package}"
+        result = subprocess.run(
+            [
+                str(python_path),
+                "-c",
+                f"import {import_name}; print({import_name}.__version__)",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f"Failed to import {package}: {result.stderr}"
+        assert result.stdout.strip(), f"No version found for {package}"
