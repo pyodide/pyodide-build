@@ -224,13 +224,6 @@ def test_pip_install(base_test_dir, packages):
 
     python_path = venv_path / "bin" / "python"
 
-    # Find the site-packages directory
-    site_packages_paths = list(venv_path.glob("lib/python*/site-packages"))
-    assert len(site_packages_paths) > 0, "site-packages directory not found"
-    site_packages_path = site_packages_paths[0]
-
-    print(f"Site packages path: {site_packages_path}")
-
     with virtual_environment_activator(venv_path):
         for package in packages:
             result = subprocess.run(
@@ -251,21 +244,20 @@ def test_pip_install(base_test_dir, packages):
             )
             assert len(dist_info_dirs) > 0, f"{package} wasn't found in the venv"
 
-            # Set PYTHONPATH to include site-packages for the subprocess
-            env = os.environ.copy()
-            env["PYTHONPATH"] = str(site_packages_path)
+            # Verify that the installed packages can be imported. It's overkill
+            # but it's a good sanity check as this is an integration test, and
+            # the import isn't the slow part here.
+
+            import_name = package.replace("-", "_")
 
             result1 = subprocess.run(
                 [str(python_path), "-c", "import sys; print(sys.platform)"],
                 capture_output=True,
                 text=True,
                 check=False,
-                env=env,  # Add the environment with PYTHONPATH
             )
             print("AGRIYA DEBUG POINT 1")
             print(result1.stdout)
-
-            import_name = package.replace("-", "_")
             result = subprocess.run(
                 [
                     str(python_path),
@@ -275,7 +267,6 @@ def test_pip_install(base_test_dir, packages):
                 capture_output=True,
                 text=True,
                 check=False,
-                env=env,  # Add the environment with PYTHONPATH
             )
             print("AGRIYA DEBUG POINT 2")
             print(result.stdout)
