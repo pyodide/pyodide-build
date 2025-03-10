@@ -195,14 +195,18 @@ def test_pip_install(base_test_dir, packages):
     venv_path = base_test_dir / "test_venv"
 
     venv.create_pyodide_venv(venv_path, [])
-    pip_path = venv_path / "bin" / "pip"
-    assert pip_path.exists(), "pip wasn't found in the virtual environment"
-
-    python_path = venv_path / "bin" / "python"
+    venv_pip_path = venv_path / "bin" / "pip"
+    assert venv_pip_path.exists(), "pip wasn't found in the virtual environment"
 
     for package in packages:
         result = subprocess.run(
-            [str(python_path), "-m", "pip", "install", package, "-v"],
+            [
+                str(venv_pip_path),
+                "install",
+                package,
+                "-v",
+                "--disable-pip-version-check",
+            ],
             capture_output=True,
             text=True,
             check=False,
