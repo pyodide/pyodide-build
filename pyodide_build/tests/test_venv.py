@@ -198,6 +198,11 @@ def test_pip_install(base_test_dir, packages):
     venv_pip_path = venv_path / "bin" / "pip"
     assert venv_pip_path.exists(), "pip wasn't found in the virtual environment"
 
+    # Find the site-packages directory for setting PYTHONPATH later
+    site_packages_paths = list(venv_path.glob("lib/python*/site-packages"))
+    assert len(site_packages_paths) > 0, "site-packages directory not found"
+    site_packages_path = site_packages_paths[0]
+
     for package in packages:
         result = subprocess.run(
             [
@@ -223,6 +228,10 @@ def test_pip_install(base_test_dir, packages):
     # but it's a good sanity check as this is an integration test, and
     # the import isn't the slow part here.
     python_path = venv_path / "bin" / "python"
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(site_packages_path)
+
     for package in packages:
         import_name = package.replace("-", "_")
         result = subprocess.run(
@@ -234,6 +243,7 @@ def test_pip_install(base_test_dir, packages):
             capture_output=True,
             text=True,
             check=False,
+            env=env,
         )
         assert result.returncode == 0, f"Failed to import {package}: {result.stderr}"
         assert result.stdout.strip(), f"No version found for {package}"
