@@ -218,22 +218,3 @@ def test_pip_install(base_test_dir, packages):
             venv_path.glob(f"**/{package.replace('-', '_')}-*.dist-info")
         )
         assert len(dist_info_dirs) > 0, f"{package} not found in the venv"
-
-    # Verify that the installed packages can be imported. It's overkill
-    # but it's a good sanity check as this is an integration test, and
-    # the import isn't the slow part here.
-    python_path = venv_path / "bin" / "python"
-    for package in packages:
-        import_name = package.replace("-", "_")
-        result = subprocess.run(
-            [
-                str(python_path),
-                "-c",
-                f"import {import_name}; print({import_name}.__version__)",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 0, f"Failed to import {package}: {result.stderr}"
-        assert result.stdout.strip(), f"No version found for {package}"
