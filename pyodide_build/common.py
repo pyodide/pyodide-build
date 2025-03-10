@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+import time
 import tomllib
 import warnings
 import zipfile
@@ -209,6 +210,18 @@ def get_num_cores() -> int:
     from pyodide_build.vendor.loky import cpu_count
 
     return cpu_count()
+
+
+def get_source_epoch() -> int:
+    """Get SOURCE_DATE_EPOCH from environment or fallback to current time.
+    Uses 315532800, i.e., 1980-01-01 00:00:00 UTC as minimum timestamp (as
+    this is the zipfile limit).
+    """
+    try:
+        source_epoch = int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))
+        return max(315532800, source_epoch)
+    except ValueError:
+        return int(time.time())
 
 
 def make_zip_archive(
