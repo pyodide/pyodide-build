@@ -57,7 +57,7 @@ def reset_env_vars():
 
 @pytest.fixture(scope="function")
 def reset_cache():
-    # Will remove all caches before each test.
+    # Will remove all caches before and after each test.
 
     def _reset():
         build_env.get_pyodide_root.cache_clear()
@@ -68,6 +68,8 @@ def reset_cache():
     _reset()
 
     yield _reset
+
+    _reset()
 
 
 @pytest.fixture(scope="function")
