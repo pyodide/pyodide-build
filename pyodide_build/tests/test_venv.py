@@ -237,12 +237,14 @@ def test_pip_install(base_test_dir, packages):
             )
             assert len(dist_info_dirs) > 0, f"{package} wasn't found in the venv"
 
-            # Verify that the installed packages can be imported. It's overkill
-            # but it's a good sanity check as this is an integration test, and
-            # the import isn't the slow part here.
+    # Verify that the installed packages can be imported. It's overkill
+    # but it's a good sanity check as this is an integration test, and
+    # the import isn't the slow part here.
 
-            import_name = package.replace("-", "_")
+    for package in packages:
+        import_name = package.replace("-", "_")
 
+        with virtual_environment_activator(venv_path):
             result1 = subprocess.run(
                 [str(python_path), "-c", "import sys; print(sys.platform)"],
                 capture_output=True,
