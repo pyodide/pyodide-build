@@ -52,16 +52,9 @@ def virtual_environment_activator(venv_path):
     activate_venv_script = venv_path / "bin" / "activate_this.py"
     runpy.run_path(str(activate_venv_script))
 
-    print("AGRIYA DEBUG POINT 3")
-    print(f"Activated virtual environment at {venv_path}")
-    print(f"PATH: {os.environ['PATH']}")
-
     yield
 
-    print("AGRIYA DEBUG POINT 4")
     os.environ["PATH"] = original_path
-    print(f"Deactivated virtual environment at {venv_path}")
-    print(f"PATH: {os.environ['PATH']}")
 
 
 @pytest.mark.parametrize(
