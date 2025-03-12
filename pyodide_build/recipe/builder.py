@@ -249,6 +249,8 @@ class RecipeBuilder:
                 if e.strerror == "Directory not empty":
                     # Not sure why this happens, but trying again seems to fix it usually?
                     shutil.rmtree(self.build_dir)
+                else:
+                    raise
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
