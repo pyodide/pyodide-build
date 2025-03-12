@@ -83,6 +83,31 @@ def disable(
     sys.exit(status)
 
 
+@app.command("pin")
+def pin(
+    names: list[str],
+    message: str = typer.Option(
+        "", "--message", "-m", help="Comment to explain why it was disabled"
+    ),
+    recipe_dir: str | None = typer.Option(
+        None,
+        help="The directory containing the recipe of packages. "
+        "If not specified, the default is ``<cwd>/packages``.",
+    ),
+) -> int:
+    recipe_dir_ = get_recipe_dir(recipe_dir)
+    status = 0
+    for name in names:
+        try:
+            skeleton.pin_package(recipe_dir_, name, message)
+        except skeleton.MkpkgFailedException as e:
+            status = -1
+            logger.error("%s update failed: %s", name, e)
+        except Exception:
+            print(name)
+            raise
+    sys.exit(status)
+
 @app.command("pypi")
 def new_recipe_pypi(
     name: str,
