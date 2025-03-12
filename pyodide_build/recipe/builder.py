@@ -243,7 +243,12 @@ class RecipeBuilder:
 
         # clear the build directory
         if self.build_dir.resolve().is_dir():
-            shutil.rmtree(self.build_dir)
+            try:
+                shutil.rmtree(self.build_dir)
+            except OSError as e:
+                if e.strerror == "Directory not empty":
+                    # Not sure why this happens, but trying again seems to fix it usually?
+                    shutil.rmtree(self.build_dir)
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
