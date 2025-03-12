@@ -17,7 +17,6 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--clear",
     "--no-clear",
     "--no-vcs-ignore",
-    "--symlinks",
     # "--copies", "--always-copy", FIXME: node fails to invoke Pyodide
     # "--symlink-app-data", FIXME: node fails to invoke Pyodide
     "--no-download",

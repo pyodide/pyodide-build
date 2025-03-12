@@ -120,7 +120,6 @@ def test_supported_virtualenv_options():
         "--clear",
         "--no-clear",
         "--no-vcs-ignore",
-        "--symlinks",
         # "--copies",
         # "--always-copy",
         # "--symlink-app-data",
