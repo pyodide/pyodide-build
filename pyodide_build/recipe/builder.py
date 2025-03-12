@@ -8,6 +8,8 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
+import time
 from collections.abc import Iterator
 from datetime import datetime
 from email.message import Message
@@ -34,6 +36,7 @@ from pyodide_build.common import (
     chdir,
     exit_with_stdio,
     find_matching_wheels,
+    get_source_epoch,
     make_zip_archive,
     modify_wheel,
     retag_wheel,
@@ -46,9 +49,29 @@ from pyodide_build.recipe.bash_runner import (
 from pyodide_build.recipe.spec import MetaConfig, _SourceSpec
 
 
+def _update_recursive_timestamp(path: Path, timestamp: int | None = None) -> None:
+    """Update timestamps recursively for all directories and files. If
+    SOURCE_DATE_EPOCH is set, uses that, otherwise keeps original ones."""
+
+    if timestamp is None and "SOURCE_DATE_EPOCH" not in os.environ:
+        return
+
+    if timestamp is None:
+        timestamp = get_source_epoch()
+
+    # Update directory, subdirectories, and files
+    os.utime(path, (timestamp, timestamp))
+    if path.is_dir():
+        for child in path.iterdir():
+            _update_recursive_timestamp(child, timestamp)
+
+
 def _make_whlfile(
     *args: Any, owner: int | None = None, group: int | None = None, **kwargs: Any
 ) -> str:
+    filetime = get_source_epoch()
+    # gtime() ensures UTC
+    kwargs["date_time"] = time.gmtime(filetime)[:6]
     return shutil._make_zipfile(*args, **kwargs)  # type: ignore[attr-defined]
 
 
@@ -274,6 +297,24 @@ class RecipeBuilder:
 
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _reproducible_filter(
+        tarinfo: tarfile.TarInfo, path: str | Path | None = None
+    ) -> tarfile.TarInfo:
+        """Filter that preserves permissions but normalizes ownership and optionally
+        timestamps. This is similar to the "data" filter but injects SOURCE_DATE_EPOCH."""
+
+        # set timestamp from SOURCE_DATE_EPOCH if available
+        filetime = get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
+
+        tarinfo.uid = tarinfo.gid = 0
+        tarinfo.uname = tarinfo.gname = "root"
+
+        if filetime is not None:
+            tarinfo.mtime = filetime
+
+        return tarinfo
+
     def _download_and_extract(self) -> None:
         """
         Download the source from specified in the package metadata,
@@ -329,11 +370,12 @@ class RecipeBuilder:
         # is too large for the chown() call. This behavior can lead to "Permission denied" errors
         # (missing x bit) or random strange `make` behavior (due to wrong mtime order) in the CI
         # pipeline.
-        shutil.unpack_archive(
-            tarballpath,
-            self.build_dir,
-            filter=None if tarballpath.suffix == ".zip" else "data",
-        )
+        if tarballpath.suffix == ".zip":
+            shutil.unpack_archive(tarballpath, self.build_dir, filter=None)
+        else:
+            shutil.unpack_archive(
+                tarballpath, self.build_dir, filter=self._reproducible_filter
+            )
 
         extract_dir_name = self.source_metadata.extract_dir
         if extract_dir_name is None:
@@ -531,7 +573,7 @@ class RecipeBuilderPackage(RecipeBuilder):
     ) -> None:
         """Package a wheel
 
-        This unpacks the wheel, unvendors tests if necessary, runs and "build.post"
+        This unpacks the wheel, unvendors tests if necessary, and runs the "build.post"
         script, and then repacks the wheel.
 
         Parameters
@@ -593,7 +635,31 @@ class RecipeBuilderPackage(RecipeBuilder):
                     )
                     if nmoved:
                         with chdir(self.src_dist_dir):
-                            shutil.make_archive(f"{self.name}-tests", "tar", test_dir)
+                            filetime = get_source_epoch()
+                            shutil.make_archive(
+                                f"{self.name}-tests",
+                                format="tar",
+                                root_dir="tests",
+                                owner="root",
+                                group="root",
+                            )
+                            if filetime is not None:
+                                with tarfile.open(f"{self.name}-tests.tar", "r") as src:
+                                    with tarfile.open(
+                                        f"{self.name}-tests.new.tar", "w"
+                                    ) as dst:
+                                        for member in src.getmembers():
+                                            member.mtime = filetime
+                                            if member.isfile():
+                                                dst.addfile(
+                                                    member, src.extractfile(member)
+                                                )
+                                            else:
+                                                dst.addfile(member)
+                            # replace original with timestamped version
+                            os.replace(
+                                f"{self.name}-tests.new.tar", f"{self.name}-tests.tar"
+                            )
             finally:
                 shutil.rmtree(test_dir, ignore_errors=True)
 
@@ -749,14 +815,20 @@ def unvendor_tests(
     n_moved = 0
     out_files = []
     shutil.rmtree(test_install_prefix, ignore_errors=True)
+
+    filetime = get_source_epoch() if "SOURCE_DATE_EPOCH" in os.environ else None
+
     for root, _dirs, files in os.walk(install_prefix):
         root_rel = Path(root).relative_to(install_prefix)
         if root_rel.name == "__pycache__" or root_rel.name.endswith(".egg_info"):
             continue
         if root_rel.name in ["test", "tests"]:
             # This is a test folder
-            (test_install_prefix / root_rel).parent.mkdir(exist_ok=True, parents=True)
-            shutil.move(install_prefix / root_rel, test_install_prefix / root_rel)
+            target = test_install_prefix / root_rel
+            target.parent.mkdir(exist_ok=True, parents=True)
+            shutil.move(install_prefix / root_rel, target)
+            if filetime is not None:
+                _update_recursive_timestamp(target, filetime)
             n_moved += 1
             continue
         out_files.append(root)
@@ -768,11 +840,12 @@ def unvendor_tests(
             ):
                 if any(fnmatch.fnmatchcase(fpath, pat) for pat in retain_test_patterns):
                     continue
-                (test_install_prefix / root_rel).mkdir(exist_ok=True, parents=True)
-                shutil.move(
-                    install_prefix / root_rel / fpath,
-                    test_install_prefix / root_rel / fpath,
-                )
+                target_dir = test_install_prefix / root_rel
+                target_dir.mkdir(exist_ok=True, parents=True)
+                target = target_dir / fpath
+                shutil.move(install_prefix / root_rel / fpath, target)
+                if filetime is not None:
+                    os.utime(target, (filetime, filetime))
                 n_moved += 1
 
     return n_moved
