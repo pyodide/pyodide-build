@@ -50,6 +50,7 @@ jobs:
         with:
           name: coverage-no-integration
           path: .coverage
+          if-no-files-found: error
 
   check-integration-test-trigger:
     name: test-integration-test-trigger
@@ -134,6 +135,7 @@ jobs:
         with:
           name: coverage-integration
           path: .coverage
+          if-no-files-found: error
 
   coverage:
     name: Collect and upload coverage
