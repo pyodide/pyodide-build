@@ -185,6 +185,13 @@ def create_pip_script(venv_bin):
     # Python in the shebang. Use whichever Python was used to invoke
     # pyodide venv.
     host_python_path = venv_bin / f"python{get_pyversion()}-host"
+    pip_path = venv_bin / "pip"
+    pyversion = get_pyversion()
+    other_pips = [
+        venv_bin / "pip3",
+        venv_bin / f"pip{pyversion}",
+        venv_bin / f"pip-{pyversion}",
+    ]
 
     # To support the "--clear" and "--no-clear" args, we need to remove
     # the existing symlinks before creating new ones.
@@ -192,15 +199,16 @@ def create_pip_script(venv_bin):
         host_python_path.unlink()
     if (venv_bin / "python-host").exists():
         (venv_bin / "python-host").unlink()
+    if pip_path.exists():
+        pip_path.unlink()
+    for pip in other_pips:
+        if pip.exists():
+            pip.unlink()
+            pip.symlink_to(pip_path)
 
     host_python_path.symlink_to(sys.executable)
     # in case someone needs a Python-version-agnostic way to refer to python-host
     (venv_bin / "python-host").symlink_to(sys.executable)
-
-    pip_path = venv_bin / "pip"
-
-    if pip_path.exists():
-        pip_path.unlink()
 
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
@@ -219,18 +227,6 @@ def create_pip_script(venv_bin):
         )
     )
     pip_path.chmod(0o777)
-
-    pyversion = get_pyversion()
-    other_pips = [
-        venv_bin / "pip3",
-        venv_bin / f"pip{pyversion}",
-        venv_bin / f"pip-{pyversion}",
-    ]
-
-    for pip in other_pips:
-        if pip.exists():
-            pip.unlink()
-        pip.symlink_to(pip_path)
 
 
 def create_pyodide_script(venv_bin: Path) -> None:
