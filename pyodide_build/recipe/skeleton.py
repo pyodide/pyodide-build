@@ -226,6 +226,20 @@ def run_prettier(meta_path: str | Path) -> None:
         )
 
 
+def load_meta_yaml(yaml, meta_path: Path):
+    if not meta_path.exists():
+        package = meta_path.parent.name
+        logger.error("%s does not exist", meta_path)
+        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
+
+    return yaml.load(meta_path.read_bytes())
+
+
+def store_meta_yaml(yaml, meta_path: Path, yaml_content):
+    yaml.dump(yaml_content, meta_path)
+    run_prettier(meta_path)
+
+
 def make_package(
     packages_dir: Path,
     package: str,
@@ -289,9 +303,7 @@ def make_package(
         raise MkpkgFailedException(f"The package {package} already exists")
 
     yaml.representer.ignore_aliases = lambda *_: True
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
-
+    store_meta_yaml(yaml, meta_path, yaml_content)
     logger.success(f"Output written to {meta_path}")
 
 
@@ -307,11 +319,7 @@ def update_package(
     yaml = YAML()
 
     meta_path = root / package / "meta.yaml"
-    if not meta_path.exists():
-        logger.error("%s does not exist", meta_path)
-        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
-
-    yaml_content = yaml.load(meta_path.read_bytes())
+    yaml_content = load_meta_yaml(yaml, meta_path)
 
     build_info = yaml_content.get("build", {})
     ty = build_info.get("type", None)
@@ -403,8 +411,7 @@ def update_package(
     yaml_content["source"]["sha256"] = dist_metadata["digests"]["sha256"]
     yaml_content["package"]["version"] = pypi_metadata["info"]["version"]
 
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
+    store_meta_yaml(yaml, meta_path, yaml_content)
 
     logger.success(f"Updated {package} from {local_ver} to {pypi_ver}.")
 
@@ -413,11 +420,7 @@ def disable_package(recipe_dir: Path, package: str, message: str) -> None:
     yaml = YAML()
 
     meta_path = recipe_dir / package / "meta.yaml"
-    if not meta_path.exists():
-        logger.error("%s does not exist", meta_path)
-        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
-
-    yaml_content = yaml.load(meta_path.read_bytes())
+    yaml_content = load_meta_yaml(yaml, meta_path)
     pkg = yaml_content["package"]
     pkg_keys = list(pkg)
     # Insert after the version key
@@ -426,8 +429,7 @@ def disable_package(recipe_dir: Path, package: str, message: str) -> None:
     # Add message above it
     if message:
         pkg.yaml_set_comment_before_after_key("_disabled", before=message)
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
+    store_meta_yaml(yaml, meta_path, yaml_content)
 
 
 def remove_comment_on_line(pkg: Any, line: int):
@@ -448,9 +450,7 @@ def enable_package(recipe_dir: Path, package: str) -> None:
     yaml = YAML()
 
     meta_path = recipe_dir / package / "meta.yaml"
-    if not meta_path.exists():
-        logger.error("%s does not exist", meta_path)
-        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
+    yaml_content = load_meta_yaml(yaml, meta_path)
 
     text_lines = meta_path.read_text().splitlines()
     for idx, line in enumerate(text_lines):  # noqa: B007
@@ -465,5 +465,5 @@ def enable_package(recipe_dir: Path, package: str) -> None:
         # There's a comment to remove, we have to hunt it down...
         remove_comment_on_line(pkg, idx - 1)
     del pkg["_disabled"]
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
+
+    store_meta_yaml(yaml, meta_path, yaml_content)
