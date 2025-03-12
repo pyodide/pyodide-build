@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a new recipe key `requirement.constraint` to set the package-level constraints.
   [#97](https://github.com/pyodide/pyodide-build/pull/97)
 
+- The `pyodide venv` command now supports more `virtualenv` command-line flags
+  to customise the virtual environment creation behaviour (experimental)
+  [#117](https://github.com/pyodide/pyodide-build/pull/117)
+
 ## [0.29.2] - 2024/11/29
 
 ### Fixed
