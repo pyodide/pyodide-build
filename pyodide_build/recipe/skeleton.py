@@ -459,7 +459,7 @@ def enable_package(recipe_dir: Path, package: str) -> None:
     else:
         # Not disabled, let's return
         return
-    yaml_content = yaml.load(meta_path.read_bytes())
+
     pkg = yaml_content["package"]
     if text_lines[idx - 1].strip().startswith("#"):
         # There's a comment to remove, we have to hunt it down...
