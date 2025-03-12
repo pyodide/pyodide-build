@@ -72,6 +72,12 @@ exclude = [
     "/pyodide_build/tests",
 ]
 
+[tool.pytest.ini_options]
+addopts = "-vra --strict-markers"
+markers = [
+  "integration: mark a test as an integration test"
+]
+
 [tool.mypy]
 python_version = "3.12"
 mypy_path = ["pyodide_build"]

@@ -139,6 +139,7 @@ def test_supported_virtualenv_options():
     assert set(supported_options) == set(expected_options)
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "options,check_function",
     [
@@ -167,6 +168,7 @@ def test_venv_creation(base_test_dir, options, check_function):
     assert check_function(venv_path)
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "package,version",
     [
@@ -183,6 +185,7 @@ def test_installation_of_seed_package_versions(base_test_dir, package, version):
     assert len(dist_info_dirs) > 0, f"{package} {version} not found in the venv"
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "packages",
     [
