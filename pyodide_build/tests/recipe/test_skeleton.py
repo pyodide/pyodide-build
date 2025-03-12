@@ -182,8 +182,22 @@ def test_mkpkg_update_pinned(tmpdir):
             "scikit-learn-1.6.1.tar.gz",
             "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit_learn-1.6.1.tar.gz",
         ),
+        # test universal wheel with py2.py3 tags
+        (
+            "distlib",
+            "0.3.9",
+            "wheel",
+            "distlib-0.3.9-py2.py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/py2.py3/d/distlib/distlib-0.3.9-py2.py3-none-any.whl",
+        ),
     ],
-    ids=["numpy-sdist", "sympy-wheel", "example-wheel-build", "scikit-learn-sdist"],
+    ids=[
+        "numpy-sdist",
+        "sympy-wheel",
+        "example-wheel-build",
+        "scikit-learn-sdist",
+        "distlib-universal-wheel",
+    ],
 )
 def test_make_predictable_url(package, version, source_type, filename, expected_url):
     """Test that predictable URLs are generated correctly for various package formats."""
