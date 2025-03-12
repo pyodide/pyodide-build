@@ -46,18 +46,18 @@ def test_constructor(tmp_path):
     )
 
     assert builder.name == "beautifulsoup4"
-    assert builder.version == "4.13.3"
-    assert builder.fullname == "beautifulsoup4-4.13.3"
+    assert builder.version == "4.10.0"
+    assert builder.fullname == "beautifulsoup4-4.10.0"
 
     assert builder.pkg_root == RECIPE_DIR / "beautifulsoup4"
     assert builder.build_dir == tmp_path / "beautifulsoup4" / "build"
     assert (
         builder.src_extract_dir
-        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.13.3"
+        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.10.0"
     )
     assert (
         builder.src_dist_dir
-        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.13.3" / "dist"
+        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.10.0" / "dist"
     )
     assert builder.dist_dir == RECIPE_DIR / "beautifulsoup4" / "dist"
     assert builder.library_install_prefix == tmp_path / ".libs"
