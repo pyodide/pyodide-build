@@ -51,6 +51,7 @@ jobs:
           name: coverage-no-integration
           path: .coverage
           if-no-files-found: error
+          include-hidden-files: true
 
   check-integration-test-trigger:
     name: test-integration-test-trigger
@@ -136,6 +137,7 @@ jobs:
           name: coverage-integration
           path: .coverage
           if-no-files-found: error
+          include-hidden-files: true
 
   coverage:
     name: Collect and upload coverage
