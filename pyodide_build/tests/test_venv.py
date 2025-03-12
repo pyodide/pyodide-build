@@ -130,7 +130,6 @@ def test_supported_virtualenv_options():
         "--extra-search-dir",
         "--pip",
         "--setuptools",
-        "--wheel",
         "--no-setuptools",
         "--no-wheel",
         "--no-periodic-update",

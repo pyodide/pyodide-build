@@ -27,7 +27,6 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--pip",
     "--setuptools",
     "--no-setuptools",
-    "--wheel",
     "--no-wheel",
     "--no-periodic-update",
 ]

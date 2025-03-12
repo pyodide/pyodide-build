@@ -57,15 +57,10 @@ def main(
         "--setuptools",
         help="Version of setuptools to install as seed: embed, bundle, none or exact version",
     ),
-    wheel: str | None = typer.Option(
-        None,
-        "--wheel",
-        help="Version of wheel to install as seed: embed, bundle, none or exact version",
-    ),
     no_setuptools: bool = typer.Option(
         False, "--no-setuptools", help="Do not install setuptools"
     ),
-    no_wheel: bool = typer.Option(False, "--no-wheel", help="Do not install wheel"),
+    no_wheel: bool = typer.Option(True, "--no-wheel", help="Do not install wheel"),
     no_periodic_update: bool = typer.Option(
         False,
         "--no-periodic-update",
@@ -106,8 +101,6 @@ def main(
         venv_args.append("--symlinks")
     if setuptools is not None:
         venv_args.extend(["--setuptools", setuptools])
-    if wheel is not None:
-        venv_args.extend(["--wheel", wheel])
     if no_wheel:
         venv_args.append("--no-wheel")
     if no_setuptools:
