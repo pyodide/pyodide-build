@@ -108,6 +108,7 @@ def pin(
             raise
     sys.exit(status)
 
+
 @app.command("pypi")
 def new_recipe_pypi(
     name: str,
