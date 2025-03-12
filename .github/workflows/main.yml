@@ -127,12 +127,13 @@ jobs:
         run: pytest --junitxml=test-results/junit.xml --cov=pyodide-build pyodide_build -m "integration"
 
       - name: Run the recipe integration tests (${{ matrix.task }})
+        if: matrix.task != 'test-integration-marker'
         env:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         working-directory: integration_tests
         run: make ${{ matrix.task }}
 
-      - name: Upload coverage
+      - name: Upload coverage for tests marked with integration
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: matrix.task == 'test-integration-marker'
         with:
