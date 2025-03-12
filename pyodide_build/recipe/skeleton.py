@@ -124,6 +124,13 @@ def _make_predictable_url(
 
     elif source_type == "wheel":
         try:
+            # Special case for universal wheels (py2.py3)
+            # we return early as packaging doesn't handle
+            # this case properly.
+            if "-py2.py3-none-any.whl" in filename:
+                python_tag = "py2.py3"
+                return f"{host}/packages/{python_tag}/{package_url_name[0]}/{package_url_name}/{filename}"
+
             _, _, _, tags = parse_wheel_filename(filename)
             python_tag = None
             for tag in tags:
