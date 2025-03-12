@@ -98,8 +98,8 @@ def main(
     if download:
         venv_args.append("--download")
     if extra_search_dir:
-        for _ in extra_search_dir:
-            venv_args.extend(["--extra-search-dir", _])
+        for search_dir in extra_search_dir:
+            venv_args.extend(["--extra-search-dir", search_dir])
     if pip:
         venv_args.extend(["--pip", pip])
     if symlinks:
