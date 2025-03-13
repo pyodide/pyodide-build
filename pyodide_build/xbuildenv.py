@@ -2,7 +2,6 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-import sys
 
 from pyodide_lock import PyodideLockSpec
 
@@ -267,15 +266,19 @@ class CrossBuildEnvManager:
         host_site_packages = self._host_site_packages_dir(xbuildenv_pyodide_root)
         host_site_packages.mkdir(exist_ok=True, parents=True)
 
-        install_prefix = [
-            uv_helper.find_uv_bin(),
-            "pip",
-            "install",
-        ] if uv_helper.should_use_uv() else [
-            "pip",
-            "install",
-            "--no-user",
-        ]
+        install_prefix = (
+            [
+                uv_helper.find_uv_bin(),
+                "pip",
+                "install",
+            ]
+            if uv_helper.should_use_uv()
+            else [
+                "pip",
+                "install",
+                "--no-user",
+            ]
+        )
 
         result = subprocess.run(
             [

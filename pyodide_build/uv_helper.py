@@ -1,6 +1,6 @@
 import functools
-import shutil
 import os
+import shutil
 
 
 @functools.cache
@@ -16,7 +16,7 @@ def find_uv_bin() -> str | None:
 
         return uv.find_uv_bin()
     except (ModuleNotFoundError, FileNotFoundError):
-        return shutil.which('uv')
+        return shutil.which("uv")
 
     return None
 

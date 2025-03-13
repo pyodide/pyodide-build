@@ -122,7 +122,9 @@ class BasePackage:
         return needs_rebuild(self.pkgdir, self.build_path(build_dir), self.meta.source)
 
     def build(self, build_args: BuildArgs, build_dir: Path) -> None:
-        run_prefix = [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
+        run_prefix = (
+            [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
+        )
         p = subprocess.run(
             [
                 *run_prefix,
