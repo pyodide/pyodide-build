@@ -152,7 +152,7 @@ jobs:
           if [[ "${{ matrix.task.installer }}" == "uv" ]]; then
             export UV_RUN_PREFIX="uv run"
           fi
-          make ${{ matrix.task }}
+          make ${{ matrix.task.name }}
 
       - name: Upload coverage for tests marked with integration
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
