@@ -472,7 +472,9 @@ def enable_package(recipe_dir: Path, package: str) -> None:
 def pin_package(recipe_dir: Path, package: str, message: str) -> None:
     yaml = YAML()
     meta_path = recipe_dir / package / "meta.yaml"
-    subprocess.run(["git", "restore", meta_path], check=True)
+    # Try to restore the file to its original state. If git isn't installed or
+    # the file isn't tracked, just ignore the error.
+    subprocess.run(["git", "restore", meta_path], check=False, capture_output=True)
     yaml_content = load_meta_yaml(yaml, meta_path)
     pkg = yaml_content["package"]
     pkg_keys = list(pkg)

@@ -87,7 +87,7 @@ def disable(
 def pin(
     names: list[str],
     message: str = typer.Option(
-        "", "--message", "-m", help="Comment to explain why it was disabled"
+        "", "--message", "-m", help="Comment to explain why it was pinned"
     ),
     recipe_dir: str | None = typer.Option(
         None,
