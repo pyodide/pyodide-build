@@ -128,7 +128,7 @@ jobs:
         with:
           path: ${{ env.EMSDK_CACHE_FOLDER }}
           key: ${{ env.EMSDK_CACHE_NUMBER }}-${{ env.EMSCRIPTEN_VERSION }}-${{ runner.os }}
-  
+
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
