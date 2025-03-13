@@ -334,7 +334,18 @@ def modify_wheel(wheel: Path) -> Iterator[Path]:
         pack_wheel(wheel_dir, wheel.parent)
 
 
-def retag_wheel(wheel_path: Path, platform: str) -> Path:
+def retag_wheel(
+    wheel_path: Path,
+    platform: str,
+    *,
+    python: str | None = None,
+    abi: str | None = None,
+) -> Path:
+    extra_flags = []
+    if python:
+        extra_flags += ["--python-tag", python]
+    if abi:
+        extra_flags += ["--abi-tag", abi]
     result = subprocess.run(
         [
             sys.executable,
@@ -345,6 +356,7 @@ def retag_wheel(wheel_path: Path, platform: str) -> Path:
             "--platform-tag",
             platform,
             "--remove",
+            *extra_flags,
         ],
         check=False,
         encoding="utf-8",
