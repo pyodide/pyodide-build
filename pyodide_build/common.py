@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+import time
 import tomllib
 import warnings
 import zipfile
@@ -493,3 +494,25 @@ def download_and_unpack_archive(
             # https://github.com/python/cpython/issues/112760
             warnings.simplefilter("ignore")
             shutil.unpack_archive(str(f_path), path)
+
+
+def retrying_rmtree(d):
+    """Sometimes rmtree fails with OSError: Directory not empty
+
+    Try again a few times if this happens.
+    See: https://github.com/python/cpython/issues/128076
+    """
+    for _ in range(3):
+        try:
+            shutil.rmtree(d)
+        except OSError as e:
+            if e.strerror == "Directory not empty":
+                # wait a bit and try again up to 3 tries
+                time.sleep(0.01)
+                continue
+            else:
+                raise
+        return
+    raise RuntimeError(
+        f"shutil.rmtree('{d}') failed with ENOTEMPTY three times"
+    )
