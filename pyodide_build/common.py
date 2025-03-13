@@ -504,15 +504,11 @@ def retrying_rmtree(d):
     """
     for _ in range(3):
         try:
-            shutil.rmtree(d)
+            return shutil.rmtree(d)
         except OSError as e:
             if e.strerror == "Directory not empty":
                 # wait a bit and try again up to 3 tries
                 time.sleep(0.01)
-                continue
             else:
                 raise
-        return
-    raise RuntimeError(
-        f"shutil.rmtree('{d}') failed with ENOTEMPTY three times"
-    )
+    raise RuntimeError(f"shutil.rmtree('{d}') failed with ENOTEMPTY three times")
