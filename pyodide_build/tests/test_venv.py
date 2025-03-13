@@ -221,3 +221,41 @@ def test_pip_install(base_test_dir, packages):
             venv_path.glob(f"**/{package.replace('-', '_')}-*.dist-info")
         )
         assert len(dist_info_dirs) > 0, f"{package} not found in the venv"
+
+
+@pytest.mark.integration
+def test_pip_downgrade(base_test_dir):
+    """Test that our monkeypatched pip can upgrade/downgrade itself"""
+    venv_path = base_test_dir / "test_venv"
+
+    venv.create_pyodide_venv(venv_path, [])
+    venv_pip_path = venv_path / "bin" / "pip"
+    assert venv_pip_path.exists(), "pip wasn't found in the virtual environment"
+
+    result = subprocess.run(
+        [
+            str(venv_pip_path),
+            "install",
+            "--upgrade",
+            "pip==24.0",
+            "-v",
+            "--disable-pip-version-check",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, f"Failed to downgrade pip: {result.stderr}"
+
+    result = subprocess.run(
+        [
+            str(venv_pip_path),
+            "--version"
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("pip 24.0")
+    assert venv_pip_path.readlink() == venv_pip_path.with_name("pip_patched")
