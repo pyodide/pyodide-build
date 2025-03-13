@@ -13,7 +13,10 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -81,12 +84,13 @@ jobs:
           fi
 
   integration-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: [check-integration-test-trigger]
     strategy:
       fail-fast: false
       matrix:
         task: [test-recipe, test-src, test-integration-marker]
+        os: [ubuntu-latest, macos-latest]
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
