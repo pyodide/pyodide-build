@@ -52,7 +52,7 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
-          name: coverage-no-integration
+          name: coverage-no-integration-${{ matrix.os }}
           path: .coverage
           if-no-files-found: error
           include-hidden-files: true
@@ -142,7 +142,7 @@ jobs:
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: matrix.task == 'test-integration-marker'
         with:
-          name: coverage-from-integration
+          name: coverage-from-integration-${{ matrix.os }}
           path: .coverage
           if-no-files-found: error
           include-hidden-files: true
@@ -159,4 +159,4 @@ jobs:
       - uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
         with:
           fail_ci_if_error: false
-          files: coverage-no-integration/.coverage,coverage-integration/.coverage
+          files: coverage-no-integration-ubuntu-latest/.coverage,coverage-integration-ubuntu-latest/.coverage,coverage-no-integration-macos-latest/.coverage,coverage-integration-macos-latest/.coverage
