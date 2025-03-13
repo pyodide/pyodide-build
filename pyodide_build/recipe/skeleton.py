@@ -124,6 +124,13 @@ def _make_predictable_url(
 
     elif source_type == "wheel":
         try:
+            # Special case for universal wheels (py2.py3)
+            # we return early as packaging doesn't handle
+            # this case properly.
+            if "-py2.py3-none-any.whl" in filename:
+                python_tag = "py2.py3"
+                return f"{host}/packages/{python_tag}/{package_url_name[0]}/{package_url_name}/{filename}"
+
             _, _, _, tags = parse_wheel_filename(filename)
             python_tag = None
             for tag in tags:
@@ -466,4 +473,22 @@ def enable_package(recipe_dir: Path, package: str) -> None:
         remove_comment_on_line(pkg, idx - 1)
     del pkg["_disabled"]
 
+    store_meta_yaml(yaml, meta_path, yaml_content)
+
+
+def pin_package(recipe_dir: Path, package: str, message: str) -> None:
+    yaml = YAML()
+    meta_path = recipe_dir / package / "meta.yaml"
+    # Try to restore the file to its original state. If git isn't installed or
+    # the file isn't tracked, just ignore the error.
+    subprocess.run(["git", "restore", meta_path], check=False, capture_output=True)
+    yaml_content = load_meta_yaml(yaml, meta_path)
+    pkg = yaml_content["package"]
+    pkg_keys = list(pkg)
+    # Insert after the version key
+    version_idx = pkg_keys.index("version") + 1
+    pkg.insert(version_idx, "pinned", True)
+    # Add message above it
+    if message:
+        pkg.yaml_set_comment_before_after_key("pinned", before=message)
     store_meta_yaml(yaml, meta_path, yaml_content)

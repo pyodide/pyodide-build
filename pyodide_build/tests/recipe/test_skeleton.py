@@ -121,6 +121,43 @@ def test_enable_disable(tmpdir):
     assert meta_path.read_text().strip() == disabled
 
 
+def test_pin(tmpdir):
+    base_dir = Path(str(tmpdir))
+
+    pinned = dedent(
+        """\
+        package:
+          name: jedi
+          version: 0.19.1
+          # Here is some information
+          pinned: true
+          top-level:
+            - jedi
+        source:
+          sha256: shasum
+          url: aurlhere
+        requirements:
+          run:
+            - parso
+        about:
+          home: https://github.com/davidhalter/jedi
+          PyPI: https://pypi.org/project/jedi
+          summary: An autocompletion tool for Python that can be used for text editors.
+          license: MIT
+        """
+    ).strip()
+    unpinned_lines = pinned.splitlines()
+    del unpinned_lines[3:5]
+    unpinned = "\n".join(unpinned_lines)
+
+    package_dir = base_dir / "jedi"
+    package_dir.mkdir(parents=True)
+    meta_path = package_dir / "meta.yaml"
+    meta_path.write_text(unpinned)
+    skeleton.pin_package(base_dir, "jedi", "Here is some information")
+    assert meta_path.read_text().strip() == pinned
+
+
 def test_mkpkg_update_pinned(tmpdir):
     base_dir = Path(str(tmpdir))
 
@@ -182,8 +219,22 @@ def test_mkpkg_update_pinned(tmpdir):
             "scikit-learn-1.6.1.tar.gz",
             "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit_learn-1.6.1.tar.gz",
         ),
+        # test universal wheel with py2.py3 tags
+        (
+            "distlib",
+            "0.3.9",
+            "wheel",
+            "distlib-0.3.9-py2.py3-none-any.whl",
+            "https://files.pythonhosted.org/packages/py2.py3/d/distlib/distlib-0.3.9-py2.py3-none-any.whl",
+        ),
     ],
-    ids=["numpy-sdist", "sympy-wheel", "example-wheel-build", "scikit-learn-sdist"],
+    ids=[
+        "numpy-sdist",
+        "sympy-wheel",
+        "example-wheel-build",
+        "scikit-learn-sdist",
+        "distlib-universal-wheel",
+    ],
 )
 def test_make_predictable_url(package, version, source_type, filename, expected_url):
     """Test that predictable URLs are generated correctly for various package formats."""
