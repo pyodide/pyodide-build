@@ -248,10 +248,7 @@ def test_pip_downgrade(base_test_dir):
     assert result.returncode == 0, f"Failed to downgrade pip: {result.stderr}"
 
     result = subprocess.run(
-        [
-            str(venv_pip_path),
-            "--version"
-        ],
+        [str(venv_pip_path), "--version"],
         capture_output=True,
         text=True,
         check=False,
