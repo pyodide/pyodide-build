@@ -10,6 +10,9 @@ concurrency:
 
 env:
   FORCE_COLOR: 3
+  # Increase this value to reset cache if emscripten_version has not changed
+  EMSDK_CACHE_FOLDER: 'emsdk-cache'
+  EMSDK_CACHE_NUMBER: 0
 
 jobs:
   test:
@@ -120,10 +123,17 @@ jobs:
           pyodide xbuildenv install
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
+      - name: Cache emsdk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.EMSDK_CACHE_FOLDER }}
+          key: ${{ env.EMSDK_CACHE_NUMBER }}-${{ env.EMSCRIPTEN_VERSION }}-${{ runner.os }}
+  
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
+          actions-cache-folder: ${{env.EMSDK_CACHE_FOLDER}}
 
       - name: Get number of cores on the runner
         id: get-cores
