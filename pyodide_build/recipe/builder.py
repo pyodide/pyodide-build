@@ -37,6 +37,7 @@ from pyodide_build.common import (
     make_zip_archive,
     modify_wheel,
     retag_wheel,
+    retrying_rmtree,
 )
 from pyodide_build.logger import logger
 from pyodide_build.recipe.bash_runner import (
@@ -243,7 +244,7 @@ class RecipeBuilder:
 
         # clear the build directory
         if self.build_dir.resolve().is_dir():
-            shutil.rmtree(self.build_dir)
+            retrying_rmtree(self.build_dir)
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
