@@ -1,4 +1,3 @@
-import os
 import subprocess
 from pathlib import Path
 
@@ -57,14 +56,14 @@ def test_subprocess_with_shared_env_logging(capfd, tmp_path):
 
         # Clean and join all outputs to handle potential line breaks,
         # and check for path components, instead of the exact path.
-        cleaned_output = cap.out.replace("\n", " ")
-        assert "Running test script in" in cleaned_output
+        assert "Running test script in" in cap.out
 
-        path_parts = str(dir).split(os.sep)
-        for part in path_parts[-3:]:
-            assert part in cleaned_output
+        # Normalize whitespace for path comparison
+        normalized_output = "".join(cap.out.split())
+        normalized_path = "".join(str(dir).split())
+        assert normalized_path in normalized_output
 
-        assert "1000" in cleaned_output
+        assert "1000" in cap.out
         assert cap.err == ""
 
         dir = tmp_path / "b"
@@ -74,11 +73,11 @@ def test_subprocess_with_shared_env_logging(capfd, tmp_path):
         cap = capfd.readouterr()
         assert e.value.args[0] == 7
 
-        cleaned_output = cap.out.replace("\n", " ")
-        assert "Running test2 script in" in cleaned_output
+        assert "Running test2 script in" in cap.out
 
-        path_parts = str(dir).split(os.sep)
-        for part in path_parts[-3:]:
-            assert part in cleaned_output
+        # Normalize whitespace for path comparison
+        normalized_output = "".join(cap.out.split())
+        normalized_path = "".join(str(dir).split())
+        assert normalized_path in normalized_output
 
         assert "ERROR: test2 script failed" in cap.err
