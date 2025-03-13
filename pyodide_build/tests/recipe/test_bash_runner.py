@@ -54,16 +54,15 @@ def test_subprocess_with_shared_env_logging(capfd, tmp_path):
         p.run("echo 1000", script_name="test script", cwd=dir)
         cap = capfd.readouterr()
 
-        # Clean and join all outputs to handle potential line breaks,
-        # and check for path components, instead of the exact path.
-        assert "Running test script in" in cap.out
+        # Clean output and compare to expected lines, and join any
+        # potential split lines to handle platform differences we've
+        # noticed (across macOS and Linux).
+        output_lines = [l.strip() for l in cap.out.splitlines()]
+        cleaned_output = "".join(output_lines)
 
-        # Normalize whitespace for path comparison
-        normalized_output = "".join(cap.out.split())
-        normalized_path = "".join(str(dir).split())
-        assert normalized_path in normalized_output
-
-        assert "1000" in cap.out
+        assert "Running test script in" in cleaned_output
+        assert str(dir) in cleaned_output
+        assert "1000" in cleaned_output
         assert cap.err == ""
 
         dir = tmp_path / "b"
@@ -73,11 +72,9 @@ def test_subprocess_with_shared_env_logging(capfd, tmp_path):
         cap = capfd.readouterr()
         assert e.value.args[0] == 7
 
-        assert "Running test2 script in" in cap.out
+        output_lines = [l.strip() for l in cap.out.splitlines()]
+        cleaned_output = "".join(output_lines)
 
-        # Normalize whitespace for path comparison
-        normalized_output = "".join(cap.out.split())
-        normalized_path = "".join(str(dir).split())
-        assert normalized_path in normalized_output
-
+        assert "Running test2 script in" in cleaned_output
+        assert str(dir) in cleaned_output
         assert "ERROR: test2 script failed" in cap.err
