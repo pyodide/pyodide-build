@@ -83,7 +83,7 @@ def test_build_recipe_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
         "pkg_test_graph3": {},
     }
 
-    pkgs_to_build = pkgs.keys() | {p for v in pkgs.values() for p in v}
+    pkgs_to_build = pkgs.keys() | {p for v in pkgs.values() for p in v} | {"pydecimal"}
 
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
