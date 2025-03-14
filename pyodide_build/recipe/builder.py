@@ -24,6 +24,8 @@ from pyodide_build.build_env import (
     get_build_environment_vars,
     get_build_flag,
     get_pyodide_root,
+    get_pyversion_major,
+    get_pyversion_minor,
     pyodide_tags,
     replace_so_abi_tags,
     wheel_platform,
@@ -555,7 +557,10 @@ class RecipeBuilderPackage(RecipeBuilder):
                 + "\n".join(f.name for f in self.src_dist_dir.glob("*.whl"))
             )
 
-        if "emscripten" in wheel.name:
+        if self.package_type == "cpython_module":
+            abi = f"cp{get_pyversion_major()}{get_pyversion_minor()}"
+            wheel = retag_wheel(wheel, wheel_platform(), python=abi, abi=abi)
+        elif "emscripten" in wheel.name:
             # Retag platformed wheels to pyodide
             wheel = retag_wheel(wheel, wheel_platform())
 
