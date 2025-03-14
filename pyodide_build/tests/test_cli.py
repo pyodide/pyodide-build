@@ -551,3 +551,32 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         "--key3": "",
         "--key4": "--value4",
     }
+
+
+def test_build_cpython_module(tmp_path, dummy_xbuildenv, mock_emscripten):
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    app = typer.Typer()
+    app.command()(build_recipes.build_recipes_no_deps)
+
+    pkg = "pydecimal"
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+    result = runner.invoke(
+        app,
+        [
+            pkg,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    assert f"Succeeded building package {pkg}" in result.stdout
+
+    dist_dir = RECIPE_DIR / pkg / "dist"
+    results = list(dist_dir.glob("*.whl"))
+    assert len(results) == 1
+    result = results[0]
+    assert result.name == "pydecimal-1.0.0-cp312-cp312-pyodide_2024_0_wasm32.whl"
