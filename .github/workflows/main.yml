@@ -154,9 +154,18 @@ jobs:
     steps:
       - uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
+          path: coverage_files
+          pattern: coverage-*
           merge-multiple: false
+
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Combine coverage files
+        run: pipx install coverage && coverage combine --append coverage_files/**/.coverage
 
       - uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
         with:
           fail_ci_if_error: false
-          files: coverage-no-integration-ubuntu-latest/.coverage,coverage-integration-ubuntu-latest/.coverage,coverage-no-integration-macos-latest/.coverage,coverage-integration-macos-latest/.coverage
+          files: .coverage
