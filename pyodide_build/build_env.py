@@ -6,7 +6,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import nullcontext, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -219,7 +219,7 @@ def wheel_platform() -> str:
     return f"pyodide_{abi_version}_wasm32"
 
 
-def pyodide_tags() -> Iterator[Tag]:
+def pyodide_tags_() -> Iterator[Tag]:
     """
     Returns the sequence of tag triples for the Pyodide interpreter.
 
@@ -233,6 +233,11 @@ def pyodide_tags() -> Iterator[Tag]:
     yield from compatible_tags(platforms=PLATFORMS, python_version=python_version)
     # Following line can be removed once packaging 22.0 is released and we update to it.
     yield Tag(interpreter=f"cp{PYMAJOR}{PYMINOR}", abi="none", platform="any")
+
+
+@functools.cache
+def pyodide_tags() -> Sequence[Tag]:
+    return list(pyodide_tags_())
 
 
 def replace_so_abi_tags(wheel_dir: Path) -> None:

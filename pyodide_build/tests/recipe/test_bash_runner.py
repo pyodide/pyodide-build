@@ -53,11 +53,16 @@ def test_subprocess_with_shared_env_logging(capfd, tmp_path):
         dir.mkdir()
         p.run("echo 1000", script_name="test script", cwd=dir)
         cap = capfd.readouterr()
-        assert [l.strip() for l in cap.out.splitlines()] == [
-            "Running test script in",
-            str(dir),
-            "1000",
-        ]
+
+        # Clean output and compare to expected lines, and join any
+        # potential split lines to handle platform differences we've
+        # noticed (across macOS and Linux).
+        output_lines = [l.strip() for l in cap.out.splitlines()]
+        cleaned_output = "".join(output_lines)
+
+        assert "Running test script in" in cleaned_output
+        assert str(dir) in cleaned_output
+        assert "1000" in cleaned_output
         assert cap.err == ""
 
         dir = tmp_path / "b"
@@ -66,9 +71,10 @@ def test_subprocess_with_shared_env_logging(capfd, tmp_path):
             p.run("exit 7", script_name="test2 script", cwd=dir)
         cap = capfd.readouterr()
         assert e.value.args[0] == 7
-        assert [l.strip() for l in cap.out.splitlines()] == [
-            "Running test2 script in",
-            str(dir),
-        ]
 
+        output_lines = [l.strip() for l in cap.out.splitlines()]
+        cleaned_output = "".join(output_lines)
+
+        assert "Running test2 script in" in cleaned_output
+        assert str(dir) in cleaned_output
         assert "ERROR: test2 script failed" in cap.err
