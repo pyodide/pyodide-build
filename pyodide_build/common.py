@@ -36,7 +36,9 @@ def xbuildenv_dirname() -> str:
 
 
 def _find_matching_wheels(
-    wheel_paths: Iterable[Path], supported_tags: Sequence[Tag], version: str | None = None
+    wheel_paths: Iterable[Path],
+    supported_tags: Sequence[Tag],
+    version: str | None = None,
 ) -> Iterator[Path]:
     """
     Returns the sequence wheels whose tags match the Pyodide interpreter.
