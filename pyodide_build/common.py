@@ -14,7 +14,7 @@ import tomllib
 import warnings
 import zipfile
 from collections import deque
-from collections.abc import Generator, Iterable, Iterator, Mapping
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -35,11 +35,15 @@ def xbuildenv_dirname() -> str:
     return f".pyodide-xbuildenv-{__version__}"
 
 
-def find_matching_wheels(
-    wheel_paths: Iterable[Path], supported_tags: Iterator[Tag]
+def _find_matching_wheels(
+    wheel_paths: Iterable[Path],
+    supported_tags: Sequence[Tag],
+    version: str | None = None,
 ) -> Iterator[Path]:
     """
     Returns the sequence wheels whose tags match the Pyodide interpreter.
+
+    We don't bother ordering them carefully because we are only hoping to find one.
 
     Parameters
     ----------
@@ -52,17 +56,41 @@ def find_matching_wheels(
     -------
     The subset of wheel_paths that have tags that match the Pyodide interpreter.
     """
-    wheel_paths = list(wheel_paths)
-    wheel_tags_list: list[frozenset[Tag]] = []
-
-    for wheel in wheel_paths:
-        _, _, _, tags = parse_wheel_filename(wheel.name)
-        wheel_tags_list.append(tags)
-
-    for supported_tag in supported_tags:
-        for wheel_path, wheel_tags in zip(wheel_paths, wheel_tags_list, strict=True):
+    for wheel_path in wheel_paths:
+        _, wheel_version, _, wheel_tags = parse_wheel_filename(wheel_path.name)
+        if version and version != str(wheel_version):
+            continue
+        for supported_tag in supported_tags:
             if supported_tag in wheel_tags:
                 yield wheel_path
+                continue
+
+
+def find_matching_wheel(
+    wheel_paths: Iterable[Path], supported_tags: Sequence[Tag], version: str = None
+) -> Path | None:
+    """
+    Find a matching wheel or raise an error if none is present.
+
+    Parameters
+    ----------
+    wheel_paths
+        A list of paths to wheels
+    supported_tags
+        A list of tags that the environment supports
+
+    Returns
+    -------
+    The subset of wheel_paths that have tags that match the Pyodide interpreter.
+    """
+    result = list(_find_matching_wheels(wheel_paths, supported_tags, version))
+    if not result:
+        return None
+    if len(result) > 1:
+        raise RuntimeError(
+            "Found multiple matching wheels:\n" + "\n".join(w.name for w in result)
+        )
+    return result[0]
 
 
 def parse_top_level_import_name(whlfile: Path) -> list[str] | None:

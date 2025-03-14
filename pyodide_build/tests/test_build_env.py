@@ -219,17 +219,21 @@ def test_wheel_paths(dummy_xbuildenv):
                 strings.append(f"wrapt-1.13.3-{interp}-{abi}-{arch}.whl")
 
     paths = [Path(x) for x in strings]
-    assert [
-        x.stem.split("-", 2)[-1]
-        for x in common.find_matching_wheels(paths, build_env.pyodide_tags())
-    ] == [
-        f"{current_version}-{current_version}-{PLATFORM}",
-        f"{current_version}-abi3-{PLATFORM}",
-        f"{current_version}-none-{PLATFORM}",
-        f"{old_version}-abi3-{PLATFORM}",
-        f"py3-none-{PLATFORM}",
-        f"py2.py3-none-{PLATFORM}",
-        "py3-none-any",
-        "py2.py3-none-any",
-        f"{current_version}-none-any",
-    ]
+    assert sorted(
+        [
+            x.stem.split("-", 2)[-1]
+            for x in common._find_matching_wheels(paths, build_env.pyodide_tags())
+        ]
+    ) == sorted(
+        [
+            f"{current_version}-{current_version}-{PLATFORM}",
+            f"{current_version}-abi3-{PLATFORM}",
+            f"{current_version}-none-{PLATFORM}",
+            f"{old_version}-abi3-{PLATFORM}",
+            f"py3-none-{PLATFORM}",
+            f"py2.py3-none-{PLATFORM}",
+            "py3-none-any",
+            "py2.py3-none-any",
+            f"{current_version}-none-any",
+        ]
+    )
