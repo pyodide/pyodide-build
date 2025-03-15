@@ -21,8 +21,8 @@ from pyodide_build import common, pypabuild
 from pyodide_build.build_env import (
     RUST_BUILD_PRELUDE,
     BuildArgs,
+    _create_constraints_file,
     get_build_environment_vars,
-    get_build_flag,
     get_pyodide_root,
     get_pyversion_major,
     get_pyversion_minor,
@@ -358,20 +358,16 @@ class RecipeBuilder:
 
         returns the path to the new constraints file.
         """
-        try:
-            host_constraints = get_build_flag("PIP_CONSTRAINT")
-        except ValueError:
-            host_constraints = ""
+        host_constraints = _create_constraints_file()
 
         constraints = self.recipe.requirements.constraint
         if not constraints:
             # nothing to override
             return host_constraints
 
-        host_constraints_file = Path(host_constraints)
         new_constraints_file = self.build_dir / "constraints.txt"
-        if host_constraints_file.is_file():
-            shutil.copy(host_constraints_file, new_constraints_file)
+        if host_constraints:
+            shutil.copy(host_constraints, new_constraints_file)
 
         with new_constraints_file.open("a") as f:
             for constraint in constraints:
