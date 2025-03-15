@@ -24,6 +24,7 @@ def run(
     target_install_dir = os.environ.get(
         "TARGETINSTALLDIR", build_env.get_build_flag("TARGETINSTALLDIR")
     )
+    build_env._create_constraints_file()
     env = os.environ.copy()
     env.update(build_env.get_build_environment_vars(get_pyodide_root()))
 

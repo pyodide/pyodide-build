@@ -23,11 +23,11 @@ def test_install_reqs(tmp_path, dummy_xbuildenv):
 
     reqs = {"foo", "bar", "baz"}
 
-    pypabuild.install_reqs(env, reqs)  # type: ignore[arg-type]
+    pypabuild.install_reqs({}, env, reqs)  # type: ignore[arg-type]
     for req in reqs:
         assert req in env.installed
 
-    pypabuild.install_reqs(env, set(pypabuild.AVOIDED_REQUIREMENTS))  # type: ignore[arg-type]
+    pypabuild.install_reqs({}, env, set(pypabuild.AVOIDED_REQUIREMENTS))  # type: ignore[arg-type]
     for req in pypabuild.AVOIDED_REQUIREMENTS:
         assert req not in env.installed
 

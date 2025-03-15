@@ -239,7 +239,7 @@ def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
     assert path == str(tmp_path / "constraints.txt")
 
     data = Path(path).read_text().strip().split("\n")
-    assert data[-3:] == ["numpy < 2.0", "pytest == 7.0"], data
+    assert data[-3:] == ["numpy < 2.0", "pytest == 7.0", "setuptools < 75"], data
 
 
 class MockSourceSpec(_SourceSpec):
