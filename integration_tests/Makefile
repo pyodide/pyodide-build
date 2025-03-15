@@ -6,7 +6,7 @@ all:
 test-recipe: check
 	@echo "... Running integration tests for building recipes"
 
-	pyodide build-recipes --recipe-dir=recipes --force-rebuild "*"
+	$(UV_RUN_PREFIX) pyodide build-recipes --recipe-dir=recipes --force-rebuild "*"
 
 	@echo "... Passed"
 

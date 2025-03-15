@@ -15,7 +15,7 @@ from build import BuildBackendException, ConfigSettingsType
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 
-from pyodide_build import _f2c_fixes, common, pywasmcross
+from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
     get_hostsitepackages,
@@ -143,7 +143,8 @@ def _build_in_isolated_env(
     # It will be left in the /tmp folder and can be inspected or entered as
     # needed.
     # _DefaultIsolatedEnv.__exit__ = lambda *args: None
-    with _DefaultIsolatedEnv() as env:
+    installer = "uv" if uv_helper.should_use_uv() else "pip"
+    with _DefaultIsolatedEnv(installer=installer) as env:
         env = cast(_DefaultIsolatedEnv, env)
         builder = _ProjectBuilder.from_isolated_env(
             env,
