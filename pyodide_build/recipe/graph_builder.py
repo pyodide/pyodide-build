@@ -831,12 +831,10 @@ def generate_packagedata(
                 pkg.meta.package.top_level if pkg.meta.package.top_level else [name]
             )
 
-        packages[normalized_name] = pkg_entry
-
         if pkg.unvendor_tests:
             unvendored_test_file = unvendor.unvendor_tests_in_wheel(wheel_file)
             if unvendored_test_file:
-                packages[normalized_name].unvendored_tests = True
+                pkg_entry.unvendored_tests = True
                 test_file_entry = PackageLockSpec(
                     name=f"{name}-tests",
                     version=pkg.version,
@@ -845,10 +843,10 @@ def generate_packagedata(
                     install_dir=pkg.install_dir,
                 )
                 update_package_sha256(test_file_entry, unvendored_test_file)
-
-                packages[normalized_name + "-tests"] = pkg_entry
+                packages[normalized_name + "-tests"] = test_pkg_entry
 
         update_package_sha256(pkg_entry, wheel_file)
+        packages[normalized_name] = pkg_entry
 
     # sort packages by name
     packages = dict(sorted(packages.items()))
