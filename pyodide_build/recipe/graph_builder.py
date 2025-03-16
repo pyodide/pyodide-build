@@ -847,7 +847,7 @@ def generate_packagedata(
                     install_dir=pkg.install_dir,
                 )
                 update_package_sha256(test_file_entry, unvendored_test_file)
-                packages[normalized_name + "-tests"] = test_pkg_entry
+                packages[normalized_name + "-tests"] = test_file_entry
 
         update_package_sha256(pkg_entry, wheel_file)
         packages[normalized_name] = pkg_entry
