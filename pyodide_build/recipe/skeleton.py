@@ -474,3 +474,21 @@ def enable_package(recipe_dir: Path, package: str) -> None:
     del pkg["_disabled"]
 
     store_meta_yaml(yaml, meta_path, yaml_content)
+
+
+def pin_package(recipe_dir: Path, package: str, message: str) -> None:
+    yaml = YAML()
+    meta_path = recipe_dir / package / "meta.yaml"
+    # Try to restore the file to its original state. If git isn't installed or
+    # the file isn't tracked, just ignore the error.
+    subprocess.run(["git", "restore", meta_path], check=False, capture_output=True)
+    yaml_content = load_meta_yaml(yaml, meta_path)
+    pkg = yaml_content["package"]
+    pkg_keys = list(pkg)
+    # Insert after the version key
+    version_idx = pkg_keys.index("version") + 1
+    pkg.insert(version_idx, "pinned", True)
+    # Add message above it
+    if message:
+        pkg.yaml_set_comment_before_after_key("pinned", before=message)
+    store_meta_yaml(yaml, meta_path, yaml_content)

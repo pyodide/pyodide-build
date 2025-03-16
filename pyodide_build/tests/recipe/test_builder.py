@@ -207,11 +207,23 @@ class MockSourceSpec(_SourceSpec):
         return self
 
 
-def test_needs_rebuild(tmpdir):
+@pytest.mark.parametrize("is_wheel", [False, True])
+def test_needs_rebuild(tmpdir, is_wheel):
     pkg_root = Path(tmpdir)
     buildpath = pkg_root / "build"
     meta_yaml = pkg_root / "meta.yaml"
-    packaged = buildpath / ".packaged"
+    version = "12"
+    if is_wheel:
+        dist_dir = pkg_root / "dist"
+        dist_dir.mkdir()
+        # Build of current version with wrong abi
+        (dist_dir / "regex-12-cp311-cp311-pyodide_2024_0_wasm32.whl").touch()
+        # Build of old version with current abi
+        (dist_dir / "regex-11-cp312-cp312-pyodide_2024_0_wasm32.whl").touch()
+        # the version we're trying to build
+        packaged = dist_dir / "regex-12-cp312-cp312-pyodide_2024_0_wasm32.whl"
+    else:
+        packaged = buildpath / ".packaged"
 
     patch_file = pkg_root / "patch"
     extra_file = pkg_root / "extra"
@@ -236,39 +248,53 @@ def test_needs_rebuild(tmpdir):
     src_path_file.touch()
 
     # No .packaged file, rebuild
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # .packaged file exists, no rebuild
     packaged.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is False
+    assert not _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer meta.yaml file, rebuild
     packaged.touch()
     time.sleep(0.01)
     meta_yaml.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer patch file, rebuild
     packaged.touch()
     time.sleep(0.01)
     patch_file.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer extra file, rebuild
     packaged.touch()
     time.sleep(0.01)
     extra_file.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer source path, rebuild
     packaged.touch()
     time.sleep(0.01)
     src_path_file.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer .packaged file, no rebuild
     packaged.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is False
+    assert not _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
 
 def test_copy_sharedlib(tmp_path):

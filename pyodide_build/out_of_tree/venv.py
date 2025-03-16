@@ -174,6 +174,45 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         sysconfig._init_config_vars()
         del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
         """
+        # Handle pip updates.
+        #
+        # The pip executable should be a symlink to pip_patched. If it is not a
+        # link, or it is a symlink to something else, pip has been updated. We
+        # have to restore the correct value of pip. Iterate through all of the
+        # pip variants in the folder and remove them and replace with a symlink
+        # to pip_patched.
+        """
+        from pathlib import Path
+
+        file_path = Path(__file__)
+
+
+        def pip_is_okay():
+            try:
+                return file_path.readlink() == file_path.with_name("pip_patched")
+            except OSError as e:
+                if e.strerror != "Invalid argument":
+                    raise
+            return False
+
+
+        def maybe_repair_after_pip_update():
+            if pip_is_okay():
+                return
+
+            venv_bin = file_path.parent
+            pip_patched = venv_bin / "pip_patched"
+            for pip in venv_bin.glob("pip*"):
+                if pip == pip_patched:
+                    continue
+                pip.unlink(missing_ok=True)
+                pip.symlink_to(venv_bin / "pip_patched")
+
+
+        import atexit
+
+        atexit.register(maybe_repair_after_pip_update)
+        """
     )
 
 
@@ -183,26 +222,17 @@ def create_pip_script(venv_bin):
     # Python in the shebang. Use whichever Python was used to invoke
     # pyodide venv.
     host_python_path = venv_bin / f"python{get_pyversion()}-host"
-    pip_path = venv_bin / "pip"
-    pyversion = get_pyversion()
-    other_pips = [
-        venv_bin / "pip3",
-        venv_bin / f"pip{pyversion}",
-        venv_bin / f"pip-{pyversion}",
-    ]
+    pip_path = venv_bin / "pip_patched"
 
     # To support the "--clear" and "--no-clear" args, we need to remove
     # the existing symlinks before creating new ones.
-    if host_python_path.exists():
-        host_python_path.unlink()
-    if (venv_bin / "python-host").exists():
-        (venv_bin / "python-host").unlink()
-    if pip_path.exists():
-        pip_path.unlink()
-    for pip in other_pips:
-        if pip.exists():
-            pip.unlink()
-            pip.symlink_to(pip_path)
+    host_python_path.unlink(missing_ok=True)
+    (venv_bin / "python-host").unlink(missing_ok=True)
+    for pip in venv_bin.glob("pip*"):
+        if pip == pip_path:
+            continue
+        pip.unlink(missing_ok=True)
+        pip.symlink_to(pip_path)
 
     host_python_path.symlink_to(sys.executable)
     # in case someone needs a Python-version-agnostic way to refer to python-host

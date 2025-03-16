@@ -24,6 +24,8 @@ from pyodide_build.build_env import (
     get_build_environment_vars,
     get_build_flag,
     get_pyodide_root,
+    get_pyversion_major,
+    get_pyversion_minor,
     pyodide_tags,
     replace_so_abi_tags,
     wheel_platform,
@@ -33,10 +35,11 @@ from pyodide_build.common import (
     _get_sha256_checksum,
     chdir,
     exit_with_stdio,
-    find_matching_wheels,
+    find_matching_wheel,
     make_zip_archive,
     modify_wheel,
     retag_wheel,
+    retrying_rmtree,
 )
 from pyodide_build.logger import logger
 from pyodide_build.recipe.bash_runner import (
@@ -118,6 +121,7 @@ class RecipeBuilder:
         self.source_metadata = self.recipe.source
         self.build_metadata = self.recipe.build
         self.package_type = self.build_metadata.package_type
+        self.is_wheel = self.package_type in ["package", "cpython_module"]
 
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
@@ -175,7 +179,8 @@ class RecipeBuilder:
         try:
             self._build()
 
-            (self.build_dir / ".packaged").touch()
+            if not self.is_wheel:
+                (self.build_dir / ".packaged").touch()
         except (Exception, KeyboardInterrupt):
             success = False
             raise
@@ -198,7 +203,11 @@ class RecipeBuilder:
 
     def _build(self) -> None:
         if not self.force_rebuild and not needs_rebuild(
-            self.pkg_root, self.build_dir, self.source_metadata
+            self.pkg_root,
+            self.build_dir,
+            self.source_metadata,
+            self.is_wheel,
+            self.version,
         ):
             return
 
@@ -243,7 +252,7 @@ class RecipeBuilder:
 
         # clear the build directory
         if self.build_dir.resolve().is_dir():
-            shutil.rmtree(self.build_dir)
+            retrying_rmtree(self.build_dir)
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
@@ -522,8 +531,7 @@ class RecipeBuilderPackage(RecipeBuilder):
             self._compile(bash_runner)
 
         self._package_wheel(bash_runner)
-        shutil.rmtree(self.dist_dir, ignore_errors=True)
-        shutil.copytree(self.src_dist_dir, self.dist_dir)
+        shutil.copytree(self.src_dist_dir, self.dist_dir, dirs_exist_ok=True)
 
     def _package_wheel(
         self,
@@ -540,15 +548,19 @@ class RecipeBuilderPackage(RecipeBuilder):
             The runner we will use to execute our bash commands. Preserves
             environment variables from one invocation to the next.
         """
-        wheel, *rest = find_matching_wheels(
-            self.src_dist_dir.glob("*.whl"), pyodide_tags()
+        wheel = find_matching_wheel(
+            self.src_dist_dir.glob("*.whl"), pyodide_tags(), version=self.version
         )
-        if rest:
-            raise Exception(
-                f"Unexpected number of wheels {len(rest) + 1} when building {self.name}"
+        if not wheel:
+            raise RuntimeError(
+                f"Found no wheel while building {self.name}. Candidates:\n"
+                + "\n".join(f.name for f in self.src_dist_dir.glob("*.whl"))
             )
 
-        if "emscripten" in wheel.name:
+        if self.package_type == "cpython_module":
+            abi = f"cp{get_pyversion_major()}{get_pyversion_minor()}"
+            wheel = retag_wheel(wheel, wheel_platform(), python=abi, abi=abi)
+        elif "emscripten" in wheel.name:
             # Retag platformed wheels to pyodide
             wheel = retag_wheel(wheel, wheel_platform())
 
@@ -714,7 +726,11 @@ def copy_sharedlibs(
 
 # TODO: move this to common.py or somewhere else
 def needs_rebuild(
-    pkg_root: Path, buildpath: Path, source_metadata: _SourceSpec
+    pkg_root: Path,
+    buildpath: Path,
+    source_metadata: _SourceSpec,
+    is_wheel: bool = True,
+    version: str | None = None,
 ) -> bool:
     """
     Determines if a package needs a rebuild because its meta.yaml, patches, or
@@ -731,14 +747,22 @@ def needs_rebuild(
     src_metadata
         The source section from meta.yaml.
     """
-    packaged_token = buildpath / ".packaged"
-    if not packaged_token.is_file():
-        logger.debug(
-            "%s needs rebuild because %s does not exist", pkg_root, packaged_token
+    dist_dir = pkg_root / "dist"
+    if is_wheel:
+        previous_wheel = find_matching_wheel(
+            dist_dir.glob("*.whl"), pyodide_tags(), version=version
         )
-        return True
-
-    package_time = packaged_token.stat().st_mtime
+        if not previous_wheel:
+            return True
+        package_time = previous_wheel.stat().st_mtime
+    else:
+        packaged_token = buildpath / ".packaged"
+        if not packaged_token.is_file():
+            logger.debug(
+                "%s needs rebuild because %s does not exist", pkg_root, packaged_token
+            )
+            return True
+        package_time = packaged_token.stat().st_mtime
 
     def source_files() -> Iterator[Path]:
         yield pkg_root / "meta.yaml"

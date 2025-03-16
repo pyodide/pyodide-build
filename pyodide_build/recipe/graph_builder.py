@@ -33,7 +33,7 @@ from pyodide_build.common import (
     download_and_unpack_archive,
     exit_with_stdio,
     extract_wheel_metadata_file,
-    find_matching_wheels,
+    find_matching_wheel,
     find_missing_executables,
     repack_zip_archive,
 )
@@ -78,6 +78,7 @@ class BasePackage:
         self.version = self.meta.package.version
         self.disabled = self.meta.package.disabled
         self.package_type = self.meta.build.package_type
+        self.is_wheel = self.package_type in ["package", "cpython_module"]
 
         assert self.name == pkgdir.name, f"{self.name} != {pkgdir.name}"
 
@@ -119,7 +120,14 @@ class BasePackage:
         return build_dir / self.name / "build"
 
     def needs_rebuild(self, build_dir: Path) -> bool:
-        return needs_rebuild(self.pkgdir, self.build_path(build_dir), self.meta.source)
+        res = needs_rebuild(
+            self.pkgdir,
+            self.build_path(build_dir),
+            self.meta.source,
+            self.is_wheel,
+            self.version,
+        )
+        return res
 
     def build(self, build_args: BuildArgs, build_dir: Path) -> None:
         p = subprocess.run(
@@ -175,16 +183,12 @@ class PythonPackage(BasePackage):
 
     def dist_artifact_path(self) -> Path | None:
         dist_dir = self.pkgdir / "dist"
-        candidates = list(
-            find_matching_wheels(dist_dir.glob("*.whl"), build_env.pyodide_tags())
+        wheel = find_matching_wheel(
+            dist_dir.glob("*.whl"), build_env.pyodide_tags(), version=self.version
         )
-
-        if len(candidates) != 1:
-            raise RuntimeError(
-                f"Unexpected number of wheels/archives {len(candidates)} when building {self.name}"
-            )
-
-        return candidates[0]
+        if not wheel:
+            raise RuntimeError(f"Found no wheel while building {self.name}")
+        return wheel
 
 
 @dataclasses.dataclass
