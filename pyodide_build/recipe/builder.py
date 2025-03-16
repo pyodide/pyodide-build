@@ -128,7 +128,8 @@ class RecipeBuilder:
         )
         if len(str(self.build_dir).split(maxsplit=1)) > 1:
             raise ValueError(
-                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces."
+                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
+                "See https://github.com/pypa/pip/issues/13283"
             )
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
