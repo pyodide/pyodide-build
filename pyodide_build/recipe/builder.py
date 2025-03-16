@@ -126,6 +126,10 @@ class RecipeBuilder:
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
+        if len(str(self.build_dir).split(maxsplit=1)) > 1:
+            raise ValueError(
+                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces."
+            )
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
             self.build_dir / self.fullname
@@ -366,14 +370,11 @@ class RecipeBuilder:
             return host_constraints
 
         new_constraints_file = self.build_dir / "constraints.txt"
-        if host_constraints:
-            shutil.copy(host_constraints, new_constraints_file)
-
-        with new_constraints_file.open("a") as f:
+        with new_constraints_file.open("w") as f:
             for constraint in constraints:
                 f.write(constraint + "\n")
 
-        return str(new_constraints_file)
+        return host_constraints + " " + str(new_constraints_file)
 
     def _compile(
         self,

@@ -160,7 +160,7 @@ def _build_in_isolated_env(
         # first install the build dependencies
         symlink_unisolated_packages(env)
         install_reqs(build_env, env, builder.build_system_requires)
-        build_reqs = None
+        build_reqs: set[str] | None = None
         try:
             build_reqs = builder.get_requires_for_build(
                 distribution,
@@ -172,7 +172,11 @@ def _build_in_isolated_env(
             # get_requires_for_build in native env failed. Maybe trying to
             # execute get_requires_for_build in the cross build environment will
             # work?
-            # TODO: Is this case ever used? Add test coverage or remove.
+
+            # This case is used in pygame-ce. In native env, the setup.py picks
+            # up native SDL2 config, then fails. In the cross env, it correctly
+            # picks up Emscripten SDL2 config.
+            # TODO: Add test coverage.
             with common.replace_env(build_env):
                 build_reqs = builder.get_requires_for_build(
                     distribution,

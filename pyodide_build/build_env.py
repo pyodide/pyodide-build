@@ -316,6 +316,11 @@ def _create_constraints_file() -> str:
     if not constraints:
         return ""
 
+    if len(constraints.split(maxsplit=1)) > 1:
+        raise ValueError(
+            "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure you clone Pyodide on a path with no spaces."
+        )
+
     constraints_file = Path(constraints)
     if not constraints_file.is_file():
         constraints_file.parent.mkdir(parents=True, exist_ok=True)
