@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import requests
+from packaging.utils import parse_wheel_filename
 
 from pyodide_build import common, pypabuild
 from pyodide_build.build_env import (
@@ -80,6 +81,14 @@ def _extract_tarballname(url: str, headers: dict) -> str:
             tarballname = filename
 
     return tarballname
+
+
+def check_versions_match(wheel_name: str, version: str):
+    wheel_version = str(parse_wheel_filename(wheel_name)[1])
+    if wheel_version != version:
+        raise ValueError(
+            f"Version mismatch: version in meta.yaml is '{version}' but version from wheel name is '{wheel_version}'"
+        )
 
 
 class RecipeBuilder:
@@ -327,6 +336,7 @@ class RecipeBuilder:
 
         # already built
         if tarballpath.suffix == ".whl":
+            check_versions_match(tarballpath.name, self.version)
             self.src_dist_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(tarballpath, self.src_dist_dir)
             return
@@ -427,9 +437,10 @@ class RecipeBuilder:
 
             build_env["PIP_CONSTRAINT"] = str(self._create_constraints_file())
 
-            pypabuild.build(
+            wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings
             )
+            check_versions_match(Path(wheel_path).name, self.version)
 
     def _patch(self) -> None:
         """
