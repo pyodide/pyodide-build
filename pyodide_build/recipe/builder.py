@@ -83,11 +83,11 @@ def _extract_tarballname(url: str, headers: dict) -> str:
     return tarballname
 
 
-def check_versions_match(wheel_name: str, version: str):
+def check_versions_match(pkg_name: str, wheel_name: str, version: str):
     wheel_version = str(parse_wheel_filename(wheel_name)[1])
     if wheel_version != version:
         raise ValueError(
-            f"Version mismatch: version in meta.yaml is '{version}' but version from wheel name is '{wheel_version}'"
+            f"Version mismatch in {pkg_name}: version in meta.yaml is '{version}' but version from wheel name is '{wheel_version}'"
         )
 
 
@@ -341,7 +341,7 @@ class RecipeBuilder:
 
         # already built
         if tarballpath.suffix == ".whl":
-            check_versions_match(tarballpath.name, self.version)
+            check_versions_match(self.name, tarballpath.name, self.version)
             self.src_dist_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(tarballpath, self.src_dist_dir)
             return
@@ -438,7 +438,7 @@ class RecipeBuilder:
             wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings
             )
-            check_versions_match(Path(wheel_path).name, self.version)
+            check_versions_match(self.name, Path(wheel_path).name, self.version)
 
     def _patch(self) -> None:
         """

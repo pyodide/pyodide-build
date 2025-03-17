@@ -603,7 +603,7 @@ def test_wheel_download_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscrip
     assert result.exit_code == 1
     assert (
         result.exception.args[0]
-        == "Version mismatch: version in meta.yaml is '2025.01.2' but version from wheel name is '2025.1.2'"
+        == "Version mismatch in xarray: version in meta.yaml is '2025.01.2' but version from wheel name is '2025.1.2'"
     )
 
 
@@ -628,7 +628,7 @@ def test_wheel_build_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten
     assert result.exit_code == 1
     assert (
         result.exception.args[0]
-        == "Version mismatch: version in meta.yaml is '1.0.0' but version from wheel name is '1.0.1'"
+        == "Version mismatch in pkg_test_version_mismatch: version in meta.yaml is '1.0.0' but version from wheel name is '1.0.1'"
     )
 
 
