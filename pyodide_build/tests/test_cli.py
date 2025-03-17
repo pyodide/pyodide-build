@@ -630,3 +630,29 @@ def test_wheel_build_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten
         result.exception.args[0]
         == "Version mismatch: version in meta.yaml is '1.0.0' but version from wheel name is '1.0.1'"
     )
+
+
+def test_build_constraint(tmp_path, dummy_xbuildenv, mock_emscripten, capsys):
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    app = typer.Typer()
+    app.command()(build_recipes.build_recipes_no_deps)
+
+    pkg = "pkg_test_constraint"
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+    result = runner.invoke(
+        app,
+        [
+            pkg,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    assert f"Succeeded building package {pkg}" in result.stdout
+    build_dir = RECIPE_DIR / pkg / "build"
+    assert (build_dir / "setuptools.version").read_text() == "74.1.3"
+    assert (build_dir / "pytest.version").read_text() == "7.0.0"
