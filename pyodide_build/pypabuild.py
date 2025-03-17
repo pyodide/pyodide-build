@@ -123,13 +123,19 @@ def remove_avoided_requirements(
     return requires
 
 
-def install_reqs(env: DefaultIsolatedEnv, reqs: set[str]) -> None:
-    env.install(
-        remove_avoided_requirements(
-            reqs,
-            get_unisolated_packages() + AVOIDED_REQUIREMENTS,
+def install_reqs(
+    build_env: Mapping[str, str], env: DefaultIsolatedEnv, reqs: set[str]
+) -> None:
+    # propagate PIP config from build_env to current environment
+    with common.replace_env(
+        os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
+    ):
+        env.install(
+            remove_avoided_requirements(
+                reqs,
+                get_unisolated_packages() + AVOIDED_REQUIREMENTS,
+            )
         )
-    )
 
 
 def _build_in_isolated_env(
@@ -142,7 +148,7 @@ def _build_in_isolated_env(
     # For debugging: The following line disables removal of the isolated venv.
     # It will be left in the /tmp folder and can be inspected or entered as
     # needed.
-    # _DefaultIsolatedEnv.__exit__ = lambda *args: None
+    # _DefaultIsolatedEnv.__exit__ = lambda self, *args: print("Skipping removing isolated env in", self.path)
     with _DefaultIsolatedEnv() as env:
         env = cast(_DefaultIsolatedEnv, env)
         builder = _ProjectBuilder.from_isolated_env(
@@ -153,26 +159,33 @@ def _build_in_isolated_env(
 
         # first install the build dependencies
         symlink_unisolated_packages(env)
-        install_reqs(env, builder.build_system_requires)
-        installed_requires_for_build = False
+        install_reqs(build_env, env, builder.build_system_requires)
+        build_reqs: set[str] | None = None
         try:
             build_reqs = builder.get_requires_for_build(
                 distribution,
             )
         except BuildBackendException:
             pass
-        else:
-            install_reqs(env, build_reqs)
-            installed_requires_for_build = True
 
-        with common.replace_env(build_env):
-            if not installed_requires_for_build:
+        if not build_reqs:
+            # get_requires_for_build in native env failed. Maybe trying to
+            # execute get_requires_for_build in the cross build environment will
+            # work?
+
+            # This case is used in pygame-ce. In native env, the setup.py picks
+            # up native SDL2 config, then fails. In the cross env, it correctly
+            # picks up Emscripten SDL2 config.
+            # TODO: Add test coverage.
+            with common.replace_env(build_env):
                 build_reqs = builder.get_requires_for_build(
                     distribution,
                     config_settings,
                 )
-                install_reqs(env, build_reqs)
 
+        install_reqs(build_env, env, build_reqs)
+
+        with common.replace_env(build_env):
             return builder.build(
                 distribution,
                 outdir,

@@ -21,8 +21,8 @@ from pyodide_build import common, pypabuild
 from pyodide_build.build_env import (
     RUST_BUILD_PRELUDE,
     BuildArgs,
+    _create_constraints_file,
     get_build_environment_vars,
-    get_build_flag,
     get_pyodide_root,
     get_pyversion_major,
     get_pyversion_minor,
@@ -126,6 +126,11 @@ class RecipeBuilder:
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
+        if len(str(self.build_dir).split(maxsplit=1)) > 1:
+            raise ValueError(
+                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
+                "See https://github.com/pypa/pip/issues/13283"
+            )
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
             self.build_dir / self.fullname
@@ -358,26 +363,19 @@ class RecipeBuilder:
 
         returns the path to the new constraints file.
         """
-        try:
-            host_constraints = get_build_flag("PIP_CONSTRAINT")
-        except ValueError:
-            host_constraints = ""
+        host_constraints = _create_constraints_file()
 
         constraints = self.recipe.requirements.constraint
         if not constraints:
             # nothing to override
             return host_constraints
 
-        host_constraints_file = Path(host_constraints)
         new_constraints_file = self.build_dir / "constraints.txt"
-        if host_constraints_file.is_file():
-            shutil.copy(host_constraints_file, new_constraints_file)
-
-        with new_constraints_file.open("a") as f:
+        with new_constraints_file.open("w") as f:
             for constraint in constraints:
                 f.write(constraint + "\n")
 
-        return str(new_constraints_file)
+        return host_constraints + " " + str(new_constraints_file)
 
     def _compile(
         self,

@@ -305,3 +305,25 @@ def local_versions() -> dict[str, str]:
         "pyodide-build": __version__,
         # "emscripten": "TODO"
     }
+
+
+def _create_constraints_file() -> str:
+    try:
+        constraints = get_build_flag("PIP_CONSTRAINT")
+    except ValueError:
+        return ""
+
+    if not constraints:
+        return ""
+
+    if len(constraints.split(maxsplit=1)) > 1:
+        raise ValueError(
+            "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to pyodide has no spaces.\n"
+            "See https://github.com/pypa/pip/issues/13283"
+        )
+
+    constraints_file = Path(constraints)
+    if not constraints_file.is_file():
+        constraints_file.parent.mkdir(parents=True, exist_ok=True)
+        constraints_file.write_text("")
+    return constraints
