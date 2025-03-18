@@ -33,10 +33,6 @@ from pyodide_build.vendor._pypabuild import (
 )
 
 AVOIDED_REQUIREMENTS = [
-    # We don't want to install cmake Python package inside the isolated env as it will shadow
-    # the pywasmcross cmake wrapper.
-    # TODO: Find a way to make scikit-build use the pywasmcross cmake wrapper.
-    "cmake",
     # mesonpy installs patchelf in linux platform but we don't want it.
     "patchelf",
 ]
@@ -52,6 +48,7 @@ SYMLINK_ENV_VARS = {
     "ranlib": "RANLIB",
     "strip": "STRIP",
     "gfortran": "FC",  # https://mesonbuild.com/Reference-tables.html#compiler-and-linker-selection-variables
+    "cmake": "CMAKE_EXECUTABLE",  # For scikit-build to find cmake (https://github.com/scikit-build/scikit-build-core/pull/603)
 }
 
 
