@@ -120,20 +120,24 @@ class TestCrossBuildEnvManager:
     def test_find_latest_version_incompat(
         self, tmp_path, fake_xbuildenv_releases_incompatible, monkeypatch
     ):
-        PatchedVersionInfo = namedtuple("PatchedVersionInfo", ["major", "minor", "patch"])
+        PatchedVersionInfo = namedtuple(
+            "PatchedVersionInfo", ["major", "minor", "patch"]
+        )
         monkeypatch.setattr(sys, "version_info", PatchedVersionInfo(3, 11, 0))
         manager = CrossBuildEnvManager(
             tmp_path, str(fake_xbuildenv_releases_incompatible)
         )
 
         with pytest.raises(
-            ValueError, match="Python version 3.11 is too old. The oldest supported version of Python is 4.5."
+            ValueError,
+            match="Python version 3.11 is too old. The oldest supported version of Python is 4.5.",
         ):
             manager._find_latest_version()
 
         monkeypatch.setattr(sys, "version_info", PatchedVersionInfo(5, 11, 0))
         with pytest.raises(
-            ValueError, match="Python version 5.11 is not yet supported. The newest supported version of Python is 4.5."
+            ValueError,
+            match="Python version 5.11 is not yet supported. The newest supported version of Python is 4.5.",
         ):
             manager._find_latest_version()
 
