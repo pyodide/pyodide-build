@@ -501,7 +501,7 @@ def pin_package(recipe_dir: Path, package: str, message: str) -> None:
 def lookup_gh_username():
     try:
         result = subprocess.run(
-            ["gah", "auth", "status"], text=True, check=False, capture_output=True
+            ["gh", "auth", "status"], text=True, check=False, capture_output=True
         )
     except FileNotFoundError:
         raise MkpkgFailedException("gh cli is not installed") from None
