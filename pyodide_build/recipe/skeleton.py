@@ -8,6 +8,7 @@ import urllib.request
 import warnings
 from collections.abc import Iterator
 from pathlib import Path
+from textwrap import indent
 from typing import Any, Literal, TypedDict
 from urllib import request
 
@@ -252,6 +253,7 @@ def make_package(
     package: str,
     version: str | None = None,
     source_fmt: Literal["wheel", "sdist"] | None = None,
+    maintainer: str | None = None,
 ) -> None:
     """
     Creates a template that will work for most pure Python packages,
@@ -299,7 +301,9 @@ def make_package(
             "summary": summary,
             "license": license,
         },
-        "extra": {"recipe-maintainers": ["PUT_YOUR_GITHUB_USERNAME_HERE"]},
+        "extra": {
+            "recipe-maintainers": [maintainer or "PUT_YOUR_GITHUB_USERNAME_HERE"]
+        },
     }
 
     package_dir = packages_dir / package
@@ -492,3 +496,31 @@ def pin_package(recipe_dir: Path, package: str, message: str) -> None:
     if message:
         pkg.yaml_set_comment_before_after_key("pinned", before=message)
     store_meta_yaml(yaml, meta_path, yaml_content)
+
+
+def lookup_gh_username():
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"], text=True, check=False, capture_output=True
+        )
+    except FileNotFoundError:
+        raise MkpkgFailedException("gh cli is not installed") from None
+
+    def fail(msg):
+        if result.stdout:
+            msg += "\nstdout:\n"
+            msg += indent(result.stdout, "   ")
+        if result.stderr:
+            msg += "\nstderr:\n"
+            msg += indent(result.stderr, "   ")
+        raise MkpkgFailedException(msg)
+
+    if result.returncode:
+        fail(f"gh auth status failed with status {result.returncode}")
+
+    for line in result.stdout.splitlines():
+        if "github.com account" in line:
+            break
+    else:
+        fail("Did not find github.com account in gh auth status")
+    return line.partition(" account ")[-1].split()[0]

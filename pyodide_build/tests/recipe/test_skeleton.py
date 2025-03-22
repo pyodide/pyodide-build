@@ -1,4 +1,6 @@
 import os
+import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 
@@ -44,6 +46,55 @@ def test_mkpkg(tmpdir, capsys, source_fmt):
     path_parts = path_str.split(os.sep)
     for part in path_parts[-3:]:
         assert part in cleaned_output
+
+
+def test_lookup_gh_username(monkeypatch):
+    @dataclass
+    class MockResult:
+        returncode: int
+        stdout: str
+        stderr: str
+
+    mock_result = None
+
+    def mock_run(*args, **kwargs):
+        return mock_result
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    mock_result = MockResult(
+        0,
+        dedent("""\
+            github.com
+              ✓ Logged in to github.com account some_gh_username (/home/uname/.config/gh/hosts.yml)
+              - Active account: true
+              - Git operations protocol: ssh
+              - Token: gho_************************************
+              - Token scopes: 'admin:public_key', 'gist', 'read:org', 'repo'
+        """),
+        "",
+    )
+    assert skeleton.lookup_gh_username() == "some_gh_username"
+    mock_result = MockResult(
+        1,
+        "",
+        "You are not logged into any GitHub hosts. To log in, run: gh auth login\n",
+    )
+    with pytest.raises(
+        skeleton.MkpkgFailedException,
+        match="You are not logged into any GitHub hosts. To log in, run: gh auth login",
+    ):
+        skeleton.lookup_gh_username()
+
+    def mock_run(*args, **kwargs):
+        raise FileNotFoundError("No such file or directory: 'gh'")
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    with pytest.raises(
+        skeleton.MkpkgFailedException,
+        match="gh cli is not installed",
+    ):
+        skeleton.lookup_gh_username()
 
 
 @pytest.mark.parametrize("old_dist_type", ["wheel", "sdist"])
