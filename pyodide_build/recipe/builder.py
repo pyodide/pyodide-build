@@ -16,13 +16,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import requests
+from packaging.utils import parse_wheel_filename
 
 from pyodide_build import common, pypabuild
 from pyodide_build.build_env import (
     RUST_BUILD_PRELUDE,
     BuildArgs,
+    _create_constraints_file,
     get_build_environment_vars,
-    get_build_flag,
     get_pyodide_root,
     get_pyversion_major,
     get_pyversion_minor,
@@ -82,6 +83,14 @@ def _extract_tarballname(url: str, headers: dict) -> str:
     return tarballname
 
 
+def check_versions_match(pkg_name: str, wheel_name: str, version: str):
+    wheel_version = str(parse_wheel_filename(wheel_name)[1])
+    if wheel_version != version:
+        raise ValueError(
+            f"Version mismatch in {pkg_name}: version in meta.yaml is '{version}' but version from wheel name is '{wheel_version}'"
+        )
+
+
 class RecipeBuilder:
     """
     A class to build a Pyodide meta.yaml recipe.
@@ -126,6 +135,11 @@ class RecipeBuilder:
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
+        if len(str(self.build_dir).split(maxsplit=1)) > 1:
+            raise ValueError(
+                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
+                "See https://github.com/pypa/pip/issues/13283"
+            )
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
             self.build_dir / self.fullname
@@ -327,6 +341,7 @@ class RecipeBuilder:
 
         # already built
         if tarballpath.suffix == ".whl":
+            check_versions_match(self.name, tarballpath.name, self.version)
             self.src_dist_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(tarballpath, self.src_dist_dir)
             return
@@ -358,26 +373,19 @@ class RecipeBuilder:
 
         returns the path to the new constraints file.
         """
-        try:
-            host_constraints = get_build_flag("PIP_CONSTRAINT")
-        except ValueError:
-            host_constraints = ""
+        host_constraints = _create_constraints_file()
 
         constraints = self.recipe.requirements.constraint
         if not constraints:
             # nothing to override
             return host_constraints
 
-        host_constraints_file = Path(host_constraints)
         new_constraints_file = self.build_dir / "constraints.txt"
-        if host_constraints_file.is_file():
-            shutil.copy(host_constraints_file, new_constraints_file)
-
-        with new_constraints_file.open("a") as f:
+        with new_constraints_file.open("w") as f:
             for constraint in constraints:
                 f.write(constraint + "\n")
 
-        return str(new_constraints_file)
+        return host_constraints + " " + str(new_constraints_file)
 
     def _compile(
         self,
@@ -427,9 +435,10 @@ class RecipeBuilder:
 
             build_env["PIP_CONSTRAINT"] = str(self._create_constraints_file())
 
-            pypabuild.build(
+            wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings
             )
+            check_versions_match(self.name, Path(wheel_path).name, self.version)
 
     def _patch(self) -> None:
         """

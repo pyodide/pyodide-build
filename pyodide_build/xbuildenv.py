@@ -240,7 +240,26 @@ class CrossBuildEnvManager:
         )
 
         if not latest:
-            raise ValueError("No compatible cross-build environment found")
+            # Check for Python version mismatch
+            python_versions = [
+                v.python_version_tuple[:2] for v in metadata.list_compatible_releases()
+            ]
+            pyver = tuple(int(x) for x in local["python"].split("."))
+            if pyver > python_versions[0]:
+                latest_supported = ".".join(str(x) for x in python_versions[0])
+                raise ValueError(
+                    f"Python version {local["python"]} is not yet supported. The newest supported version of Python is {latest_supported}."
+                )
+
+            if pyver < python_versions[-1]:
+                oldest_supported = ".".join(str(x) for x in python_versions[-1])
+                raise ValueError(
+                    f"Python version {local["python"]} is too old. The oldest supported version of Python is {oldest_supported}."
+                )
+
+            raise ValueError(
+                f"Python version {local["python"]} is not compatible with pyodide build version {local["pyodide-build"]}"
+            )
 
         return latest.version
 
