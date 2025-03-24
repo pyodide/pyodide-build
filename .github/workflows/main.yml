@@ -136,7 +136,13 @@ jobs:
         env:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         working-directory: integration_tests
-        run: make ${{ matrix.task }}
+        run: |
+          # https://github.com/pyodide/pyodide-build/issues/147
+          # disable package with scikit-build-core
+          if [[ ${{ matrix.os }} == "macos-latest" ]]; then
+            export RECIPE_BUILD_TARGET="*,!boost-histogram"
+          fi
+          make ${{ matrix.task }}
 
       - name: Upload coverage for tests marked with integration
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
