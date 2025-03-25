@@ -16,7 +16,7 @@ def monkeypatch_subprocess_run_pip(monkeypatch):
     orig_run = subprocess.run
 
     def monkeypatch_func(cmds, *args, **kwargs):
-        if cmds[0] == "pip":
+        if cmds[0] == "pip" or cmds[0:3] == [sys.executable, "-m", "pip"]:
             called_with.extend(cmds)
             return subprocess.CompletedProcess(cmds, 0, "", "")
         else:
@@ -289,12 +289,20 @@ class TestCrossBuildEnvManager:
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
         manager._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
 
-        assert len(pip_called_with) == 7
-        assert pip_called_with[0:4] == ["pip", "install", "--no-user", "-t"]
-        assert pip_called_with[4].startswith(
+        assert len(pip_called_with) == 9
+        assert pip_called_with[0:8] == [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-user",
+            "-r",
+            str(xbuildenv_root / "requirements.txt"),
+            "--target",
+        ]
+        assert pip_called_with[8].startswith(
             str(xbuildenv_pyodide_root)
         )  # hostsitepackages
-        assert pip_called_with[5:7] == ["-r", str(xbuildenv_root / "requirements.txt")]
 
         hostsitepackages = manager._host_site_packages_dir(xbuildenv_pyodide_root)
         assert hostsitepackages.exists()

@@ -10,6 +10,9 @@ concurrency:
 
 env:
   FORCE_COLOR: 3
+  # Increase this value to reset cache if emscripten_version has not changed
+  EMSDK_CACHE_FOLDER: 'emsdk-cache'
+  EMSDK_CACHE_NUMBER: 0
 
 jobs:
   test:
@@ -89,7 +92,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        task: [test-recipe, test-src, test-integration-marker]
+        task: [
+          {name: test-recipe, installer: pip},
+          {name: test-src, installer: pip},
+          {name: test-recipe, installer: uv},
+          {name: test-src, installer: uv},
+          {name: test-integration-marker, installer: pip},  # installer doesn't matter
+        ]
         os: [ubuntu-latest, macos-latest]
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
@@ -111,36 +120,47 @@ jobs:
       - name: Install the package
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ."[test]"
+          python -m pip install -e ."[test,uv]"
 
       - name: Install xbuildenv
         run: |
           pyodide xbuildenv install
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
+      - name: Cache emsdk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.EMSDK_CACHE_FOLDER }}
+          key: ${{ env.EMSDK_CACHE_NUMBER }}-${{ env.EMSCRIPTEN_VERSION }}-${{ runner.os }}
+
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
+          actions-cache-folder: ${{env.EMSDK_CACHE_FOLDER}}
 
       - name: Get number of cores on the runner
         id: get-cores
         run: echo "CORES=$(nproc)" >> $GITHUB_OUTPUT
 
       - name: Run tests marked with integration
-        if: matrix.task == 'test-integration-marker'
+        if: matrix.task.name == 'test-integration-marker'
         run: pytest --junitxml=test-results/junit.xml --cov=pyodide-build pyodide_build -m "integration"
 
       - name: Run the recipe integration tests (${{ matrix.task }})
-        if: matrix.task != 'test-integration-marker'
+        if: matrix.task.name != 'test-integration-marker'
         env:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         working-directory: integration_tests
-        run: make ${{ matrix.task }}
+        run: |
+          if [[ "${{ matrix.task.installer }}" == "uv" ]]; then
+            export UV_RUN_PREFIX="uv run"
+          fi
+          make ${{ matrix.task.name }}
 
       - name: Upload coverage for tests marked with integration
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: matrix.task == 'test-integration-marker'
+        if: matrix.task.name == 'test-integration-marker'
         with:
           name: coverage-from-integration-${{ matrix.os }}
           path: .coverage
