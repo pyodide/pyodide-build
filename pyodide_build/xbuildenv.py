@@ -1,6 +1,7 @@
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from pyodide_lock import PyodideLockSpec
@@ -294,7 +295,8 @@ class CrossBuildEnvManager:
             if uv_helper.should_use_uv()
             else [
                 sys.executable,
-                "-m" "pip",
+                "-m",
+                "pip",
                 "install",
                 "--no-user",
             ]
