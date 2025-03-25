@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from pyodide_build import build_env
+from pyodide_build import build_env, common
 from pyodide_build.common import xbuildenv_dirname
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
@@ -64,6 +64,7 @@ def reset_cache():
         build_env.get_host_build_environment_vars.cache_clear()
         build_env.get_build_environment_vars.cache_clear()
         build_env.get_unisolated_packages.cache_clear()
+        common.default_xbuildenv_path.cache_clear()
 
     _reset()
 

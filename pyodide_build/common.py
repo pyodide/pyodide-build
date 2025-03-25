@@ -16,6 +16,7 @@ import zipfile
 from collections import deque
 from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from functools import lru_cache
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any, NoReturn
@@ -30,9 +31,50 @@ from pyodide_build.logger import logger
 
 
 def xbuildenv_dirname() -> str:
-    from pyodide_build import __version__
+    try:
+        from pyodide_build import __version__
+    except ImportError:
+        __version__ = "0.0.0"
 
     return f".pyodide-xbuildenv-{__version__}"
+
+
+@lru_cache(maxsize=1)
+def default_xbuildenv_path() -> Path:
+    """
+    Return the default path to the cross-build environment directory.
+
+    This directory is used when no path is provided to the `pyodide xbuildenv` subcommands.
+    """
+    dirname = xbuildenv_dirname()
+    candidates = []
+
+    # 1. xdg-cache directory
+    if xdg_cache_home := os.environ.get("XDG_CACHE_HOME"):
+        candidates.append(Path(xdg_cache_home) / dirname)
+
+    # 2. user cache directory
+    candidates.append(Path.home() / ".cache" / dirname)
+
+    # 3. current working directory
+    candidates.append(Path.cwd() / dirname)
+
+    for candidate in candidates:
+        if _has_write_access(candidate):
+            return candidate
+
+
+def _has_write_access(folder: Path) -> bool:
+    """
+    Checks if the current user has write access to the given folder using pathlib.
+    """
+    try:
+        if not folder.exists() and folder.parent != folder:
+            return _has_write_access(folder.parent)
+
+        return os.access(str(folder), os.W_OK)
+    except OSError:
+        return False
 
 
 def _find_matching_wheels(

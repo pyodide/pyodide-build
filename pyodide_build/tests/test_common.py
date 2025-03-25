@@ -1,15 +1,18 @@
 import zipfile
+from pathlib import Path
 
 import pytest
 
 from pyodide_build.common import (
     check_wasm_magic_number,
+    default_xbuildenv_path,
     environment_substitute_args,
     extract_wheel_metadata_file,
     find_missing_executables,
     make_zip_archive,
     parse_top_level_import_name,
     repack_zip_archive,
+    xbuildenv_dirname,
 )
 
 
@@ -153,3 +156,33 @@ def test_check_wasm_magic_number(tmp_path):
 
     (tmp_path / "badfile.so").write_bytes(not_wasm_magic_number)
     assert check_wasm_magic_number(tmp_path / "badfile.so") is False
+
+
+def test_default_xbuildenv_path(tmp_path, reset_cache):
+    import os
+
+    os.environ.pop("XDG_CACHE_HOME", None)
+
+    dirname = xbuildenv_dirname()
+
+    assert default_xbuildenv_path() == Path.home() / ".cache" / dirname
+
+    reset_cache()
+
+    os.environ["XDG_CACHE_HOME"] = str(tmp_path)
+
+    assert default_xbuildenv_path() == tmp_path / dirname
+
+    reset_cache()
+
+    not_writeable_path = tmp_path / "not_writeable"
+    not_writeable_path.mkdir()
+    not_writeable_path.chmod(0o444)
+
+    os.environ["XDG_CACHE_HOME"] = str(not_writeable_path)
+
+    assert default_xbuildenv_path() == Path.home() / ".cache" / dirname
+
+    reset_cache()
+
+    os.environ.pop("XDG_CACHE_HOME", None)
