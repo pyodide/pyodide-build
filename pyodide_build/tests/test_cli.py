@@ -71,7 +71,8 @@ def test_skeleton_pypi(tmp_path):
         skeleton.app, ["pypi", test_pkg, "--recipe-dir", str(tmp_path)]
     )
     assert result.exit_code != 0
-    assert "already exists" in str(result.exception)
+    assert "already exists" in str(result.stdout)
+    assert isinstance(result.exception, SystemExit)
 
 
 def test_build_recipe_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
