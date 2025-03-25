@@ -207,7 +207,7 @@ class CrossBuildEnvManager:
             xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
             install_marker = download_path / ".installed"
             if not install_marker.exists():
-                logger.info("Installing Pyodide cross-build environment")
+                logger.info("Installing Pyodide cross-build environment to %s", download_path)
 
                 if not skip_install_cross_build_packages:
                     self._install_cross_build_packages(
