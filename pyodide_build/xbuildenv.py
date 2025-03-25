@@ -294,8 +294,7 @@ class CrossBuildEnvManager:
             if uv_helper.should_use_uv()
             else [
                 sys.executable,
-                "-m"
-                "pip",
+                "-m" "pip",
                 "install",
                 "--no-user",
             ]
