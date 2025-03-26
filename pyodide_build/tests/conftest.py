@@ -91,7 +91,11 @@ def dummy_xbuildenv_url(httpserver):
 
 
 @pytest.fixture(scope="function")
-def dummy_xbuildenv(dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache):
+def dummy_xbuildenv(
+    dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache, monkeypatch
+):
+    import platformdirs
+
     """
     Downloads the dummy xbuildenv archive and installs it in the temporary directory.
 
@@ -99,9 +103,8 @@ def dummy_xbuildenv(dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache):
     """
     assert "PYODIDE_ROOT" not in os.environ
 
-    os.environ["XDG_CACHE_HOME"] = str(
-        tmp_path
-    )  # use PYODIDE_XBUILDENV_PATH instead after #114
+    # use PYODIDE_XBUILDENV_PATH instead patching platformdirs after #114
+    monkeypatch.setattr(platformdirs, "user_cache_dir", lambda: tmp_path)
     manager = CrossBuildEnvManager(default_xbuildenv_path())
     manager.install(
         version=None, url=dummy_xbuildenv_url, skip_install_cross_build_packages=True

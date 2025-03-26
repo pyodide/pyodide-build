@@ -23,10 +23,10 @@ from typing import Any, NoReturn
 from urllib.request import urlopen
 from zipfile import ZipFile
 
+import platformdirs
 from packaging.tags import Tag
 from packaging.utils import canonicalize_name as canonicalize_package_name
 from packaging.utils import parse_wheel_filename
-from platformdirs import user_cache_dir
 
 from pyodide_build.logger import logger
 
@@ -51,7 +51,7 @@ def default_xbuildenv_path() -> Path:
     candidates = []
 
     # 1. default cache directory
-    candidates.append(Path(user_cache_dir()) / dirname)
+    candidates.append(Path(platformdirs.user_cache_dir()) / dirname)
 
     # 2. current working directory
     candidates.append(Path.cwd() / dirname)
