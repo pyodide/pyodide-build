@@ -159,9 +159,21 @@ def test_check_wasm_magic_number(tmp_path):
 
 
 def test_default_xbuildenv_path(tmp_path, reset_cache):
+    import platformdirs
+
+    dirname = xbuildenv_dirname()
+
+    assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
+
+
+def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
     import os
+    import sys
 
     import platformdirs
+
+    if sys.platform != "linux":
+        pytest.skip("Test only runs on Linux")
 
     os.environ.pop("XDG_CACHE_HOME", None)
 
