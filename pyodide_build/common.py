@@ -26,6 +26,7 @@ from zipfile import ZipFile
 from packaging.tags import Tag
 from packaging.utils import canonicalize_name as canonicalize_package_name
 from packaging.utils import parse_wheel_filename
+from platformdirs import user_cache_dir
 
 from pyodide_build.logger import logger
 
@@ -49,14 +50,10 @@ def default_xbuildenv_path() -> Path:
     dirname = xbuildenv_dirname()
     candidates = []
 
-    # 1. xdg-cache directory
-    if xdg_cache_home := os.environ.get("XDG_CACHE_HOME"):
-        candidates.append(Path(xdg_cache_home) / dirname)
+    # 1. default cache directory
+    candidates.append(Path(user_cache_dir()) / dirname)
 
-    # 2. user cache directory
-    candidates.append(Path.home() / ".cache" / dirname)
-
-    # 3. current working directory
+    # 2. current working directory
     candidates.append(Path.cwd() / dirname)
 
     for candidate in candidates:

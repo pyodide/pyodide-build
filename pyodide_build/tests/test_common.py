@@ -161,11 +161,13 @@ def test_check_wasm_magic_number(tmp_path):
 def test_default_xbuildenv_path(tmp_path, reset_cache):
     import os
 
+    import platformdirs
+
     os.environ.pop("XDG_CACHE_HOME", None)
 
     dirname = xbuildenv_dirname()
 
-    assert default_xbuildenv_path() == Path.home() / ".cache" / dirname
+    assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
 
     reset_cache()
 
@@ -181,7 +183,7 @@ def test_default_xbuildenv_path(tmp_path, reset_cache):
 
     os.environ["XDG_CACHE_HOME"] = str(not_writeable_path)
 
-    assert default_xbuildenv_path() == Path.home() / ".cache" / dirname
+    assert default_xbuildenv_path() == Path.cwd() / dirname
 
     reset_cache()
 
