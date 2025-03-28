@@ -315,7 +315,9 @@ def _get_sha256_checksum(archive: Path) -> str:
     return h.hexdigest()
 
 
-def unpack_wheel(wheel_path: Path, target_dir: Path | None = None, verbose=True) -> None:
+def unpack_wheel(
+    wheel_path: Path, target_dir: Path | None = None, verbose=True
+) -> None:
     if target_dir is None:
         target_dir = wheel_path.parent
     result = subprocess.run(
