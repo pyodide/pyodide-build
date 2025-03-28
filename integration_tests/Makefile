@@ -7,7 +7,7 @@ test-recipe: check
 	@echo "... Running integration tests for building recipes"
 
 	RECIPE_BUILD_TARGET=${RECIPE_BUILD_TARGET:-*}
-	pyodide build-recipes --recipe-dir=recipes --install --force-rebuild "${RECIPE_BUILD_TARGET}"
+	$(UV_RUN_PREFIX) pyodide build-recipes --recipe-dir=recipes --install --force-rebuild "${RECIPE_BUILD_TARGET}"
 
 	@echo "... Passed"
 
