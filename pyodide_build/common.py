@@ -315,26 +315,28 @@ def _get_sha256_checksum(archive: Path) -> str:
     return h.hexdigest()
 
 
-def unpack_wheel(wheel_path: Path, target_dir: Path | None = None) -> None:
+def unpack_wheel(wheel_path: Path, target_dir: Path | None = None, verbose=True) -> None:
     if target_dir is None:
         target_dir = wheel_path.parent
     result = subprocess.run(
         [sys.executable, "-m", "wheel", "unpack", wheel_path, "-d", target_dir],
         check=False,
         encoding="utf-8",
+        capture_output=not verbose,
     )
     if result.returncode != 0:
         logger.error("ERROR: Unpacking wheel %s failed", wheel_path.name)
         exit_with_stdio(result)
 
 
-def pack_wheel(wheel_dir: Path, target_dir: Path | None = None) -> None:
+def pack_wheel(wheel_dir: Path, target_dir: Path | None = None, verbose=True) -> None:
     if target_dir is None:
         target_dir = wheel_dir.parent
     result = subprocess.run(
         [sys.executable, "-m", "wheel", "pack", wheel_dir, "-d", target_dir],
         check=False,
         encoding="utf-8",
+        capture_output=not verbose,
     )
     if result.returncode != 0:
         logger.error("ERROR: Packing wheel %s failed", wheel_dir)
@@ -342,7 +344,7 @@ def pack_wheel(wheel_dir: Path, target_dir: Path | None = None) -> None:
 
 
 @contextmanager
-def modify_wheel(wheel: Path) -> Iterator[Path]:
+def modify_wheel(wheel: Path, verbose=True) -> Iterator[Path]:
     """Unpacks the wheel into a temp directory and yields the path to the
     unpacked directory.
 
@@ -353,13 +355,13 @@ def modify_wheel(wheel: Path) -> Iterator[Path]:
     wheel is left unchanged.
     """
     with TemporaryDirectory() as temp_dir:
-        unpack_wheel(wheel, Path(temp_dir))
+        unpack_wheel(wheel, Path(temp_dir), verbose=verbose)
         name, ver, _ = wheel.name.split("-", 2)
         wheel_dir_name = f"{name}-{ver}"
         wheel_dir = Path(temp_dir) / wheel_dir_name
         yield wheel_dir
         wheel.unlink()
-        pack_wheel(wheel_dir, wheel.parent)
+        pack_wheel(wheel_dir, wheel.parent, verbose=verbose)
 
 
 def retag_wheel(
