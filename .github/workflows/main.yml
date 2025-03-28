@@ -153,6 +153,13 @@ jobs:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         working-directory: integration_tests
         run: |
+
+          # https://github.com/pyodide/pyodide-build/issues/147
+          # disable package with scikit-build-core
+          if [[ ${{ matrix.os }} == "macos-latest" ]]; then
+            export RECIPE_BUILD_TARGET="*,!boost-histogram"
+          fi
+
           if [[ "${{ matrix.task.installer }}" == "uv" ]]; then
             export UV_RUN_PREFIX="uv run"
           fi
