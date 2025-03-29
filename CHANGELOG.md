@@ -13,9 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [#103](https://github.com/pyodide/pyodide-build/pull/103)
 
 - Pyodide cross-build environment will now be installed in the user cache directory by default,
-  which is `<home>/.cache` in unix system and `/Users/<user>/Library/Caches` in MacOS.
+  which is `<home>/.cache` in Linux systems and `/Users/<user>/Library/Caches` in macOS.
   [#148](https://github.com/pyodide/pyodide-build/pull/148)
-
 ### Fixed
 
 - Fixed Pyodide venv `sys_platform` marker evaluation with pip >= 25.

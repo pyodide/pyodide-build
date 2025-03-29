@@ -16,7 +16,7 @@ import zipfile
 from collections import deque
 from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any, NoReturn
@@ -40,7 +40,7 @@ def xbuildenv_dirname() -> str:
     return f".pyodide-xbuildenv-{__version__}"
 
 
-@lru_cache(maxsize=1)
+@cache
 def default_xbuildenv_path() -> Path:
     """
     Return the default path to the cross-build environment directory.
