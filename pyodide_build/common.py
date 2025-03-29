@@ -75,10 +75,11 @@ def _has_write_access(folder: Path) -> bool:
     Checks if the current user has write access to the given folder using pathlib.
     """
     try:
-        p = folder.resolve()
+        # If folder doesn't exist, recursively check parent (unless we're at root)
+        if not folder.exists() and folder.parent != folder:
+            return _has_write_access(folder.parent)
 
-        while not p.exists() and p != p.parent:
-            p = p.parent
+        p = folder.resolve()
 
         # 1. check owner by name
         try:
@@ -89,8 +90,7 @@ def _has_write_access(folder: Path) -> bool:
         # 2. check owner by UID
         if hasattr(os, "geteuid"):
             try:
-                st = p.stat()
-                return st.st_uid == os.geteuid()
+                return p.stat().st_uid == os.geteuid()
             except (OSError, NotImplementedError):
                 pass
 
