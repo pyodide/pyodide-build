@@ -60,6 +60,12 @@ def default_xbuildenv_path() -> Path:
         if _has_write_access(candidate):
             return candidate
 
+    raise RuntimeError(
+        "Cannot find a writable directory for the cross-build environment. "
+        "Please check if you have write access to the following directories:\n"
+        f"  {', '.join(str(c) for c in candidates)}\n"
+    )
+
 
 def _has_write_access(folder: Path) -> bool:
     """
