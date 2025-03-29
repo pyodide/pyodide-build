@@ -13,6 +13,8 @@ def run(
     outdir: Path,
     exports: _BuildSpecExports,
     config_settings: ConfigSettingsType,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
 ) -> Path:
     outdir = outdir.resolve()
     cflags = build_env.get_build_flag("SIDE_MODULE_CFLAGS")
@@ -39,7 +41,14 @@ def run(
     )
 
     with build_env_ctx as env:
-        built_wheel = pypabuild.build(srcdir, outdir, env, config_settings)
+        built_wheel = pypabuild.build(
+            srcdir,
+            outdir,
+            env,
+            config_settings,
+            isolation=isolation,
+            skip_dependency_check=skip_dependency_check,
+        )
 
     wheel_path = Path(built_wheel)
     if "emscripten" in wheel_path.name:
