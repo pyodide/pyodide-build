@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Rust toolchain version has been updated to `nightly-2025-01-18`.
   [#103](https://github.com/pyodide/pyodide-build/pull/103)
 
+- Pyodide cross-build environment will now be installed in the user cache directory by default,
+  which is `<home>/.cache` in Linux systems and `/Users/<user>/Library/Caches` in macOS.
+  [#148](https://github.com/pyodide/pyodide-build/pull/148)
+
 - Removed `cmake` dependency from the package.
   The Pyodide build system now uses the `cmake` package specified in the `pyproject.toml` file
   of the target package.

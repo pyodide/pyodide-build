@@ -14,7 +14,7 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import search_pyproject_toml, to_bool, xbuildenv_dirname
+from pyodide_build.common import default_xbuildenv_path, search_pyproject_toml, to_bool
 from pyodide_build.config import ConfigManager, CrossBuildEnvConfigManager
 
 RUST_BUILD_PRELUDE = """
@@ -74,7 +74,7 @@ def _init_xbuild_env(*, quiet: bool = False) -> Path:
     """
     from pyodide_build.xbuildenv import CrossBuildEnvManager  # avoid circular import
 
-    xbuildenv_path = Path(xbuildenv_dirname()).resolve()
+    xbuildenv_path = default_xbuildenv_path()
     context = redirect_stdout(StringIO()) if quiet else nullcontext()
     with context:
         manager = CrossBuildEnvManager(xbuildenv_path)

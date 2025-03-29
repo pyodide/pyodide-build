@@ -16,12 +16,14 @@ import zipfile
 from collections import deque
 from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from functools import cache
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any, NoReturn
 from urllib.request import urlopen
 from zipfile import ZipFile
 
+import platformdirs
 from packaging.tags import Tag
 from packaging.utils import canonicalize_name as canonicalize_package_name
 from packaging.utils import parse_wheel_filename
@@ -30,9 +32,52 @@ from pyodide_build.logger import logger
 
 
 def xbuildenv_dirname() -> str:
-    from pyodide_build import __version__
+    try:
+        from pyodide_build import __version__
+    except ImportError:
+        __version__ = "0.0.0"
 
     return f".pyodide-xbuildenv-{__version__}"
+
+
+@cache
+def default_xbuildenv_path() -> Path:
+    """
+    Return the default path to the cross-build environment directory.
+
+    This directory is used when no path is provided to the `pyodide xbuildenv` subcommands.
+    """
+    dirname = xbuildenv_dirname()
+    candidates = []
+
+    # 1. default cache directory
+    candidates.append(Path(platformdirs.user_cache_dir()) / dirname)
+
+    # 2. current working directory
+    candidates.append(Path.cwd() / dirname)
+
+    for candidate in candidates:
+        if _has_write_access(candidate):
+            return candidate
+
+    raise RuntimeError(
+        "Cannot find a writable directory for the cross-build environment. "
+        "Please check if you have write access to the following directories:\n"
+        f"  {', '.join(str(c) for c in candidates)}\n"
+    )
+
+
+def _has_write_access(folder: Path) -> bool:
+    """
+    Checks if the current user has write access to the given folder using pathlib.
+    """
+    try:
+        if not folder.exists() and folder.parent != folder:
+            return _has_write_access(folder.parent)
+
+        return os.access(str(folder), os.W_OK)
+    except OSError:
+        return False
 
 
 def _find_matching_wheels(
