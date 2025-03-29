@@ -83,14 +83,16 @@ def _has_write_access(folder: Path) -> bool:
 
         # 1. check owner by name
         try:
-            return p.owner() == os.getlogin()
+            if p.owner() == os.getlogin():
+                return True
         except Exception:
             pass
 
         # 2. check owner by UID
         if hasattr(os, "geteuid"):
             try:
-                return p.stat().st_uid == os.geteuid()
+                if p.stat().st_uid == os.geteuid():
+                    return True
             except (OSError, NotImplementedError):
                 pass
 
