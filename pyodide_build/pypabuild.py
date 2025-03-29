@@ -15,7 +15,7 @@ from build import BuildBackendException, ConfigSettingsType
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 
-from pyodide_build import _f2c_fixes, common, pywasmcross
+from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
     get_hostsitepackages,
@@ -33,10 +33,6 @@ from pyodide_build.vendor._pypabuild import (
 )
 
 AVOIDED_REQUIREMENTS = [
-    # We don't want to install cmake Python package inside the isolated env as it will shadow
-    # the pywasmcross cmake wrapper.
-    # TODO: Find a way to make scikit-build use the pywasmcross cmake wrapper.
-    "cmake",
     # mesonpy installs patchelf in linux platform but we don't want it.
     "patchelf",
 ]
@@ -52,6 +48,7 @@ SYMLINK_ENV_VARS = {
     "ranlib": "RANLIB",
     "strip": "STRIP",
     "gfortran": "FC",  # https://mesonbuild.com/Reference-tables.html#compiler-and-linker-selection-variables
+    "cmake": "CMAKE_EXECUTABLE",  # For scikit-build to find cmake (https://github.com/scikit-build/scikit-build-core/pull/603)
 }
 
 
@@ -149,7 +146,8 @@ def _build_in_isolated_env(
     # It will be left in the /tmp folder and can be inspected or entered as
     # needed.
     # _DefaultIsolatedEnv.__exit__ = lambda self, *args: print("Skipping removing isolated env in", self.path)
-    with _DefaultIsolatedEnv() as env:
+    installer = "uv" if uv_helper.should_use_uv() else "pip"
+    with _DefaultIsolatedEnv(installer=installer) as env:
         env = cast(_DefaultIsolatedEnv, env)
         builder = _ProjectBuilder.from_isolated_env(
             env,

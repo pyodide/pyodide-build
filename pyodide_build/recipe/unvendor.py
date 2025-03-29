@@ -44,7 +44,7 @@ def unvendor_tests_in_wheel(
     with TemporaryDirectory() as _tmpdir:
         tmpdir = Path(_tmpdir)
         test_dir = tmpdir / "tests"
-        with modify_wheel(wheel) as wheel_extract_dir:
+        with modify_wheel(wheel, verbose=False) as wheel_extract_dir:
             nmoved = unvendor_tests(
                 wheel_extract_dir,
                 test_dir,

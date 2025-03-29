@@ -27,7 +27,7 @@ from rich.progress import BarColumn, Progress, TimeElapsedColumn
 from rich.spinner import Spinner
 from rich.table import Table
 
-from pyodide_build import build_env
+from pyodide_build import build_env, uv_helper
 from pyodide_build.build_env import BuildArgs
 from pyodide_build.common import (
     download_and_unpack_archive,
@@ -130,8 +130,12 @@ class BasePackage:
         return res
 
     def build(self, build_args: BuildArgs, build_dir: Path) -> None:
+        run_prefix = (
+            [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
+        )
         p = subprocess.run(
             [
+                *run_prefix,
                 "pyodide",
                 "build-recipes-no-deps",
                 self.name,
@@ -836,7 +840,9 @@ def generate_packagedata(
             )
 
         if pkg.unvendor_tests:
-            unvendored_test_file = unvendor.unvendor_tests_in_wheel(wheel_file)
+            unvendored_test_file = unvendor.unvendor_tests_in_wheel(
+                wheel_file, pkg.meta.build.retain_test_patterns
+            )
             if unvendored_test_file:
                 pkg_entry.unvendored_tests = True
                 test_file_entry = PackageLockSpec(

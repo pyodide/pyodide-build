@@ -6,7 +6,12 @@ all:
 test-recipe: check
 	@echo "... Running integration tests for building recipes"
 
-	pyodide build-recipes --recipe-dir=recipes --install --force-rebuild "*"
+	@if [ -z "$(RECIPE_BUILD_TARGET)" ]; then \
+		RECIPE_TARGET='*'; \
+	else \
+		RECIPE_TARGET='$(RECIPE_BUILD_TARGET)'; \
+	fi; \
+	$(UV_RUN_PREFIX) pyodide build-recipes --recipe-dir=recipes --install --force-rebuild "$${RECIPE_TARGET}"
 
 	@echo "... Passed"
 

@@ -142,6 +142,15 @@ def new_recipe_pypi(
         help="The directory containing the recipe of packages. "
         "If not specified, the default is ``<cwd>/packages``.",
     ),
+    maintainer: str | None = typer.Option(
+        None, "--maintainer", "-m", help="The github username to use as the maintainer"
+    ),
+    gh_maintainer: bool = typer.Option(
+        False,
+        "--gh-maintainer",
+        "--ghm",
+        help="Set the maintainer from 'gh auth status'. Requires gh cli.",
+    ),
 ) -> None:
     """
     Create a new package recipe from PyPI or update an existing recipe.
@@ -157,8 +166,13 @@ def new_recipe_pypi(
 
     recipe_dir_ = get_recipe_dir(recipe_dir)
 
-    if update or update_patched or update_pinned:
-        try:
+    try:
+        if update or update_patched or update_pinned:
+            action = "update"
+            if maintainer or gh_maintainer:
+                raise skeleton.MkpkgFailedException(
+                    "--maintainer and --gh-maintainer are only currently supported when creating a new recipe."
+                )
             skeleton.update_package(
                 recipe_dir_,
                 name,
@@ -167,13 +181,27 @@ def new_recipe_pypi(
                 update_patched=update_patched,
                 update_pinned=update_pinned,
             )
-        except skeleton.MkpkgFailedException as e:
-            logger.error("%s update failed: %s", name, e)
-            sys.exit(1)
-        except skeleton.MkpkgSkipped as e:
-            logger.warning("%s update skipped: %s", name, e)
-        except Exception:
-            print(name)
-            raise
-    else:
-        skeleton.make_package(recipe_dir_, name, version, source_fmt=source_format)  # type: ignore[arg-type]
+        else:
+            action = "create"
+            if maintainer and gh_maintainer:
+                raise skeleton.MkpkgFailedException(
+                    "At most one of --maintainer and --gh-maintainer can use used."
+                )
+            if gh_maintainer:
+                maintainer = skeleton.lookup_gh_username()
+            skeleton.make_package(
+                recipe_dir_,
+                name,
+                version,
+                source_fmt=source_format,
+                maintainer=maintainer,
+            )  # type: ignore[arg-type]
+
+    except skeleton.MkpkgFailedException as e:
+        logger.error("Failed to %s %s: %s", action, name, e)
+        sys.exit(1)
+    except skeleton.MkpkgSkipped as e:
+        logger.warning("%s %s skipped: %s", name, action, e)
+    except Exception:
+        print(name)
+        raise
