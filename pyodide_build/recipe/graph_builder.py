@@ -840,7 +840,7 @@ def generate_packagedata(
             )
 
         if pkg.unvendor_tests:
-            unvendored_test_file = unvendor.unvendor_tests_in_wheel(wheel_file)
+            unvendored_test_file = unvendor.unvendor_tests_in_wheel(wheel_file, pkg.meta.build.retain_test_patterns)
             if unvendored_test_file:
                 pkg_entry.unvendored_tests = True
                 test_file_entry = PackageLockSpec(
