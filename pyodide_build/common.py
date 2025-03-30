@@ -67,15 +67,38 @@ def default_xbuildenv_path() -> Path:
     )
 
 
+# Adapted from
+# https://github.com/jupyter/jupyter_core/blob/dc840a3bef34316a511aacb5972b5212c4c0e7af/jupyter_core/paths.py#L83-L108
+# License: BSD-3-Clause
 def _has_write_access(folder: Path) -> bool:
     """
     Checks if the current user has write access to the given folder using pathlib.
     """
     try:
+        # If folder doesn't exist, recursively check parent (unless we're at root)
         if not folder.exists() and folder.parent != folder:
             return _has_write_access(folder.parent)
 
-        return os.access(str(folder), os.W_OK)
+        p = folder.resolve()
+
+        # 1. check owner by name
+        try:
+            if p.owner() == os.getlogin():
+                return True
+        except Exception:
+            pass
+
+        # 2. check owner by UID
+        if hasattr(os, "geteuid"):
+            try:
+                if p.stat().st_uid == os.geteuid():
+                    return True
+            except (OSError, NotImplementedError):
+                pass
+
+        # 3. fall back to access check if both fail
+        return os.access(str(p), os.W_OK)
+
     except OSError:
         return False
 
