@@ -315,6 +315,19 @@ def _get_sha256_checksum(archive: Path) -> str:
     return h.hexdigest()
 
 
+def _format_dep_chain(dep_chain: Sequence[str]) -> str:
+    return " -> ".join(dep.partition(";")[0].strip() for dep in dep_chain)
+
+
+def _format_missing_dependencies(missing) -> str:
+    return "".join(
+        "\n\t" + dep
+        for deps in missing
+        for dep in (deps[0], _format_dep_chain(deps[1:]))
+        if dep
+    )
+
+
 def unpack_wheel(wheel_path: Path, target_dir: Path | None = None) -> None:
     if target_dir is None:
         target_dir = wheel_path.parent

@@ -5,16 +5,6 @@ import subprocess as sp
 import sys
 import traceback
 from collections.abc import Callable, Iterator, Mapping, Sequence
-
-
-# A helper function from pypa/build/__main__.py since
-# it's not in the vendorized code we have
-# TODO: we should move this to a new file. it's out of place
-# between the other imports ;-)
-def _format_dep_chain(dep_chain: Sequence[str]) -> str:
-    return " -> ".join(dep.partition(";")[0].strip() for dep in dep_chain)
-
-
 from contextlib import contextmanager
 from itertools import chain
 from pathlib import Path
@@ -209,16 +199,6 @@ def _build_in_isolated_env(
             )
 
 
-# TODO: move to common.py
-def _format_missing_dependencies(missing) -> str:
-    return "".join(
-        "\n\t" + dep
-        for deps in missing
-        for dep in (deps[0], _format_dep_chain(deps[1:]))
-        if dep
-    )
-
-
 def _build_in_current_env(
     build_env: Mapping[str, str],
     srcdir: Path,
@@ -233,7 +213,7 @@ def _build_in_current_env(
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})
             if missing:
-                dependencies = _format_missing_dependencies(missing)
+                dependencies = common._format_missing_dependencies(missing)
                 _error(f"Missing dependencies: {dependencies}")
 
         return builder.build(
