@@ -209,6 +209,16 @@ def _build_in_isolated_env(
             )
 
 
+# TODO: move to common.py
+def _format_missing_dependencies(missing) -> str:
+    return "".join(
+        "\n\t" + dep
+        for deps in missing
+        for dep in (deps[0], _format_dep_chain(deps[1:]))
+        if dep
+    )
+
+
 def _build_in_current_env(
     build_env: Mapping[str, str],
     srcdir: Path,
@@ -218,34 +228,19 @@ def _build_in_current_env(
     skip_dependency_check: bool = False,
 ) -> str:
     with common.replace_env(build_env):
-        # Setup sysconfigdata path in environment
-        sysconfigdata_name = get_build_flag("SYSCONFIG_NAME")
-        sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
-        env = os.environ.copy()
-        env["_PYTHON_SYSCONFIGDATA_NAME"] = sysconfigdata_name
-        env["PYTHONPATH"] = f"{str(sysconfig_dir)}:{env.get('PYTHONPATH', '')}"
+        builder = _ProjectBuilder(srcdir, runner=_gen_runner(build_env))
 
-        with common.replace_env(env):
-            builder = _ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+        if not skip_dependency_check:
+            missing = builder.check_dependencies(distribution, config_settings or {})
+            if missing:
+                dependencies = _format_missing_dependencies(missing)
+                _error(f"Missing dependencies: {dependencies}")
 
-            if not skip_dependency_check:
-                missing = builder.check_dependencies(
-                    distribution, config_settings or {}
-                )
-                if missing:
-                    dependencies = "".join(
-                        "\n\t" + dep
-                        for deps in missing
-                        for dep in (deps[0], _format_dep_chain(deps[1:]))
-                        if dep
-                    )
-                    _error(f"Missing dependencies:{dependencies}")
-
-            return builder.build(
-                distribution,
-                outdir,
-                config_settings,
-            )
+        return builder.build(
+            distribution,
+            outdir,
+            config_settings,
+        )
 
 
 def parse_backend_flags(backend_flags: str | list[str]) -> ConfigSettingsType:
