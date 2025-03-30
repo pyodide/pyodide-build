@@ -100,9 +100,11 @@ jobs:
           {name: test-recipe, installer: uv},
           {name: test-src, installer: uv},
           {name: test-integration-marker, installer: pip},  # installer doesn't matter
-          {name: test-src-no-isolation, installer: pip}, # installer doesn't matter
         ]
         os: [ubuntu-latest, macos-latest]
+        include:
+          - task: {name: test-src-no-isolation, installer: pip} # installer doesn't matter
+            os: ubuntu-latest
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
