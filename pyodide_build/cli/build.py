@@ -193,7 +193,8 @@ def main(
         False,
         "--skip-dependency-check",
         "-x",
-        help="Do not check that build dependencies are installed",
+        help="Do not check that the build dependencies are installed. This option "
+        "is only useful when used with --no-isolation.",
     ),
     config_setting: Optional[list[str]] = typer.Option(  # noqa: UP007 typer does not accept list[str] | None yet.
         None,
