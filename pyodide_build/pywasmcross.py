@@ -124,9 +124,8 @@ def replay_genargs_handle_dashl(arg: str, used_libs: set[str], abi: str) -> str 
     # Some Emscripten libraries that use setjmp/longjmp.
     # The Emscripten linker should automatically know to use these variants so
     # this shouldn't be necessary.
-    # This suffix will need to change soon to `-legacysjlj`.
     if abi > "2025" and arg in ["-lfreetype", "-lpng"]:
-        arg += "-wasm-sjlj"
+        arg += "-legacysjlj"
 
     # WASM link doesn't like libraries being included twice
     # skip second one
