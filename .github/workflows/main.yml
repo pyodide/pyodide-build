@@ -98,6 +98,7 @@ jobs:
           {name: test-recipe, installer: uv},
           {name: test-src, installer: uv},
           {name: test-integration-marker, installer: pip},  # installer doesn't matter
+          {name: test-src-no-isolation, installer: pip}, # installer doesn't matter
         ]
         os: [ubuntu-latest, macos-latest]
     if: needs.check-integration-test-trigger.outputs.run-integration-test

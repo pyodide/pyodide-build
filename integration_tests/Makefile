@@ -23,6 +23,19 @@ test-src: check
 
 	@echo "... Passed"
 
+.PHONY: test-src-no-isolation
+test-src-no-isolation: check
+	@echo "... Running integration tests for building src with --no-isolation --skip-dependency-check"
+
+	# Ensure the necessary build dependencies are installed in the
+	# host environment as we need to do so ourselves.
+
+	pip install meson-python meson cython
+
+	./src/numpy.sh --no-isolation --skip-dependency-check
+
+	@echo "... Passed"
+
 .PHONY: check
 check:
 	@echo "... Checking dependencies"
