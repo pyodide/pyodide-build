@@ -355,7 +355,14 @@ def test_py_compile(tmp_path, target, compression_level):
 def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
     from pyodide_build import pypabuild
 
-    def mocked_build(srcdir: Path, outdir: Path, env: Any, backend_flags: Any) -> str:
+    def mocked_build(
+        srcdir: Path,
+        outdir: Path,
+        env: Any,
+        backend_flags: Any,
+        isolation=True,
+        skip_dependency_check=False,
+    ) -> str:
         results["srcdir"] = srcdir
         results["outdir"] = outdir
         results["backend_flags"] = backend_flags
@@ -431,7 +438,14 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
 
     exports_ = None
 
-    def run_shim(builddir, output_directory, exports, backend_flags):
+    def run_shim(
+        builddir,
+        output_directory,
+        exports,
+        backend_flags,
+        isolation=True,
+        skip_dependency_check=False,
+    ):
         nonlocal exports_
         exports_ = exports
 
@@ -491,7 +505,14 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
 
     config_settings_passed = None
 
-    def run(srcdir, outdir, exports, config_settings):
+    def run(
+        srcdir,
+        outdir,
+        exports,
+        config_settings,
+        isolation=True,
+        skip_dependency_check=False,
+    ):
         nonlocal config_settings_passed
         config_settings_passed = config_settings
 
