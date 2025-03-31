@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from textwrap import dedent
 
 from build import ConfigSettingsType
 
@@ -33,6 +34,16 @@ def run(
     # create a persistent build dir in the source dir
     build_dir = srcdir / ".pyodide_build"
     build_dir.mkdir(exist_ok=True)
+    # don't track the build dir (helps if building in a git repo)
+    gitignore_path = build_dir / ".gitignore"
+    if not gitignore_path.exists():
+        with gitignore_path.open("w") as f:
+            f.write(
+                dedent("""\
+                    # Created by pyodide-build
+                    *""")
+            )
+
     build_env_ctx = pypabuild.get_build_env(
         env=env,
         pkgname="",
