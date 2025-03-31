@@ -154,7 +154,6 @@ jobs:
 
       - name: Run the recipe integration tests (${{ matrix.task }})
         if: matrix.task.name != 'test-integration-marker'
-        shell: bash
         env:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         working-directory: integration_tests
