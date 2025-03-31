@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# The same as "numpy.sh", but without the isolation.
+# The same as "numpy.sh", but without the isolation, and
+# builds both NumPy and numpy-tests from a persistent
+# build directory.
 
 set -e
 
