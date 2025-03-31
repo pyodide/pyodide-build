@@ -30,6 +30,9 @@ def run(
     env = os.environ.copy()
     env.update(build_env.get_build_environment_vars(get_pyodide_root()))
 
+    # create a persistent build dir in the source dir
+    build_dir = srcdir / ".pyodide_build"
+    build_dir.mkdir(exist_ok=True)
     build_env_ctx = pypabuild.get_build_env(
         env=env,
         pkgname="",
@@ -38,6 +41,7 @@ def run(
         ldflags=ldflags,
         target_install_dir=target_install_dir,
         exports=exports,
+        build_dir=build_dir,
     )
 
     with build_env_ctx as env:

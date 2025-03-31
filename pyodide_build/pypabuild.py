@@ -8,7 +8,6 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from itertools import chain
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Literal, cast
 
 from build import BuildBackendException, ConfigSettingsType
@@ -287,33 +286,13 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
 
 @contextmanager
 def _create_symlink_dir(
-    env: dict[str, str], build_dir: Path | None, no_isolation: bool = False
+    env: dict[str, str], build_dir: Path, no_isolation: bool = False
 ):
-    if build_dir:
-        # If we're running under build-recipes, leave the symlinks in
-        # the build directory. This helps with reproducing.
-        symlink_dir = build_dir / "pywasmcross_symlinks"
-        shutil.rmtree(symlink_dir, ignore_errors=True)
-        symlink_dir.mkdir()
-        yield symlink_dir
-        return
-
-    # TODO: FIXME: compiler wrappers are still ending up in a temporary
-    # directory, which breaks persistent builds. This is not ideal, but
-    # it is better than nothing so this is non-blocking for now. It has
-    # to be investigated further.
-
-    if no_isolation:
-        # For non-isolated builds, create a persistent directory in the current working directory
-        # or in a well-known location like ~/.pyodide/compiler_wrappers
-        symlink_dir = Path.cwd() / ".pyodide_compiler_wrappers"
-        symlink_dir.mkdir(exist_ok=True)
-        yield symlink_dir
-    else:
-        # Running from "pyodide build". Put symlinks in a temporary directory.
-        # TODO: Add a debug option to save the symlinks.
-        with TemporaryDirectory() as symlink_dir_str:
-            yield Path(symlink_dir_str)
+    # Leave the symlinks in the build directory. This helps with reproducing.
+    symlink_dir = build_dir / "pywasmcross_symlinks"
+    shutil.rmtree(symlink_dir, ignore_errors=True)
+    symlink_dir.mkdir()
+    yield symlink_dir
 
 
 @contextmanager
