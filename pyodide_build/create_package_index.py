@@ -1,5 +1,6 @@
 from pathlib import Path
 from textwrap import dedent
+from urllib.parse import urlparse
 
 from pyodide_lock.spec import PackageSpec
 
@@ -84,8 +85,11 @@ def create_package_index(
     for pkgname, pkginfo in packages.items():
         pkgdir = index_dir / pkgname
         filename = pkginfo.file_name
-        shasum = pkginfo.sha256
-        href = f"{dist_url}{filename}#sha256={shasum}"
+        if urlparse(filename).scheme:
+            href = filename
+        else:
+            shasum = pkginfo.sha256
+            href = f"{dist_url}{filename}#sha256={shasum}"
         links_str = f'<a href="{href}">{pkgname}</a>\n'
         files_html = files_template.format(pkgname=pkgname, links=links_str)
 
