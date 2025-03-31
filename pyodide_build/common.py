@@ -64,7 +64,7 @@ def default_xbuildenv_path() -> Path:
         if _has_write_access(path):
             return path
         else:
-            logger.warning(
+            logger.error(
                 "The directory specified in PYODIDE_XBUILDENV_PATH (%s) is not writable. "
                 "Falling back to other locations.",
                 path,
@@ -86,13 +86,13 @@ def default_xbuildenv_path() -> Path:
             if _has_write_access(config_path):
                 return config_path
             else:
-                warning_msg = (
-                    f"The directory specified in pyproject.toml ({config_path}) is not writable. "
-                    "Falling back to default locations."
+                logger.error(
+                    "The directory specified in pyproject.toml (%s) is not writable. "
+                    "Falling back to default locations.",
+                    config_path,
                 )
-                logger.warning(warning_msg)
     except Exception as e:
-        logger.warning("Error reading xbuildenv_path from config system: %s", e)
+        logger.error("Error reading xbuildenv_path from config system: %s", e)
 
     # 3. use default locations from platformdirs and elsewhere
     dirname = xbuildenv_dirname()
