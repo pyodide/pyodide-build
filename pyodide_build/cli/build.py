@@ -174,10 +174,16 @@ def main(
         ),
         metavar="KEY[=VALUE]",
     ),
+    xbuildenv_path: Optional[Path] = typer.Option(  # noqa: UP007 typer does not accept Path | None yet.
+        None,
+        "--xbuildenv-path",
+        envvar="PYODIDE_XBUILDENV_PATH",
+        help="Path to the cross-build environment directory. If not provided, the default location will be used.",
+    ),
     ctx: typer.Context = typer.Context,  # type: ignore[assignment]
 ) -> None:
     """Use pypa/build to build a Python package from source, pypi or url."""
-    init_environment()
+    init_environment(xbuildenv_path=xbuildenv_path)
     try:
         check_emscripten_version()
     except RuntimeError as e:
