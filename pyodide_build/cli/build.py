@@ -15,6 +15,7 @@ from pyodide_build.build_env import (
     get_pyodide_root,
     init_environment,
 )
+from pyodide_build.common import default_xbuildenv_path
 from pyodide_build.logger import logger
 from pyodide_build.out_of_tree import build
 from pyodide_build.out_of_tree.pypi import (
@@ -120,6 +121,9 @@ def source(
     return built_wheel
 
 
+DEFAULT_PATH = default_xbuildenv_path()
+
+
 # simple 'pyodide build' command
 def main(
     source_location: Optional[str] = typer.Argument(  # noqa: UP007 typer does not accept list[str] | None yet.
@@ -174,11 +178,11 @@ def main(
         ),
         metavar="KEY[=VALUE]",
     ),
-    xbuildenv_path: Optional[Path] = typer.Option(  # noqa: UP007 typer does not accept Path | None yet.
-        None,
+    xbuildenv_path: Path = typer.Option(
+        DEFAULT_PATH,
         "--xbuildenv-path",
         envvar="PYODIDE_XBUILDENV_PATH",
-        help="Path to the cross-build environment directory. If not provided, the default location will be used.",
+        help="Path to the cross-build environment directory.",
     ),
     ctx: typer.Context = typer.Context,  # type: ignore[assignment]
 ) -> None:
