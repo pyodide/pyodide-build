@@ -37,7 +37,7 @@ def _install(
     path: Path = typer.Option(
         DEFAULT_PATH,
         envvar="PYODIDE_XBUILDENV_PATH",
-        help="path to download cross-build environment directory to.",
+        help="destination to download cross-build environment directory to.",
     ),
     url: str = typer.Option(None, help="URL to download cross-build environment from"),
     force_install: bool = typer.Option(
