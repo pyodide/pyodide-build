@@ -232,8 +232,13 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatc
 
     assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
 
+    reset_cache()
+
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+
     assert default_xbuildenv_path() == tmp_path / dirname
+
+    reset_cache()
 
     not_writeable_path = tmp_path / "not_writeable"
     not_writeable_path.mkdir()
@@ -242,6 +247,8 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatc
     monkeypatch.setenv("XDG_CACHE_HOME", str(not_writeable_path))
 
     assert default_xbuildenv_path() == Path.cwd() / dirname
+
+    reset_cache()
 
 
 def test_config_with_pyproject_toml(tmp_path, reset_cache, monkeypatch):
