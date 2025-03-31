@@ -218,7 +218,7 @@ def test_default_xbuildenv_path_relative_config(reset_cache, monkeypatch):
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Test only runs on Linux")
-def test_default_xbuildenv_path_xdg_cache_home(tmp_path, monkeypatch):
+def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatch):
     """Test XDG_CACHE_HOME on Linux."""
 
     os.environ.pop("XDG_CACHE_HOME", None)
@@ -244,7 +244,7 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, monkeypatch):
     assert default_xbuildenv_path() == Path.cwd() / dirname
 
 
-def test_config_with_pyproject_toml(tmp_path, monkeypatch):
+def test_config_with_pyproject_toml(tmp_path, reset_cache, monkeypatch):
     """Test that xbuildenv_path from pyproject.toml is properly used."""
     # Create a temporary pyproject.toml file
     pyproject_dir = tmp_path / "project"
@@ -289,7 +289,6 @@ def test_config_full_precedence(tmp_path, reset_cache, monkeypatch):
 
     # 2. set environment variable and verify it takes precedence
     monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(env_var_path))
-
     reset_cache()
 
     path = default_xbuildenv_path()
