@@ -43,17 +43,71 @@ def xbuildenv_dirname() -> str:
 @cache
 def default_xbuildenv_path() -> Path:
     """
-    Return the default path to the cross-build environment directory.
+    Return the default path to the cross-build environment directory. This directory
+    is used when no path is provided to `pyodide xbuildenv`'s subcommands.
 
-    This directory is used when no path is provided to the `pyodide xbuildenv` subcommands.
+    The search order for determining the path is as follows:
+    1. the PYODIDE_XBUILDENV_PATH environment variable if set
+    2. the value provided by "pyodide config xbuildenv_path"
+    3. the default location based on platformdirs
+
+    Returns
+    -------
+    Path
+        The path to the cross-build environment directory
     """
+    # We need some special handling for the config tests as this seems
+    # to conflict with the paths and picks up non-mocked paths otherwise
+    in_pytest = "PYTEST_CURRENT_TEST" in os.environ
+    test_path = os.environ.get("_PYTEST_XBUILDENV_PATH")
+    if in_pytest and test_path:
+        return Path(test_path)
+
+    # 1. check environment variable
+    env_path = os.environ.get("PYODIDE_XBUILDENV_PATH")
+    if env_path:
+        path = Path(env_path)
+        if _has_write_access(path):
+            return path
+        else:
+            logger.warning(
+                "The directory specified in PYODIDE_XBUILDENV_PATH (%s) is not writable. "
+                "Falling back to other locations.",
+                path,
+            )
+
+    # 2. check "pyodide config xbuildenv_path"
+    if not in_pytest:
+        try:
+            from pyodide_build.config import ConfigManager
+
+            config_manager = ConfigManager()
+            if (
+                "xbuildenv_path" in config_manager.config
+                and config_manager.config["xbuildenv_path"]
+            ):
+                config_path = Path(config_manager.config["xbuildenv_path"])
+                if not config_path.is_absolute():
+                    config_path = Path.cwd() / config_path
+
+                if _has_write_access(config_path):
+                    return config_path
+                else:
+                    warning_msg = (
+                        f"The directory specified in pyproject.toml ({config_path}) is not writable. "
+                        "Falling back to default locations."
+                    )
+                    logger.warning(warning_msg)
+        except Exception as e:
+            logger.warning("Error reading xbuildenv_path from config system: %s", e)
+
+    # 3. use default locations from platformdirs and elsewhere
     dirname = xbuildenv_dirname()
     candidates = []
 
-    # 1. default cache directory
+    # 3.1. default cache directory
     candidates.append(Path(platformdirs.user_cache_dir()) / dirname)
-
-    # 2. current working directory
+    # 3.2. current working directory
     candidates.append(Path.cwd() / dirname)
 
     for candidate in candidates:
