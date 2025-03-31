@@ -198,6 +198,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
+    "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -216,6 +217,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "skip_emscripten_version_check",
     "build_dependency_index_url",
     "default_cross_build_env_url",
+    "xbuildenv_path",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -237,6 +239,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "skip_emscripten_version_check": "0",
     "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
     "default_cross_build_env_url": "",
+    "xbuildenv_path": "",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }

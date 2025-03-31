@@ -20,6 +20,7 @@ PYODIDE_CONFIGS = {
     "cxxflags": "SIDE_MODULE_CXXFLAGS",
     "ldflags": "SIDE_MODULE_LDFLAGS",
     "meson_cross_file": "MESON_CROSS_FILE",
+    "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
 }
 
 
@@ -33,7 +34,11 @@ def _get_configs() -> dict[str, str]:
 
     configs: dict[str, str] = get_build_environment_vars(get_pyodide_root())
 
-    configs_filtered = {k: configs[v] for k, v in PYODIDE_CONFIGS.items()}
+    # Print out empty config variables as well, instead of ignoring them. It
+    # helps with visibility as to what is being used in the builds, and what
+    # isn't being used.
+    configs_filtered = {k: configs.get(v, "") for k, v in PYODIDE_CONFIGS.items()}
+
     return configs_filtered
 
 
