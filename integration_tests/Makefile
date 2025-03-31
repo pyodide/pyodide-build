@@ -27,15 +27,21 @@ test-src: check
 test-src-no-isolation: check
 	@echo "... Running integration tests for building src with --no-isolation --skip-dependency-check"
 
-	# Ensure the necessary build dependencies are installed in the
-	# host environment as we need to do so ourselves.
+	# Some virtualenv workarounds from https://stackoverflow.com/a/24736236
+	# to make sure that we are using the right environment
+	@( \
+        set -e; \
+		python -m venv ./test_venv; \
+		source ./test_venv/bin/activate; \
+		pip install meson-python meson cython; \
+		pip install -e ../; \
+		./src/numpy_no_isolation.sh; \
+		deactivate; \
+	)
 
-	pip install meson-python meson cython
-
-	./src/numpy.sh --no-isolation --skip-dependency-check
+	@rm -rf ./test_venv
 
 	@echo "... Passed"
-
 .PHONY: check
 check:
 	@echo "... Checking dependencies"
@@ -49,5 +55,9 @@ check:
 clean:
 	rm -rf .pyodide-xbuildenv*
 	rm -rf recipes/*/build
+	rm -rf test_venv
 	rm -rf src/numpy-*
+	rm -rf src/numpy-*.tar.gz
+	rm -rf numpy-*
+	rm -rf numpy-*.tar.gz
 	rm -rf dist
