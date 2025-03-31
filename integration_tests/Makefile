@@ -32,7 +32,7 @@ test-src-no-isolation: check
 	@( \
         set -e; \
 		python -m venv ./test_venv; \
-		source ./test_venv/bin/activate; \
+		. ./test_venv/bin/activate; \
 		pip install meson-python meson cython; \
 		pip install -e ../; \
 		./src/numpy_no_isolation.sh; \
