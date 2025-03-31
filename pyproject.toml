@@ -26,6 +26,7 @@ dependencies = [
     "requests",
     "typer>=0.13",
     "rich",
+    "platformdirs",
     # TODO: make this a extra dependency
     "resolvelib",
     "unearth~=0.6",
