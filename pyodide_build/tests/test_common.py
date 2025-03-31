@@ -170,16 +170,11 @@ class MockConfigManager:
         return self._config
 
 
-def test_default_xbuildenv_path_default(tmp_path, reset_cache, monkeypatch):
-    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("_PYTEST_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-
+def test_default_xbuildenv_path_default(monkeypatch):
     mock_config_manager = MockConfigManager({})
     monkeypatch.setattr(
         "pyodide_build.config.ConfigManager", lambda: mock_config_manager
     )
-    reset_cache()
 
     dirname = xbuildenv_dirname()
     expected_path = Path(platformdirs.user_cache_dir()) / dirname
@@ -193,16 +188,12 @@ def test_default_xbuildenv_path_env_var_takes_precedence(
     custom_path = tmp_path / "custom" / "path"
 
     monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(custom_path))
-    reset_cache()
 
     assert default_xbuildenv_path() == custom_path
 
 
-def test_default_xbuildenv_path_from_config(tmp_path, reset_cache, monkeypatch):
+def test_default_xbuildenv_path_from_config(tmp_path, monkeypatch):
     """Test that the path is correctly read from the ConfigManager."""
-    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("_PYTEST_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
     config_path = tmp_path / "config_path"
     mock_config_manager = MockConfigManager({"xbuildenv_path": str(config_path)})
@@ -210,25 +201,16 @@ def test_default_xbuildenv_path_from_config(tmp_path, reset_cache, monkeypatch):
         "pyodide_build.config.ConfigManager", lambda: mock_config_manager
     )
 
-    reset_cache()
-
     assert default_xbuildenv_path() == config_path
 
 
-def test_default_xbuildenv_path_relative_config(tmp_path, reset_cache, monkeypatch):
-    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("_PYTEST_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-
-    relative_path = "relative/path/to/somewhere"
+def test_default_xbuildenv_path_relative_config(reset_cache, monkeypatch):
+    relative_path = "../relative/path/to/somewhere"
 
     mock_config_manager = MockConfigManager({"xbuildenv_path": relative_path})
-
     monkeypatch.setattr(
         "pyodide_build.config.ConfigManager", lambda: mock_config_manager
     )
-
-    reset_cache()
 
     expected_path = Path.cwd() / relative_path
 
@@ -236,11 +218,9 @@ def test_default_xbuildenv_path_relative_config(tmp_path, reset_cache, monkeypat
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Test only runs on Linux")
-def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatch):
+def test_default_xbuildenv_path_xdg_cache_home(tmp_path, monkeypatch):
     """Test XDG_CACHE_HOME on Linux."""
-    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("_PYTEST_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
     os.environ.pop("XDG_CACHE_HOME", None)
 
     mock_config_manager = MockConfigManager({})
@@ -252,12 +232,8 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatc
 
     assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
 
-    reset_cache()
-
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
     assert default_xbuildenv_path() == tmp_path / dirname
-
-    reset_cache()
 
     not_writeable_path = tmp_path / "not_writeable"
     not_writeable_path.mkdir()
@@ -268,7 +244,7 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatc
     assert default_xbuildenv_path() == Path.cwd() / dirname
 
 
-def test_config_with_pyproject_toml(tmp_path, reset_cache, monkeypatch):
+def test_config_with_pyproject_toml(tmp_path, monkeypatch):
     """Test that xbuildenv_path from pyproject.toml is properly used."""
     # Create a temporary pyproject.toml file
     pyproject_dir = tmp_path / "project"
@@ -283,16 +259,10 @@ xbuildenv_path = "{xbuildenv_path}"
 """
     pyproject_path.write_text(pyproject_content)
 
-    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("_PYTEST_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-
     mock_config_manager = MockConfigManager({"xbuildenv_path": str(xbuildenv_path)})
     monkeypatch.setattr(
         "pyodide_build.config.ConfigManager", lambda: mock_config_manager
     )
-
-    reset_cache()
 
     path = default_xbuildenv_path()
     assert path == xbuildenv_path
@@ -306,10 +276,6 @@ def test_config_full_precedence(tmp_path, reset_cache, monkeypatch):
     env_var_path = tmp_path / "env-var-path"
     pyproject_path_value = pyproject_dir / "pyproject-path"
 
-    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("_PYTEST_XBUILDENV_PATH", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-
     mock_config_manager = MockConfigManager(
         {"xbuildenv_path": str(pyproject_path_value)}
     )
@@ -317,14 +283,13 @@ def test_config_full_precedence(tmp_path, reset_cache, monkeypatch):
         "pyodide_build.config.ConfigManager", lambda: mock_config_manager
     )
 
-    reset_cache()
-
     # 1. test using pyodide config when no env var is set
     path = default_xbuildenv_path()
     assert path == pyproject_path_value
 
     # 2. set environment variable and verify it takes precedence
     monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(env_var_path))
+
     reset_cache()
 
     path = default_xbuildenv_path()
