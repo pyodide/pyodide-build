@@ -90,7 +90,7 @@ jobs:
           fi
 
   integration-test:
-    name: integration-test (${{ matrix.task.name }}, ${{ matrix.task.installer }}, ${{ matrix.pyodide-version }}, ${{ matrix.os }})
+    name: integration-test (${{ matrix.task.name }}, ${{ matrix.task.installer }}, ${{ matrix.pyodide-version }}-pyodide, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: [check-integration-test-trigger]
     strategy:
@@ -103,11 +103,16 @@ jobs:
             { name: test-src, installer: uv },
             { name: test-integration-marker, installer: pip }, # installer doesn't matter
           ]
-        pyodide-version: [
-            "minimum",
-            "", # stable
-          ]
         os: [ubuntu-latest, macos-latest]
+        # Run Pyodide minimum version testing only for the pip installer and on Linux
+        include:
+          - task: { name: test-recipe, installer: pip }
+            os: ubuntu-latest
+            pyodide-version: minimum
+          - task: { name: test-src, installer: pip }
+            os: ubuntu-latest
+            pyodide-version: minimum
+
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
