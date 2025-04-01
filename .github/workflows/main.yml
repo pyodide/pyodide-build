@@ -104,6 +104,7 @@ jobs:
             { name: test-integration-marker, installer: pip }, # installer doesn't matter
           ]
         os: [ubuntu-latest, macos-latest]
+        pyodide-version: [stable]
         # Run Pyodide minimum version testing only for the pip installer and on Linux
         include:
           - task: { name: test-recipe, installer: pip }
