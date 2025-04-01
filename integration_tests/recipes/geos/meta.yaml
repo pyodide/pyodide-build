@@ -1,11 +1,11 @@
 package:
   name: geos
-  version: 3.12.1
+  version: 3.13.1
   tag:
     - library
 source:
-  url: https://github.com/libgeos/geos/releases/download/3.12.1/geos-3.12.1.tar.bz2
-  sha256: d6ea7e492224b51193e8244fe3ec17c4d44d0777f3c32ca4fb171140549a0d03
+  url: https://github.com/libgeos/geos/releases/download/3.13.1/geos-3.13.1.tar.bz2
+  sha256: df2c50503295f325e7c8d7b783aca8ba4773919cde984193850cf9e361dfd28c
 
 build:
   type: shared_library
