@@ -188,6 +188,9 @@ def replay_genargs_handle_linker_opts(arg: str) -> str | None:
             # wasm-ld does not recognize some link flags
             "--sort-common",
             "--as-needed",
+            # macOS-specific linker flags that wasm-ld doesn't understand
+            "-headerpad_max_install_names",
+            "-dead_strip_dylibs",
         ]:
             continue
 
