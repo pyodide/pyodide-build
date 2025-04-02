@@ -34,8 +34,7 @@ def _get_configs() -> dict[str, str]:
 
     configs: dict[str, str] = get_build_environment_vars(get_pyodide_root())
 
-    configs_filtered = {k: configs.get(v, "") for k, v in PYODIDE_CONFIGS.items()}
-
+    configs_filtered = {k: configs[v] for k, v in PYODIDE_CONFIGS.items()}
     return configs_filtered
 
 
