@@ -167,7 +167,7 @@ jobs:
         if: matrix.task.name == 'test-integration-marker'
         run: pytest --junitxml=test-results/junit.xml --cov=pyodide-build pyodide_build -m "integration"
 
-      - name: Run the recipe integration tests (${{ matrix.task }})
+      - name: Run the recipe integration tests (${{ matrix.task.name }})
         if: matrix.task.name != 'test-integration-marker'
         env:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
