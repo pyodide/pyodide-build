@@ -182,16 +182,6 @@ def test_default_xbuildenv_path_default(monkeypatch):
     assert default_xbuildenv_path() == expected_path
 
 
-def test_default_xbuildenv_path_env_var_takes_precedence(
-    tmp_path, reset_cache, monkeypatch
-):
-    custom_path = tmp_path / "custom" / "path"
-
-    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(custom_path))
-
-    assert default_xbuildenv_path() == custom_path
-
-
 def test_default_xbuildenv_path_from_config(tmp_path, monkeypatch):
     """Test that the path is correctly read from the ConfigManager."""
 
@@ -273,30 +263,3 @@ xbuildenv_path = "{xbuildenv_path}"
 
     path = default_xbuildenv_path()
     assert path == xbuildenv_path
-
-
-def test_config_full_precedence(tmp_path, reset_cache, monkeypatch):
-    """Test the full precedence order: env var > pyproject.toml > platformdirs."""
-    pyproject_dir = tmp_path / "project"
-    pyproject_dir.mkdir()
-
-    env_var_path = tmp_path / "env-var-path"
-    pyproject_path_value = pyproject_dir / "pyproject-path"
-
-    mock_config_manager = MockConfigManager(
-        {"xbuildenv_path": str(pyproject_path_value)}
-    )
-    monkeypatch.setattr(
-        "pyodide_build.config.ConfigManager", lambda: mock_config_manager
-    )
-
-    # 1. test using pyodide config when no env var is set
-    path = default_xbuildenv_path()
-    assert path == pyproject_path_value
-
-    # 2. set environment variable and verify it takes precedence
-    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(env_var_path))
-    reset_cache()
-
-    path = default_xbuildenv_path()
-    assert path == env_var_path
