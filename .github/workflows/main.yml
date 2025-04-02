@@ -2,16 +2,18 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
   FORCE_COLOR: 3
   # Increase this value to reset cache if emscripten_version has not changed
-  EMSDK_CACHE_FOLDER: 'emsdk-cache'
+  EMSDK_CACHE_FOLDER: "emsdk-cache"
   EMSDK_CACHE_NUMBER: 0
 
 jobs:
@@ -19,6 +21,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+      fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -87,19 +90,30 @@ jobs:
           fi
 
   integration-test:
+    name: integration-test (${{ matrix.task.name }}, ${{ matrix.task.installer }}, ${{ matrix.pyodide-version }}-pyodide, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: [check-integration-test-trigger]
     strategy:
       fail-fast: false
       matrix:
         task: [
-          {name: test-recipe, installer: pip},
-          {name: test-src, installer: pip},
-          {name: test-recipe, installer: uv},
-          {name: test-src, installer: uv},
-          {name: test-integration-marker, installer: pip},  # installer doesn't matter
-        ]
+            { name: test-recipe, installer: pip },
+            { name: test-src, installer: pip },
+            { name: test-recipe, installer: uv },
+            { name: test-src, installer: uv },
+            { name: test-integration-marker, installer: pip }, # installer doesn't matter
+          ]
         os: [ubuntu-latest, macos-latest]
+        pyodide-version: [stable]
+        # Run Pyodide minimum version testing only for the pip installer and on Linux
+        include:
+          - task: { name: test-recipe, installer: pip }
+            os: ubuntu-latest
+            pyodide-version: minimum
+          - task: { name: test-src, installer: pip }
+            os: ubuntu-latest
+            pyodide-version: minimum
+
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -124,7 +138,13 @@ jobs:
 
       - name: Install xbuildenv
         run: |
-          pyodide xbuildenv install
+          if [[ "${{ matrix.pyodide-version }}" == "minimum" ]]; then
+            MIN_VERSION=$(pyodide xbuildenv search --json | jq -r '.environments | sort_by(.version) | .[0].version')
+            echo "Installing Pyodide xbuildenv version: $MIN_VERSION"
+            pyodide xbuildenv install $MIN_VERSION
+          else
+            pyodide xbuildenv install
+          fi
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
       - name: Cache emsdk
@@ -147,7 +167,7 @@ jobs:
         if: matrix.task.name == 'test-integration-marker'
         run: pytest --junitxml=test-results/junit.xml --cov=pyodide-build pyodide_build -m "integration"
 
-      - name: Run the recipe integration tests (${{ matrix.task }})
+      - name: Run the recipe integration tests (${{ matrix.task.name }})
         if: matrix.task.name != 'test-integration-marker'
         env:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
