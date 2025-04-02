@@ -1,14 +1,14 @@
-# pyodide-build release workflow
+# `pyodide-build` release workflow
 
-This document provides maintenance and release instructions for `pyodide-build` project, adapted
-from the [Maintainer information page from the Pyodide project](https://pyodide.org/en/stable/development/maintainers.html)
+This document provides maintenance and release instructions for `pyodide-build`, adapted
+from the [Maintainer information page from the Pyodide project](https://pyodide.org/en/stable/development/maintainers.html).
 
 > [!NOTE]
 > `pyodide-build` is also used as a submodule in-tree within the Pyodide repository, and it is usually acceptable to
 update the submodule to point to a newer commit in most cases and a release isn't always required unless it's needed
 to address bugs or add features for out-of-tree builds.
 >
-> See the [Updating `pyodide-build](https://pyodide.org/en/stable/development/maintainers.html#updating-pyodide-build) for more information.
+> See the [Updating `pyodide-build`](https://pyodide.org/en/stable/development/maintainers.html#updating-pyodide-build) section for more information.
 
 # Release instructions
 
@@ -24,4 +24,4 @@ to address bugs or add features for out-of-tree builds.
 - If backward-incompatible changes are introduced:
     - the release notes should be updated to include a "Breaking changes" section, if not already present through the CHANGELOG.
     - we also test against a minimum version of Pyodide xbuildenvs in the integration tests in `main.yml`. If a new minimum version
-    is required, then update it in the [`tools/update_cross_build_releases.py`](https://github.com/pyodide/pyodide/blob/74bd69b5afa00074580f16a72eae3d7ce5a0817a/tools/update_cross_build_releases.py#L23-L25) file so that cross-build environments metadata for newer versionf of Pyodide will contain the correct minimum and maximum `pyodide-build` versions.
+    is required, then update it in the [`tools/update_cross_build_releases.py`](https://github.com/pyodide/pyodide/blob/74bd69b5afa00074580f16a72eae3d7ce5a0817a/tools/update_cross_build_releases.py#L23-L25) file so that cross-build environments metadata for newer versions of Pyodide will contain the correct minimum and maximum versions of `pyodide-build` they can be used with.
