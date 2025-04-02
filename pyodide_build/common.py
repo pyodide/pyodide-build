@@ -57,50 +57,34 @@ def default_xbuildenv_path() -> Path:
         The path to the cross-build environment directory
     """
 
-    # 1. check environment variable
-    env_path = os.environ.get("PYODIDE_XBUILDENV_PATH")
-    if env_path:
-        path = Path(env_path)
-        if _has_write_access(path):
-            return path
+    # 1. check "pyodide config xbuildenv_path"
+    try:
+        from pyodide_build.build_env import get_host_build_flag
+
+        config_path = Path(get_host_build_flag("PYODIDE_XBUILDENV_PATH"))
+        print("CONFIG PATH", config_path)
+
+        if not config_path.is_absolute():
+            config_path = Path.cwd() / config_path
+
+        if _has_write_access(config_path):
+            return config_path
         else:
             logger.error(
-                "The directory specified in PYODIDE_XBUILDENV_PATH (%s) is not writable. "
-                "Falling back to other locations.",
-                path,
+                "The directory specified in pyproject.toml (%s) is not writable. "
+                "Falling back to default locations.",
+                config_path,
             )
-
-    # 2. check "pyodide config xbuildenv_path"
-    try:
-        from pyodide_build.config import ConfigManager
-
-        config_manager = ConfigManager()
-        if (
-            "xbuildenv_path" in config_manager.config
-            and config_manager.config["xbuildenv_path"]
-        ):
-            config_path = Path(config_manager.config["xbuildenv_path"])
-            if not config_path.is_absolute():
-                config_path = Path.cwd() / config_path
-
-            if _has_write_access(config_path):
-                return config_path
-            else:
-                logger.error(
-                    "The directory specified in pyproject.toml (%s) is not writable. "
-                    "Falling back to default locations.",
-                    config_path,
-                )
     except Exception as e:
         logger.error("Error reading xbuildenv_path from config system: %s", e)
 
-    # 3. use default locations from platformdirs and elsewhere
+    # 2. use default locations from platformdirs and elsewhere
     dirname = xbuildenv_dirname()
     candidates = []
 
-    # 3.1. default cache directory
+    # 2.1. default cache directory
     candidates.append(Path(platformdirs.user_cache_dir()) / dirname)
-    # 3.2. current working directory
+    # 2.2. current working directory
     candidates.append(Path.cwd() / dirname)
 
     for candidate in candidates:
