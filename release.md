@@ -11,14 +11,11 @@ it is sufficient to update the git submodule. A release is only necessary if the
 
 # Release instructions
 
-- First, create a "Release planning" tracking issue that can list information such as:
-    - the timeline of the release
-    - the scope of the release and the pull requests to be included, ideally by attaching a milestone to them or creating one through the GitHub Issues UI if it doesn't exist
-    - any other relevant resources
+- Decide on a new version number: we follow the [SemVer](https://semver.org/) versioning scheme; which means that we create major/minor versions for feature releases and micro/patch versions for bug fixes. The package uses [Semantic Versioning](https://semver.org/) for versioning. The version number is defined in the `pyproject.toml` file in the root of the repository.
 
-- Once a consensus is reached on the release plan, create a new milestone in the GitHub Issues UI. This milestone should have the same name as the release version (e.g., `v0.23.0`) and should be marked as "open". The milestone should also be assigned to the release planning issue.
+- If there is a compelling reason to discuss or plan a new release before creating it (what is to be included, timeline, planned scope, etc.), open a new "Release planning" tracking issue with the information and any other relevant resources. Optionally, a new milestone for the release can also be created. This is not strictly necessary, but it can help to keep track of the issues and PRs that are planned to be included.
 
-- Create a tag with the version number (e.g., `v0.X.Y`) while on the `main` branch, and create and publish a GitHub release with the tag and attach a link to the CHANGELOG. Other release notes can be generated with the "Generate release notes" button, which will add a list of all PRs that were merged with the tag. The release notes can be reviewed and edited as necessary at the time of creating the release or edited after it is created.
+- Create a tag with the version number (e.g., `v0.X.Y`) while on the `main` branch, and create and publish a GitHub release with the tag and attach a link to the CHANGELOG. Other release notes can be generated with the "Generate release notes" button in the GitHub UI, which will add a list of all PRs that were merged with the tag. The release notes can be reviewed and edited as necessary at the time of creating the release or edited after it is created. The release notes from the previous releases can be used for reference and inspiration.
 
 - If backward-incompatible changes are introduced:
     - the release notes should be updated to include a "Breaking changes" section, if not already present through the CHANGELOG.
