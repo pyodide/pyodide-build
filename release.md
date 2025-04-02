@@ -4,9 +4,8 @@ This document provides maintenance and release instructions for `pyodide-build`,
 from the [Maintainer information page from the Pyodide project](https://pyodide.org/en/stable/development/maintainers.html).
 
 > [!NOTE]
-> `pyodide-build` is also used as a submodule in-tree within the Pyodide repository, and it is usually acceptable to
-update the submodule to point to a newer commit in most cases and a release isn't always required unless it's needed
-to address bugs or add features for out-of-tree builds.
+> `pyodide-build` is used as a git submodule by the Pyodide repository. If a change is only required for in-tree builds,
+it is sufficient to update the git submodule. A release is only necessary if the changes are required by out-of-tree builds.
 >
 > See the [Updating `pyodide-build`](https://pyodide.org/en/stable/development/maintainers.html#updating-pyodide-build) section for more information.
 
