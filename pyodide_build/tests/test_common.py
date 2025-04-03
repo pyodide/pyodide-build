@@ -1,9 +1,6 @@
-import os
-import sys
 import zipfile
 from pathlib import Path
 
-import platformdirs
 import pytest
 
 from pyodide_build.common import (
@@ -161,62 +158,24 @@ def test_check_wasm_magic_number(tmp_path):
     assert check_wasm_magic_number(tmp_path / "badfile.so") is False
 
 
-class MockConfigManager:
-    def __init__(self, mock_config=None):
-        self._config = mock_config or {}
-
-    @property
-    def config(self):
-        return self._config
-
-
-def test_default_xbuildenv_path_default(monkeypatch):
-    mock_config_manager = MockConfigManager({})
-    monkeypatch.setattr(
-        "pyodide_build.config.ConfigManager", lambda: mock_config_manager
-    )
+def test_default_xbuildenv_path(tmp_path, reset_cache):
+    import platformdirs
 
     dirname = xbuildenv_dirname()
-    expected_path = Path(platformdirs.user_cache_dir()) / dirname
 
-    assert default_xbuildenv_path() == expected_path
-
-
-def test_default_xbuildenv_path_from_config(tmp_path, monkeypatch):
-    """Test that the path is correctly read from the ConfigManager."""
-
-    config_path = tmp_path / "config_path"
-    mock_config_manager = MockConfigManager({"xbuildenv_path": str(config_path)})
-    monkeypatch.setattr(
-        "pyodide_build.config.ConfigManager", lambda: mock_config_manager
-    )
-
-    assert default_xbuildenv_path() == config_path
+    assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
 
 
-def test_default_xbuildenv_path_relative_config(reset_cache, monkeypatch):
-    relative_path = "../relative/path/to/somewhere"
+def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
+    import os
+    import sys
 
-    mock_config_manager = MockConfigManager({"xbuildenv_path": relative_path})
-    monkeypatch.setattr(
-        "pyodide_build.config.ConfigManager", lambda: mock_config_manager
-    )
+    import platformdirs
 
-    expected_path = Path.cwd() / relative_path
-
-    assert default_xbuildenv_path() == expected_path
-
-
-@pytest.mark.skipif(sys.platform != "linux", reason="Test only runs on Linux")
-def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatch):
-    """Test XDG_CACHE_HOME on Linux."""
+    if sys.platform != "linux":
+        pytest.skip("Test only runs on Linux")
 
     os.environ.pop("XDG_CACHE_HOME", None)
-
-    mock_config_manager = MockConfigManager({})
-    monkeypatch.setattr(
-        "pyodide_build.config.ConfigManager", lambda: mock_config_manager
-    )
 
     dirname = xbuildenv_dirname()
 
@@ -224,7 +183,7 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatc
 
     reset_cache()
 
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    os.environ["XDG_CACHE_HOME"] = str(tmp_path)
 
     assert default_xbuildenv_path() == tmp_path / dirname
 
@@ -234,32 +193,10 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache, monkeypatc
     not_writeable_path.mkdir()
     not_writeable_path.chmod(0o444)
 
-    monkeypatch.setenv("XDG_CACHE_HOME", str(not_writeable_path))
+    os.environ["XDG_CACHE_HOME"] = str(not_writeable_path)
 
     assert default_xbuildenv_path() == Path.cwd() / dirname
 
     reset_cache()
 
-
-def test_config_with_pyproject_toml(tmp_path, reset_cache, monkeypatch):
-    """Test that xbuildenv_path from pyproject.toml is properly used."""
-    # Create a temporary pyproject.toml file
-    pyproject_dir = tmp_path / "project"
-    pyproject_dir.mkdir()
-    pyproject_path = pyproject_dir / "pyproject.toml"
-
-    xbuildenv_path = pyproject_dir / "custom-xbuildenv-from-config"
-
-    pyproject_content = f"""
-[tool.pyodide.build]
-xbuildenv_path = "{xbuildenv_path}"
-"""
-    pyproject_path.write_text(pyproject_content)
-
-    mock_config_manager = MockConfigManager({"xbuildenv_path": str(xbuildenv_path)})
-    monkeypatch.setattr(
-        "pyodide_build.config.ConfigManager", lambda: mock_config_manager
-    )
-
-    path = default_xbuildenv_path()
-    assert path == xbuildenv_path
+    os.environ.pop("XDG_CACHE_HOME", None)
