@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from pyodide_build import build_env, common
-from pyodide_build.common import default_xbuildenv_path
+from pyodide_build.common import default_xbuildenv_path, xbuildenv_dirname
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
@@ -94,8 +94,6 @@ def dummy_xbuildenv_url(httpserver):
 def dummy_xbuildenv(
     dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache, monkeypatch
 ):
-    import platformdirs
-
     """
     Downloads the dummy xbuildenv archive and installs it in the temporary directory.
 
@@ -103,8 +101,17 @@ def dummy_xbuildenv(
     """
     assert "PYODIDE_ROOT" not in os.environ
 
-    # use PYODIDE_XBUILDENV_PATH instead patching platformdirs after #114
-    monkeypatch.setattr(platformdirs, "user_cache_dir", lambda: tmp_path)
+    xbuildenv_dir = tmp_path / xbuildenv_dirname()
+
+    def mock_get_host_build_flag(flag_name):
+        if flag_name == "PYODIDE_XBUILDENV_PATH":
+            return str(xbuildenv_dir)
+        return ""
+
+    monkeypatch.setattr(
+        "pyodide_build.build_env.get_host_build_flag", mock_get_host_build_flag
+    )
+
     manager = CrossBuildEnvManager(default_xbuildenv_path())
     manager.install(
         version=None, url=dummy_xbuildenv_url, skip_install_cross_build_packages=True
