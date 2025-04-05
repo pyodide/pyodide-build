@@ -284,6 +284,7 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     return env
 
 
+# TODO: a context manager is no longer needed here
 @contextmanager
 def _create_symlink_dir(
     env: dict[str, str],
