@@ -77,6 +77,7 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         ldflags="",
         target_install_dir=str(tmp_path),
         exports="pyinit",
+        build_dir=tmp_path,
     )
 
     with build_env_ctx as env:

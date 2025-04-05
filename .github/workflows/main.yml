@@ -105,8 +105,11 @@ jobs:
           ]
         os: [ubuntu-latest, macos-latest]
         pyodide-version: [stable]
-        # Run Pyodide minimum version testing only for the pip installer and on Linux
         include:
+        # Run no-isolation tests and Pyodide minimum version testing only
+        # for the pip installer and on Linux
+          - task: {name: test-src-no-isolation, installer: pip} # installer doesn't matter
+            os: ubuntu-latest
           - task: { name: test-recipe, installer: pip }
             os: ubuntu-latest
             pyodide-version: minimum
