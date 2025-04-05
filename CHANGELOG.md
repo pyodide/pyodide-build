@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PYODIDE_XBUILDENV_PATH` environment variable.
   [#158](https://github.com/pyodide/pyodide-build/pull/158)
 
+- Added support for building without a wheel without build isolation: `pyodide build` no accepts
+  the `--no-isolation`/`-n` and/or `--skip-dependency-check`/`-x` flags to customise the wheel
+  building behaviour, similar to `pypa/build`.
+  [#152](https://github.com/pyodide/pyodide-build/pull/152)
+
 ### Changed
 
 - The Rust toolchain version has been updated to `nightly-2025-01-18`.

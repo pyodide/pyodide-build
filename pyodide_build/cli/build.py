@@ -47,6 +47,8 @@ def pypi(
     output_directory: Path,
     exports: str,
     config_settings: ConfigSettingsType,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
 ) -> Path:
     """Fetch a wheel from pypi, or build from source if none available."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -66,6 +68,8 @@ def pypi(
             output_directory,
             convert_exports(exports),
             config_settings,
+            isolation=isolation,
+            skip_dependency_check=skip_dependency_check,
         )
         return built_wheel
 
@@ -87,6 +91,8 @@ def url(
     output_directory: Path,
     exports: str,
     config_settings: ConfigSettingsType,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
 ) -> Path:
     """Fetch a wheel or build sdist from url."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -103,7 +109,12 @@ def url(
             # unzipped into subfolder
             builddir = files[0]
         wheel_path = build.run(
-            builddir, output_directory, convert_exports(exports), config_settings
+            builddir,
+            output_directory,
+            convert_exports(exports),
+            config_settings,
+            isolation=isolation,
+            skip_dependency_check=skip_dependency_check,
         )
         return wheel_path
 
@@ -113,10 +124,17 @@ def source(
     output_directory: Path,
     exports: str,
     config_settings: ConfigSettingsType,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
 ) -> Path:
     """Use pypa/build to build a Python package from source"""
     built_wheel = build.run(
-        source_location, output_directory, convert_exports(exports), config_settings
+        source_location,
+        output_directory,
+        convert_exports(exports),
+        config_settings,
+        isolation=isolation,
+        skip_dependency_check=skip_dependency_check,
     )
     return built_wheel
 
@@ -167,6 +185,20 @@ def main(
     ),
     compression_level: int = typer.Option(
         6, help="Compression level to use for the created zip file"
+    ),
+    no_isolation: bool = typer.Option(
+        False,
+        "--no-isolation",
+        "-n",
+        help="Disable building the project in an isolated virtual environment. "
+        "Build dependencies must be installed separately when this option is used",
+    ),
+    skip_dependency_check: bool = typer.Option(
+        False,
+        "--skip-dependency-check",
+        "-x",
+        help="Do not check that the build dependencies are installed. This option "
+        "is only useful when used with --no-isolation.",
     ),
     config_setting: list[str] | None = typer.Option(
         None,
@@ -242,6 +274,8 @@ def main(
                 # dependencies? Not sure this makes sense...
                 convert_exports(exports),
                 config_settings,
+                isolation=not no_isolation,
+                skip_dependency_check=skip_dependency_check,
                 output_lockfile=output_lockfile,
             )
         except BaseException as e:
@@ -257,17 +291,43 @@ def main(
             source_location = source_location[0 : source_location.find("[")]
     if not source_location:
         # build the current folder
-        wheel = source(Path.cwd(), outpath, exports, config_settings)
+        wheel = source(
+            Path.cwd(),
+            outpath,
+            exports,
+            config_settings,
+            isolation=not no_isolation,
+            skip_dependency_check=skip_dependency_check,
+        )
     elif source_location.find("://") != -1:
-        wheel = url(source_location, outpath, exports, config_settings)
+        wheel = url(
+            source_location,
+            outpath,
+            exports,
+            config_settings,
+            isolation=not no_isolation,
+            skip_dependency_check=skip_dependency_check,
+        )
     elif Path(source_location).is_dir():
         # a folder, build it
         wheel = source(
-            Path(source_location).resolve(), outpath, exports, config_settings
+            Path(source_location).resolve(),
+            outpath,
+            exports,
+            config_settings,
+            isolation=not no_isolation,
+            skip_dependency_check=skip_dependency_check,
         )
     elif source_location.find("/") == -1:
         # try fetch or build from pypi
-        wheel = pypi(source_location, outpath, exports, config_settings)
+        wheel = pypi(
+            source_location,
+            outpath,
+            exports,
+            config_settings,
+            isolation=not no_isolation,
+            skip_dependency_check=skip_dependency_check,
+        )
     else:
         raise RuntimeError(f"Couldn't determine source type for {source_location}")
     # now build deps for wheel
@@ -281,6 +341,8 @@ def main(
                 # dependencies? Not sure this makes sense...
                 convert_exports(exports),
                 config_settings,
+                isolation=not no_isolation,
+                skip_dependency_check=skip_dependency_check,
                 output_lockfile=output_lockfile,
                 compression_level=compression_level,
             )
