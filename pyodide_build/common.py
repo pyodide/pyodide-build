@@ -61,20 +61,25 @@ def default_xbuildenv_path() -> Path:
     try:
         from pyodide_build.build_env import get_host_build_flag
 
-        config_path = Path(get_host_build_flag("PYODIDE_XBUILDENV_PATH"))
-        print("CONFIG PATH", config_path)
+        config_path_str = get_host_build_flag("PYODIDE_XBUILDENV_PATH")
 
-        if not config_path.is_absolute():
-            config_path = Path.cwd() / config_path
+        # we can skip to fallback options if the config path is empty
+        # as Path("") returns Path("."), which is not what we want.
+        if config_path_str:
+            config_path = Path(config_path_str)
 
-        if _has_write_access(config_path):
-            return config_path
-        else:
-            logger.error(
-                "The directory specified in pyproject.toml (%s) is not writable. "
-                "Falling back to default locations.",
-                config_path,
-            )
+            if not config_path.is_absolute():
+                config_path = Path.cwd() / config_path
+
+            if _has_write_access(config_path):
+                return config_path
+            else:
+                logger.error(
+                    "The directory specified in pyproject.toml (%s) is not writable. "
+                    "Falling back to default locations.",
+                    config_path,
+                )
+
     except Exception as e:
         logger.error("Error reading xbuildenv_path from config system: %s", e)
 
