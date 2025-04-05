@@ -9,6 +9,29 @@ from pyodide_build.build_env import get_pyodide_root, wheel_platform
 from pyodide_build.spec import _BuildSpecExports
 
 
+def prepare_build_dir(build_dir: Path) -> None:
+    # create a persistent build dir in the source dir
+    # don't track the build dir in git (helps if building in a git/mercurial repo)
+    build_dir.mkdir(exist_ok=True)
+    gitignore_path = build_dir / ".gitignore"
+    if not gitignore_path.exists():
+        with gitignore_path.open("w") as f:
+            f.write(
+                dedent("""\
+                    # Created by pyodide-build
+                    *""")
+            )
+    hgignore_path = build_dir / ".hgignore"
+    if not hgignore_path.exists():
+        with hgignore_path.open("w") as f:
+            f.write(
+                dedent("""\
+                    # Created by pyodide-build
+                    syntax: glob
+                    **/*""")
+            )
+
+
 def run(
     srcdir: Path,
     outdir: Path,
@@ -31,18 +54,8 @@ def run(
     env = os.environ.copy()
     env.update(build_env.get_build_environment_vars(get_pyodide_root()))
 
-    # create a persistent build dir in the source dir
     build_dir = srcdir / ".pyodide_build"
-    build_dir.mkdir(exist_ok=True)
-    # don't track the build dir (helps if building in a git repo)
-    gitignore_path = build_dir / ".gitignore"
-    if not gitignore_path.exists():
-        with gitignore_path.open("w") as f:
-            f.write(
-                dedent("""\
-                    # Created by pyodide-build
-                    *""")
-            )
+    prepare_build_dir(build_dir)
 
     build_env_ctx = pypabuild.get_build_env(
         env=env,
