@@ -43,17 +43,53 @@ def xbuildenv_dirname() -> str:
 @cache
 def default_xbuildenv_path() -> Path:
     """
-    Return the default path to the cross-build environment directory.
+    Return the default path to the cross-build environment directory. This directory
+    is used when no path is provided to `pyodide xbuildenv`'s subcommands.
 
-    This directory is used when no path is provided to the `pyodide xbuildenv` subcommands.
+    The search order for determining the path is as follows:
+    1. the PYODIDE_XBUILDENV_PATH environment variable if set
+    2. the value provided by "pyodide config xbuildenv_path"
+    3. the default location based on platformdirs
+
+    Returns
+    -------
+    Path
+        The path to the cross-build environment directory
     """
+
+    # 1. check "pyodide config xbuildenv_path"
+    try:
+        from pyodide_build.build_env import get_host_build_flag
+
+        config_path_str = get_host_build_flag("PYODIDE_XBUILDENV_PATH")
+
+        # we can skip to fallback options if the config path is empty
+        # as Path("") returns Path("."), which is not what we want.
+        if config_path_str:
+            config_path = Path(config_path_str)
+
+            if not config_path.is_absolute():
+                config_path = Path.cwd() / config_path
+
+            if _has_write_access(config_path):
+                return config_path
+            else:
+                logger.error(
+                    "The directory specified in pyproject.toml (%s) is not writable. "
+                    "Falling back to default locations.",
+                    config_path,
+                )
+
+    except Exception as e:
+        logger.error("Error reading xbuildenv_path from config system: %s", e)
+
+    # 2. use default locations from platformdirs and elsewhere
     dirname = xbuildenv_dirname()
     candidates = []
 
-    # 1. default cache directory
+    # 2.1. default cache directory
     candidates.append(Path(platformdirs.user_cache_dir()) / dirname)
-
-    # 2. current working directory
+    # 2.2. current working directory
     candidates.append(Path.cwd() / dirname)
 
     for candidate in candidates:

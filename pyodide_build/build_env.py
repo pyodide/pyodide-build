@@ -37,7 +37,9 @@ class BuildArgs:
     builddir: str = ""  # The path to run pypa/build
 
 
-def init_environment(*, quiet: bool = False) -> None:
+def init_environment(
+    *, quiet: bool = False, xbuildenv_path: Path | None = None
+) -> None:
     """
     Initialize Pyodide build environment.
     This function needs to be called before any other Pyodide build functions.
@@ -46,6 +48,9 @@ def init_environment(*, quiet: bool = False) -> None:
     ----------
     quiet
         If True, do not print any messages
+    xbuildenv_path
+        Path to the cross-build environment directory. If None, the default
+        location will be used.
     """
 
     # Already initialized
@@ -54,12 +59,14 @@ def init_environment(*, quiet: bool = False) -> None:
 
     root = search_pyodide_root(Path.cwd())
     if not root:  # Not in Pyodide tree
-        root = _init_xbuild_env(quiet=quiet)
+        root = _init_xbuild_env(quiet=quiet, xbuildenv_path=xbuildenv_path)
 
     os.environ["PYODIDE_ROOT"] = str(root)
 
 
-def _init_xbuild_env(*, quiet: bool = False) -> Path:
+def _init_xbuild_env(
+    *, quiet: bool = False, xbuildenv_path: Path | None = None
+) -> Path:
     """
     Initialize the build environment for out-of-tree builds.
 
@@ -67,6 +74,8 @@ def _init_xbuild_env(*, quiet: bool = False) -> Path:
     ----------
     quiet
         If True, do not print any messages
+    xbuildenv_path
+        Path to the cross-build environment directory. If None, the default location will be used.
 
     Returns
     -------
@@ -74,7 +83,7 @@ def _init_xbuild_env(*, quiet: bool = False) -> Path:
     """
     from pyodide_build.xbuildenv import CrossBuildEnvManager  # avoid circular import
 
-    xbuildenv_path = default_xbuildenv_path()
+    xbuildenv_path = xbuildenv_path or default_xbuildenv_path()
     context = redirect_stdout(StringIO()) if quiet else nullcontext()
     with context:
         manager = CrossBuildEnvManager(xbuildenv_path)

@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build` in `uv`-managed virtual environments will now work.
   [#132](https://github.com/pyodide/pyodide-build/pull/132)
 
+- `pyodide build` now takes an additional `--xbuildenv-path` argument and corresponding
+  equivalent `PYODIDE_XBUILDENV_PATH` environment variable to either use an existing
+  cross-build environment or create one at the specified path. This means that users
+  can use `pyodide xbuildenv install <...> --path` to install a cross-build environment
+  somewhere and reuse this with `pyodide build`.
+  [#158](https://github.com/pyodide/pyodide-build/pull/158)
+
+- Added a new config variable `xbuildenv_path` that can be left in the `[tool.pyodide.build]`
+  section in `pyproject.toml` and retrieved through `pyodide config get xbuildenv_path`.
+  The `pyodide xbuildenv` and `pyodide build` commands will setup/use cross-build environments
+  at this path if one isn't specified as a CLI argument or unless overridden through the
+  `PYODIDE_XBUILDENV_PATH` environment variable.
+  [#158](https://github.com/pyodide/pyodide-build/pull/158)
+
 ### Changed
 
 - The Rust toolchain version has been updated to `nightly-2025-01-18`.

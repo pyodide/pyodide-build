@@ -20,11 +20,13 @@ class TestConfigManager:
         env = {
             "CMAKE_TOOLCHAIN_FILE": "/path/to/toolchain",
             "MESON_CROSS_FILE": "/path/to/crossfile",
+            "PYODIDE_XBUILDENV_PATH": "/path/to/xbuildenv",
         }
 
         config = config_manager._load_config_from_env(env)
         assert config["cmake_toolchain_file"] == "/path/to/toolchain"
         assert config["meson_cross_file"] == "/path/to/crossfile"
+        assert config["xbuildenv_path"] == "/path/to/xbuildenv"
 
     def test_load_config_from_file(self, tmp_path, reset_env_vars, reset_cache):
         pyproject_file = tmp_path / "pyproject.toml"
@@ -37,6 +39,7 @@ class TestConfigManager:
                                   invalid_flags = "this_should_not_be_parsed"
                                   default_cross_build_env_url = "https://example.com/cross_build_env.tar.gz"
                                   skip_emscripten_version_check = "1"
+                                  xbuildenv_path = "my_custom/xbuildenv_path"
                                   """)
 
         config_manager = ConfigManager()
@@ -48,6 +51,7 @@ class TestConfigManager:
             == "https://example.com/cross_build_env.tar.gz"
         )
         assert config["skip_emscripten_version_check"] == "1"
+        assert config["xbuildenv_path"] == "my_custom/xbuildenv_path"
 
 
 class TestCrossBuildEnvConfigManager_OutOfTree:
@@ -119,11 +123,13 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         env = {
             "CMAKE_TOOLCHAIN_FILE": "/path/to/toolchain",
             "MESON_CROSS_FILE": "/path/to/crossfile",
+            "PYODIDE_XBUILDENV_PATH": "/path/to/xbuildenv",
         }
 
         config = config_manager._load_config_from_env(env)
         assert config["cmake_toolchain_file"] == "/path/to/toolchain"
         assert config["meson_cross_file"] == "/path/to/crossfile"
+        assert config["xbuildenv_path"] == "/path/to/xbuildenv"
 
     def test_load_config_from_file(
         self, tmp_path, dummy_xbuildenv, reset_env_vars, reset_cache
@@ -142,6 +148,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
                                   rust_toolchain = "nightly"
                                   meson_cross_file = "$(MESON_CROSS_FILE)"
                                   build_dependency_index_url = "https://example.com/simple"
+                                  xbuildenv_path = "../my_custom/xbuildenv_path" # also helps check relative paths
                                   """)
 
         xbuildenv_manager = CrossBuildEnvManager(
@@ -159,6 +166,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert config["rust_toolchain"] == "nightly"
         assert config["meson_cross_file"] == "/path/to/crossfile"
         assert config["build_dependency_index_url"] == "https://example.com/simple"
+        assert config["xbuildenv_path"] == "../my_custom/xbuildenv_path"
 
     def test_config_all(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
