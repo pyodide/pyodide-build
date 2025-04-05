@@ -298,7 +298,7 @@ def install_stdlib(venv_bin: Path) -> None:
                 from pyodide_js import loadPackage
                 from pyodide_js._api import lockfile_packages
                 from pyodide_js._api import lockfile_unvendored_stdlibs_and_test
-                shared_libs = [pkgname for (pkgname,pkg) in lockfile_packages.object_entries() if getattr(pkg, "package_type") == "shared_library"]
+                shared_libs = [pkgname for (pkgname,pkg) in lockfile_packages.object_entries() if getattr(pkg, "package_type", None) == "shared_library"]
 
                 to_load = [*lockfile_unvendored_stdlibs_and_test, *shared_libs, *{to_load!r}]
                 loadPackage(to_load);
