@@ -286,7 +286,8 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
 
 @contextmanager
 def _create_symlink_dir(
-    env: dict[str, str], build_dir: Path, no_isolation: bool = False
+    env: dict[str, str],
+    build_dir: Path,
 ):
     # Leave the symlinks in the build directory. This helps with reproducing.
     symlink_dir = build_dir / "pywasmcross_symlinks"
@@ -325,7 +326,7 @@ def get_build_env(
     args["exports"] = exports
     env = env.copy()
 
-    with _create_symlink_dir(env, build_dir, no_isolation) as symlink_dir:
+    with _create_symlink_dir(env, build_dir) as symlink_dir:
         env.update(make_command_wrapper_symlinks(symlink_dir))
         sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
         args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
