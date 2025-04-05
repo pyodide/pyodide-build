@@ -8,7 +8,6 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from itertools import chain
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Literal, cast
 
 from build import BuildBackendException, ConfigSettingsType
@@ -54,7 +53,7 @@ SYMLINK_ENV_VARS = {
 
 def _gen_runner(
     cross_build_env: Mapping[str, str],
-    isolated_build_env: _DefaultIsolatedEnv,
+    isolated_build_env: _DefaultIsolatedEnv = None,
 ) -> Callable[[Sequence[str], str | None, Mapping[str, str] | None], None]:
     """
     This returns a slightly modified version of default subprocess runner that pypa/build uses.
@@ -79,7 +78,15 @@ def _gen_runner(
 
         # Some build dependencies like cmake, meson installs binaries to this directory
         # and we should add it to the PATH so that they can be found.
-        env["BUILD_ENV_SCRIPTS_DIR"] = isolated_build_env.scripts_dir
+        if isolated_build_env:
+            env["BUILD_ENV_SCRIPTS_DIR"] = isolated_build_env.scripts_dir
+        else:
+            # For non-isolated builds, set a fallback path or use the current Python path
+            import sysconfig
+
+            scripts_dir = sysconfig.get_path("scripts")
+            env["BUILD_ENV_SCRIPTS_DIR"] = scripts_dir
+
         env["PATH"] = f"{cross_build_env['COMPILER_WRAPPER_DIR']}:{env['PATH']}"
         # For debugging: Uncomment the following line to print the build command
         # print("Build backend call:", " ".join(str(x) for x in cmd), file=sys.stderr)
@@ -191,6 +198,30 @@ def _build_in_isolated_env(
             )
 
 
+def _build_in_current_env(
+    build_env: Mapping[str, str],
+    srcdir: Path,
+    outdir: str,
+    distribution: Literal["sdist", "wheel"],
+    config_settings: ConfigSettingsType,
+    skip_dependency_check: bool = False,
+) -> str:
+    with common.replace_env(build_env):
+        builder = _ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+
+        if not skip_dependency_check:
+            missing = builder.check_dependencies(distribution, config_settings or {})
+            if missing:
+                dependencies = common._format_missing_dependencies(missing)
+                _error(f"Missing dependencies: {dependencies}")
+
+        return builder.build(
+            distribution,
+            outdir,
+            config_settings,
+        )
+
+
 def parse_backend_flags(backend_flags: str | list[str]) -> ConfigSettingsType:
     config_settings: dict[str, str | list[str]] = {}
 
@@ -253,21 +284,17 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     return env
 
 
+# TODO: a context manager is no longer needed here
 @contextmanager
-def _create_symlink_dir(env: dict[str, str], build_dir: Path | None):
-    if build_dir:
-        # If we're running under build-recipes, leave the symlinks in
-        # the build directory. This helps with reproducing.
-        symlink_dir = build_dir / "pywasmcross_symlinks"
-        shutil.rmtree(symlink_dir, ignore_errors=True)
-        symlink_dir.mkdir()
-        yield symlink_dir
-        return
-
-    # Running from "pyodide build". Put symlinks in a temporary directory.
-    # TODO: Add a debug option to save the symlinks.
-    with TemporaryDirectory() as symlink_dir_str:
-        yield Path(symlink_dir_str)
+def _create_symlink_dir(
+    env: dict[str, str],
+    build_dir: Path,
+):
+    # Leave the symlinks in the build directory. This helps with reproducing.
+    symlink_dir = build_dir / "pywasmcross_symlinks"
+    shutil.rmtree(symlink_dir, ignore_errors=True)
+    symlink_dir.mkdir()
+    yield symlink_dir
 
 
 @contextmanager
@@ -281,6 +308,7 @@ def get_build_env(
     target_install_dir: str,
     exports: _BuildSpecExports,
     build_dir: Path | None = None,
+    no_isolation: bool = False,
 ) -> Iterator[dict[str, str]]:
     """
     Returns a dict of environment variables that should be used when building
@@ -328,12 +356,24 @@ def build(
     outdir: Path,
     build_env: Mapping[str, str],
     config_settings: ConfigSettingsType,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
 ) -> str:
     try:
         with _handle_build_error():
-            built = _build_in_isolated_env(
-                build_env, srcdir, str(outdir), "wheel", config_settings
-            )
+            if isolation:
+                built = _build_in_isolated_env(
+                    build_env, srcdir, str(outdir), "wheel", config_settings
+                )
+            else:
+                built = _build_in_current_env(
+                    build_env,
+                    srcdir,
+                    str(outdir),
+                    "wheel",
+                    config_settings,
+                    skip_dependency_check,
+                )
             print("{bold}{green}Successfully built {}{reset}".format(built, **_STYLES))
             return built
     except Exception as e:  # pragma: no cover

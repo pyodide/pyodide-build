@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build` in `uv`-managed virtual environments will now work.
   [#132](https://github.com/pyodide/pyodide-build/pull/132)
 
+- Added support for building without a wheel without build isolation: `pyodide build` no accepts
+  the `--no-isolation`/`-n` and/or `--skip-dependency-check`/`-x` flags to customise the wheel
+  building behaviour, similar to `pypa/build`.
+
 ### Changed
 
 - The Rust toolchain version has been updated to `nightly-2025-01-18`.

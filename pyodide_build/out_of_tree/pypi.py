@@ -70,12 +70,12 @@ def stream_redirected(to=os.devnull, stream=None):
             to = None
 
 
-def get_built_wheel(url):
-    return _get_built_wheel_internal(url)["path"]
+def get_built_wheel(url, isolation=True, skip_dependency_check=False):
+    return _get_built_wheel_internal(url, isolation, skip_dependency_check)["path"]
 
 
 @cache
-def _get_built_wheel_internal(url):
+def _get_built_wheel_internal(url, isolation=True, skip_dependency_check=False):
     parsed_url = urlparse(url)
     gz_name = Path(parsed_url.path).name
 
@@ -107,6 +107,8 @@ def _get_built_wheel_internal(url):
                 build_path / "dist",
                 PyPIProvider.BUILD_EXPORTS,
                 PyPIProvider.BUILD_FLAGS,
+                isolation=isolation,
+                skip_dependency_check=skip_dependency_check,
             )
         except BaseException as e:
             logger.error(" Failed\n Error is:")
@@ -199,11 +201,15 @@ def get_project_from_pypi(package_name, extras):
 
 
 def download_or_build_wheel(
-    url: str, target_directory: Path, compression_level: int = 6
+    url: str,
+    target_directory: Path,
+    compression_level: int = 6,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
 ) -> None:
     parsed_url = urlparse(url)
     if parsed_url.path.endswith("gz"):
-        wheel_file = get_built_wheel(url)
+        wheel_file = get_built_wheel(url, isolation, skip_dependency_check)
         shutil.copy(wheel_file, target_directory)
         wheel_path = target_directory / wheel_file.name
     elif parsed_url.path.endswith(".whl"):
@@ -333,6 +339,8 @@ def _resolve_and_build(
     build_dependencies: bool,
     extras: list[str],
     output_lockfile: str | None,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
     compression_level: int = 6,
 ) -> None:
     requirements = []
@@ -362,7 +370,7 @@ def _resolve_and_build(
     if output_lockfile is not None and len(output_lockfile) > 0:
         version_file = open(output_lockfile, "w")
     for x in result.mapping.values():
-        download_or_build_wheel(x.url, target_folder)
+        download_or_build_wheel(x.url, target_folder, compression_level)
         if len(x.extras) > 0:
             extratxt = "[" + ",".join(x.extras) + "]"
         else:
@@ -380,7 +388,10 @@ def build_wheels_from_pypi_requirements(
     skip_dependency: list[str],
     exports: _BuildSpecExports,
     config_settings: ConfigSettingsType,
-    output_lockfile: str | None,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
+    output_lockfile: str | None = None,
+    compression_level: int = 6,
 ) -> None:
     """
     Given a list of package requirements, build or fetch them. If build_dependencies is true, then
@@ -395,6 +406,9 @@ def build_wheels_from_pypi_requirements(
         build_dependencies,
         extras=[],
         output_lockfile=output_lockfile,
+        isolation=isolation,
+        skip_dependency_check=skip_dependency_check,
+        compression_level=compression_level,
     )
 
 
@@ -404,7 +418,9 @@ def build_dependencies_for_wheel(
     skip_dependency: list[str],
     exports: _BuildSpecExports,
     config_settings: ConfigSettingsType,
-    output_lockfile: str | None,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
+    output_lockfile: str | None = None,
     compression_level: int = 6,
 ) -> None:
     """Extract dependencies from this wheel and build pypi dependencies
@@ -435,6 +451,8 @@ def build_dependencies_for_wheel(
         build_dependencies=True,
         extras=extras,
         output_lockfile=output_lockfile,
+        isolation=isolation,
+        skip_dependency_check=skip_dependency_check,
         compression_level=compression_level,
     )
     # add the current wheel to the package-versions.txt

@@ -355,7 +355,14 @@ def test_py_compile(tmp_path, target, compression_level):
 def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
     from pyodide_build import pypabuild
 
-    def mocked_build(srcdir: Path, outdir: Path, env: Any, backend_flags: Any) -> str:
+    def mocked_build(
+        srcdir: Path,
+        outdir: Path,
+        env: Any,
+        backend_flags: Any,
+        isolation=True,
+        skip_dependency_check=False,
+    ) -> str:
         results["srcdir"] = srcdir
         results["outdir"] = outdir
         results["backend_flags"] = backend_flags
@@ -431,7 +438,14 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
 
     exports_ = None
 
-    def run_shim(builddir, output_directory, exports, backend_flags):
+    def run_shim(
+        builddir,
+        output_directory,
+        exports,
+        backend_flags,
+        isolation=True,
+        skip_dependency_check=False,
+    ):
         nonlocal exports_
         exports_ = exports
 
@@ -491,7 +505,14 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
 
     config_settings_passed = None
 
-    def run(srcdir, outdir, exports, config_settings):
+    def run(
+        srcdir,
+        outdir,
+        exports,
+        config_settings,
+        isolation=True,
+        skip_dependency_check=False,
+    ):
         nonlocal config_settings_passed
         config_settings_passed = config_settings
 
@@ -657,3 +678,201 @@ def test_build_constraint(tmp_path, dummy_xbuildenv, mock_emscripten, capsys):
     build_dir = RECIPE_DIR / pkg / "build"
     assert (build_dir / "setuptools.version").read_text() == "74.1.3"
     assert (build_dir / "pytest.version").read_text() == "7.0.0"
+
+
+@pytest.mark.parametrize(
+    "isolation_flag",
+    [
+        None,
+        "--no-isolation",
+    ],
+)
+def test_build_isolation_flags(
+    tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten, isolation_flag
+):
+    """Test that build works with different isolation flags."""
+    from pyodide_build import pypabuild
+
+    build_calls = []
+
+    def mocked_build(
+        srcdir,
+        outdir,
+        env,
+        config_settings,
+        isolation=True,
+        skip_dependency_check=False,
+    ):
+        build_calls.append(
+            {
+                "srcdir": srcdir,
+                "isolation": isolation,
+                "skip_dependency_check": skip_dependency_check,
+            }
+        )
+        dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        return str(dummy_wheel)
+
+    monkeypatch.setattr(pypabuild, "build", mocked_build)
+    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
+    monkeypatch.setattr(
+        common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
+    )
+
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
+
+    app = typer.Typer()
+    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
+
+    srcdir = tmp_path / "in"
+    outdir = tmp_path / "out"
+    srcdir.mkdir()
+
+    args = [str(srcdir), "--outdir", str(outdir)]
+    if isolation_flag:
+        args.append(isolation_flag)
+
+    result = runner.invoke(app, args)
+
+    assert result.exit_code == 0, result.stdout
+    assert len(build_calls) == 1
+
+    # Check that isolation was properly passed
+    expected_isolation = isolation_flag is None
+    assert build_calls[0]["isolation"] == expected_isolation
+
+
+@pytest.mark.parametrize(
+    "skip_check_flag",
+    [
+        None,  # Default: with dependency check
+        "--skip-dependency-check",
+        "-x",
+    ],
+)
+def test_build_skip_dependency_check(
+    tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten, skip_check_flag
+):
+    """Test that build works with different skip dependency check flags."""
+    from pyodide_build import pypabuild
+
+    build_calls = []
+
+    def mocked_build(
+        srcdir,
+        outdir,
+        env,
+        config_settings,
+        isolation=True,
+        skip_dependency_check=False,
+    ):
+        build_calls.append(
+            {
+                "srcdir": srcdir,
+                "isolation": isolation,
+                "skip_dependency_check": skip_dependency_check,
+            }
+        )
+        dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        return str(dummy_wheel)
+
+    monkeypatch.setattr(pypabuild, "build", mocked_build)
+    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
+    monkeypatch.setattr(
+        common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
+    )
+
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
+
+    app = typer.Typer()
+    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
+
+    srcdir = tmp_path / "in"
+    outdir = tmp_path / "out"
+    srcdir.mkdir()
+
+    args = [str(srcdir), "--outdir", str(outdir)]
+    if skip_check_flag:
+        args.append(skip_check_flag)
+
+    result = runner.invoke(app, args)
+
+    assert result.exit_code == 0, result.stdout
+    assert len(build_calls) == 1
+
+    # Check that skip_dependency_check was properly passed
+    expected_skip = skip_check_flag is not None
+    assert build_calls[0]["skip_dependency_check"] == expected_skip
+
+
+@pytest.mark.parametrize(
+    "isolation,skip_check",
+    [
+        (True, False),  # default: with isolation, without skipping dependency checking
+        (False, False),
+        (True, True),
+        (False, True),
+    ],
+)
+def test_build_combined_flags(
+    tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten, isolation, skip_check
+):
+    """Test combinations of isolation and skip dependency check flags."""
+    from pyodide_build import pypabuild
+
+    build_calls = []
+
+    def mocked_build(
+        srcdir,
+        outdir,
+        env,
+        config_settings,
+        isolation=True,
+        skip_dependency_check=False,
+    ):
+        build_calls.append(
+            {
+                "srcdir": srcdir,
+                "isolation": isolation,
+                "skip_dependency_check": skip_dependency_check,
+            }
+        )
+        dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        return str(dummy_wheel)
+
+    monkeypatch.setattr(pypabuild, "build", mocked_build)
+    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
+    monkeypatch.setattr(
+        common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
+    )
+
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
+
+    app = typer.Typer()
+    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
+
+    srcdir = tmp_path / "in"
+    outdir = tmp_path / "out"
+    srcdir.mkdir()
+
+    args = [str(srcdir), "--outdir", str(outdir)]
+    if not isolation:
+        args.append("--no-isolation")
+    if skip_check:
+        args.append("--skip-dependency-check")
+
+    result = runner.invoke(app, args)
+
+    assert result.exit_code == 0, result.stdout
+    assert len(build_calls) == 1
+    assert build_calls[0]["isolation"] == isolation
+    assert build_calls[0]["skip_dependency_check"] == skip_check
