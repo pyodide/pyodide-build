@@ -299,7 +299,8 @@ def test_needs_rebuild(tmpdir, is_wheel):
     )
 
 
-def test_copy_sharedlib(tmp_path):
+@pytest.mark.parametrize("modify_rpath", [False, True])
+def test_copy_sharedlib(tmp_path, modify_rpath):
     wheel_file_name = "sharedlib_test_py-1.0-cp310-cp310-emscripten_3_1_21_wasm32.whl"
     wheel = WHEEL_DIR / "wheel" / wheel_file_name
     libdir = WHEEL_DIR / "lib"
@@ -312,7 +313,7 @@ def test_copy_sharedlib(tmp_path):
     wheel_dir_name = f"{name}-{ver}"
     wheel_dir = tmp_path / wheel_dir_name
 
-    dep_map = _builder.copy_sharedlibs(wheel_copy, wheel_dir, libdir)
+    dep_map = _builder.copy_sharedlibs(wheel_copy, wheel_dir, libdir, modify_rpath)
 
     deps = ("sharedlib-test.so", "sharedlib-test-dep.so", "sharedlib-test-dep2.so")
     for dep in deps:

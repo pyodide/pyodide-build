@@ -24,6 +24,7 @@ from pyodide_build.build_env import (
     BuildArgs,
     _create_constraints_file,
     get_build_environment_vars,
+    get_build_flag,
     get_pyodide_root,
     get_pyversion_major,
     get_pyversion_minor,
@@ -587,7 +588,12 @@ class RecipeBuilderPackage(RecipeBuilder):
 
             if self.build_metadata.vendor_sharedlib:
                 lib_dir = self.library_install_prefix
-                copy_sharedlibs(wheel, wheel_dir, lib_dir)
+                # Old version of Emscripten does not have RUNTIME_PATH section, so only
+                # patch the rpath if it is present.
+                should_modify_rpath = get_build_flag("PYODIDE_ABI_VERSION") > "2025"
+                copy_sharedlibs(
+                    wheel, wheel_dir, lib_dir, modify_rpath=should_modify_rpath
+                )
 
             python_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
             host_site_packages = (
@@ -706,9 +712,12 @@ def trim_archive_extension(tarballname: str) -> str:
 
 
 def copy_sharedlibs(
-    wheel_file: Path, wheel_dir: Path, lib_dir: Path
+    wheel_file: Path,
+    wheel_dir: Path,
+    lib_dir: Path,
+    modify_rpath=False,
 ) -> dict[str, Path]:
-    from auditwheel_emscripten import copylib, resolve_sharedlib
+    from auditwheel_emscripten import copylib, modify_runtime_path, resolve_sharedlib
     from auditwheel_emscripten.wheel_utils import WHEEL_INFO_RE
 
     match = WHEEL_INFO_RE.match(wheel_file.name)
@@ -720,9 +729,10 @@ def copy_sharedlibs(
         lib_dir,
     )
     lib_sdir: str = match.group("name") + ".libs"
-
     if dep_map:
         dep_map_new = copylib(wheel_dir, dep_map, lib_sdir)
+        if modify_rpath:
+            modify_runtime_path(wheel_dir, lib_sdir)
         logger.info("Copied shared libraries:")
         for lib, path in dep_map_new.items():
             original_path = dep_map[lib]
