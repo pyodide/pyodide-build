@@ -258,7 +258,7 @@ def test_get_cmake_compiler_flags():
 def test_handle_command_cmake(build_args):
     args = build_args
 
-    build_cmd = ["cmake", "--build", "." "--target", "target"]
+    build_cmd = ["cmake", "--build", ".--target", "target"]
     assert handle_command_generate_args(build_cmd, args) == build_cmd
 
 

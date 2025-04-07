@@ -108,9 +108,9 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
     venv.create_pyodide_venv(temp_venv_path, options)
 
     for expected_arg in expected_calls:
-        assert (
-            expected_arg in captured_args
-        ), f"Expected {expected_arg} in call args: {captured_args}"
+        assert expected_arg in captured_args, (
+            f"Expected {expected_arg} in call args: {captured_args}"
+        )
 
 
 def test_supported_virtualenv_options():

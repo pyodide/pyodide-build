@@ -241,9 +241,9 @@ def test_xbuildenv_use(tmp_path):
     )
 
     assert result.exit_code == 0, result.stdout
-    assert (
-        "Pyodide cross-build environment 0.25.0 is now in use" in result.stdout
-    ), result.stdout
+    assert "Pyodide cross-build environment 0.25.0 is now in use" in result.stdout, (
+        result.stdout
+    )
 
 
 def test_xbuildenv_uninstall(tmp_path):
@@ -265,9 +265,9 @@ def test_xbuildenv_uninstall(tmp_path):
     )
 
     assert result.exit_code == 0, result.stdout
-    assert (
-        "Pyodide cross-build environment 0.25.0 uninstalled" in result.stdout
-    ), result.stdout
+    assert "Pyodide cross-build environment 0.25.0 uninstalled" in result.stdout, (
+        result.stdout
+    )
 
     result = runner.invoke(
         xbuildenv.app,
@@ -280,9 +280,9 @@ def test_xbuildenv_uninstall(tmp_path):
     )
 
     assert result.exit_code == 0, result.stdout
-    assert (
-        "Pyodide cross-build environment 0.26.0 uninstalled" in result.stdout
-    ), result.stdout
+    assert "Pyodide cross-build environment 0.26.0 uninstalled" in result.stdout, (
+        result.stdout
+    )
 
     result = runner.invoke(
         xbuildenv.app,
@@ -390,27 +390,27 @@ def test_xbuildenv_search_json(tmp_path, fake_xbuildenv_releases_compatible):
 
         assert isinstance(environment["version"], str), "version should be a string"
         assert isinstance(environment["python"], str), "python should be a string"
-        assert isinstance(
-            environment["emscripten"], str
-        ), "emscripten should be a string"
-        assert isinstance(
-            environment["compatible"], bool
-        ), "compatible should be either True or False"
+        assert isinstance(environment["emscripten"], str), (
+            "emscripten should be a string"
+        )
+        assert isinstance(environment["compatible"], bool), (
+            "compatible should be either True or False"
+        )
 
-        assert isinstance(
-            environment["pyodide_build"], dict
-        ), "pyodide_build should be a dictionary"
+        assert isinstance(environment["pyodide_build"], dict), (
+            "pyodide_build should be a dictionary"
+        )
         assert set(environment["pyodide_build"].keys()) == {
             "min",
             "max",
         }, f"pyodide_build has unexpected keys: {environment['pyodide_build'].keys()}"
-        assert isinstance(
-            environment["pyodide_build"]["min"], (str, type(None))
-        ), "pyodide_build-min should be a string or None"
-        assert isinstance(
-            environment["pyodide_build"]["max"], (str, type(None))
-        ), "pyodide_build-max should be a string or None"
+        assert isinstance(environment["pyodide_build"]["min"], (str, type(None))), (
+            "pyodide_build-min should be a string or None"
+        )
+        assert isinstance(environment["pyodide_build"]["max"], (str, type(None))), (
+            "pyodide_build-max should be a string or None"
+        )
 
-    assert any(
-        env["compatible"] for env in output["environments"]
-    ), "There should be at least one compatible environment"
+    assert any(env["compatible"] for env in output["environments"]), (
+        "There should be at least one compatible environment"
+    )
