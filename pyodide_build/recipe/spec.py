@@ -124,6 +124,7 @@ class _RequirementsSpec(BaseModel):
     run: list[str] = []
     host: list[str] = []
     executable: list[str] = []
+    constraint: list[str] = []
     model_config = ConfigDict(extra="forbid")
 
 

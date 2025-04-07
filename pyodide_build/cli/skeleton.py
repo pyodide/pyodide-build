@@ -36,7 +36,7 @@ def enable(
     names: list[str],
     recipe_dir: str | None = typer.Option(
         None,
-        help="The directory containing the recipe of packages."
+        help="The directory containing the recipe of packages. "
         "If not specified, the default is ``<cwd>/packages``.",
     ),
 ):
@@ -65,7 +65,7 @@ def disable(
     ),
     recipe_dir: str | None = typer.Option(
         None,
-        help="The directory containing the recipe of packages."
+        help="The directory containing the recipe of packages. "
         "If not specified, the default is ``<cwd>/packages``.",
     ),
 ) -> int:
@@ -83,6 +83,32 @@ def disable(
     sys.exit(status)
 
 
+@app.command("pin")
+def pin(
+    names: list[str],
+    message: str = typer.Option(
+        "", "--message", "-m", help="Comment to explain why it was pinned"
+    ),
+    recipe_dir: str | None = typer.Option(
+        None,
+        help="The directory containing the recipe of packages. "
+        "If not specified, the default is ``<cwd>/packages``.",
+    ),
+) -> int:
+    recipe_dir_ = get_recipe_dir(recipe_dir)
+    status = 0
+    for name in names:
+        try:
+            skeleton.pin_package(recipe_dir_, name, message)
+        except skeleton.MkpkgFailedException as e:
+            status = -1
+            logger.error("%s update failed: %s", name, e)
+        except Exception:
+            print(name)
+            raise
+    sys.exit(status)
+
+
 @app.command("pypi")
 def new_recipe_pypi(
     name: str,
@@ -90,7 +116,7 @@ def new_recipe_pypi(
         False,
         "--update",
         "-u",
-        help="Update an existing recipe instead of creating a new one",
+        help="Update an existing recipe instead of creating a new one.",
     ),
     update_patched: bool = typer.Option(
         False,
@@ -113,8 +139,17 @@ def new_recipe_pypi(
     ),
     recipe_dir: str | None = typer.Option(
         None,
-        help="The directory containing the recipe of packages."
+        help="The directory containing the recipe of packages. "
         "If not specified, the default is ``<cwd>/packages``.",
+    ),
+    maintainer: str | None = typer.Option(
+        None, "--maintainer", "-m", help="The github username to use as the maintainer"
+    ),
+    gh_maintainer: bool = typer.Option(
+        False,
+        "--gh-maintainer",
+        "--ghm",
+        help="Set the maintainer from 'gh auth status'. Requires gh cli.",
     ),
 ) -> None:
     """
@@ -131,8 +166,13 @@ def new_recipe_pypi(
 
     recipe_dir_ = get_recipe_dir(recipe_dir)
 
-    if update or update_patched or update_pinned:
-        try:
+    try:
+        if update or update_patched or update_pinned:
+            action = "update"
+            if maintainer or gh_maintainer:
+                raise skeleton.MkpkgFailedException(
+                    "--maintainer and --gh-maintainer are only currently supported when creating a new recipe."
+                )
             skeleton.update_package(
                 recipe_dir_,
                 name,
@@ -141,13 +181,27 @@ def new_recipe_pypi(
                 update_patched=update_patched,
                 update_pinned=update_pinned,
             )
-        except skeleton.MkpkgFailedException as e:
-            logger.error("%s update failed: %s", name, e)
-            sys.exit(1)
-        except skeleton.MkpkgSkipped as e:
-            logger.warning("%s update skipped: %s", name, e)
-        except Exception:
-            print(name)
-            raise
-    else:
-        skeleton.make_package(recipe_dir_, name, version, source_fmt=source_format)  # type: ignore[arg-type]
+        else:
+            action = "create"
+            if maintainer and gh_maintainer:
+                raise skeleton.MkpkgFailedException(
+                    "At most one of --maintainer and --gh-maintainer can use used."
+                )
+            if gh_maintainer:
+                maintainer = skeleton.lookup_gh_username()
+            skeleton.make_package(
+                recipe_dir_,
+                name,
+                version,
+                source_fmt=source_format,
+                maintainer=maintainer,
+            )  # type: ignore[arg-type]
+
+    except skeleton.MkpkgFailedException as e:
+        logger.error("Failed to %s %s: %s", action, name, e)
+        sys.exit(1)
+    except skeleton.MkpkgSkipped as e:
+        logger.warning("%s %s skipped: %s", name, action, e)
+    except Exception:
+        print(name)
+        raise

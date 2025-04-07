@@ -1,5 +1,6 @@
 import os
 import sys
+from collections import namedtuple
 
 import pytest
 
@@ -15,7 +16,7 @@ def monkeypatch_subprocess_run_pip(monkeypatch):
     orig_run = subprocess.run
 
     def monkeypatch_func(cmds, *args, **kwargs):
-        if cmds[0] == "pip":
+        if cmds[0] == "pip" or cmds[0:3] == [sys.executable, "-m", "pip"]:
             called_with.extend(cmds)
             return subprocess.CompletedProcess(cmds, 0, "", "")
         else:
@@ -117,14 +118,26 @@ class TestCrossBuildEnvManager:
         assert latest_version == "0.2.0", latest_version
 
     def test_find_latest_version_incompat(
-        self, tmp_path, fake_xbuildenv_releases_incompatible
+        self, tmp_path, fake_xbuildenv_releases_incompatible, monkeypatch
     ):
+        PatchedVersionInfo = namedtuple(
+            "PatchedVersionInfo", ["major", "minor", "patch"]
+        )
+        monkeypatch.setattr(sys, "version_info", PatchedVersionInfo(3, 11, 0))
         manager = CrossBuildEnvManager(
             tmp_path, str(fake_xbuildenv_releases_incompatible)
         )
 
         with pytest.raises(
-            ValueError, match="No compatible cross-build environment found"
+            ValueError,
+            match="Python version 3.11 is too old. The oldest supported version of Python is 4.5.",
+        ):
+            manager._find_latest_version()
+
+        monkeypatch.setattr(sys, "version_info", PatchedVersionInfo(5, 11, 0))
+        with pytest.raises(
+            ValueError,
+            match="Python version 5.11 is not yet supported. The newest supported version of Python is 4.5.",
         ):
             manager._find_latest_version()
 
@@ -276,12 +289,20 @@ class TestCrossBuildEnvManager:
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
         manager._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
 
-        assert len(pip_called_with) == 7
-        assert pip_called_with[0:4] == ["pip", "install", "--no-user", "-t"]
-        assert pip_called_with[4].startswith(
+        assert len(pip_called_with) == 9
+        assert pip_called_with[0:8] == [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-user",
+            "-r",
+            str(xbuildenv_root / "requirements.txt"),
+            "--target",
+        ]
+        assert pip_called_with[8].startswith(
             str(xbuildenv_pyodide_root)
         )  # hostsitepackages
-        assert pip_called_with[5:7] == ["-r", str(xbuildenv_root / "requirements.txt")]
 
         hostsitepackages = manager._host_site_packages_dir(xbuildenv_pyodide_root)
         assert hostsitepackages.exists()

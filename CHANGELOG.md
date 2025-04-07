@@ -9,8 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build` in `uv`-managed virtual environments will now work.
+  [#132](https://github.com/pyodide/pyodide-build/pull/132)
+
+- Added support for building without a wheel without build isolation: `pyodide build` no accepts
+  the `--no-isolation`/`-n` and/or `--skip-dependency-check`/`-x` flags to customise the wheel
+  building behaviour, similar to `pypa/build`.
+
+### Changed
+
+- The Rust toolchain version has been updated to `nightly-2025-01-18`.
+  [#103](https://github.com/pyodide/pyodide-build/pull/103)
+
+- Pyodide cross-build environment will now be installed in the user cache directory by default,
+  which is `<home>/.cache` in Linux systems and `/Users/<user>/Library/Caches` in macOS.
+  [#148](https://github.com/pyodide/pyodide-build/pull/148)
+
+- Removed `cmake` dependency from the package.
+  The Pyodide build system now uses the `cmake` package specified in the `pyproject.toml` file
+  of the target package.
+  [#141](https://github.com/pyodide/pyodide-build/pull/141)
+
+### Fixed
+
+- Fixed Pyodide venv `sys_platform` marker evaluation with pip >= 25.
+  [#108](https://github.com/pyodide/pyodide-build/pull/108)
+
+## [0.29.3] - 2025/02/04
+
+### Added
+
 - Added new configuration variable `default_cross_build_env_url`.
   [#85](https://github.com/pyodide/pyodide-build/pull/85)
+
+- Added a new recipe key `requirement.constraint` to set the package-level constraints.
+  [#97](https://github.com/pyodide/pyodide-build/pull/97)
+
+- The `pyodide venv` command now supports more `virtualenv` command-line flags
+  to customise the virtual environment creation behaviour (experimental)
+  [#117](https://github.com/pyodide/pyodide-build/pull/117)
 
 ## [0.29.2] - 2024/11/29
 

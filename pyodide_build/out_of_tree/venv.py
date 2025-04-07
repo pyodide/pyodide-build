@@ -9,6 +9,27 @@ from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuilde
 from pyodide_build.common import exit_with_stdio
 from pyodide_build.logger import logger
 
+# A subset of supported virtualenv options that make sense in Pyodide's context.
+# Our aim will not be to support all of them, and some of them will never be in
+# the list, for example, --no-pip and so on. We provide these on a best-effort
+# basis as they should work and are easy to test.
+SUPPORTED_VIRTUALENV_OPTIONS = [
+    "--clear",
+    "--no-clear",
+    "--no-vcs-ignore",
+    # "--copies", "--always-copy", FIXME: node fails to invoke Pyodide
+    # "--symlink-app-data", FIXME: node fails to invoke Pyodide
+    "--no-download",
+    "--never-download",
+    "--download",
+    "--extra-search-dir",
+    "--pip",
+    "--setuptools",
+    "--no-setuptools",
+    "--no-wheel",
+    "--no-periodic-update",
+]
+
 
 def check_result(result: subprocess.CompletedProcess[str], msg: str) -> None:
     """Abort if the process returns a nonzero error code"""
@@ -141,7 +162,6 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         f"""
         os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
         os.name = os_name
-        orig_platform = sys.platform
         sys.platform = sys_platform
         sys.platlibdir = "lib"
         sys.implementation._multiarch = multiarch
@@ -153,7 +173,45 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         import sysconfig
         sysconfig._init_config_vars()
         del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
-        sys.platform = orig_platform
+        """
+        # Handle pip updates.
+        #
+        # The pip executable should be a symlink to pip_patched. If it is not a
+        # link, or it is a symlink to something else, pip has been updated. We
+        # have to restore the correct value of pip. Iterate through all of the
+        # pip variants in the folder and remove them and replace with a symlink
+        # to pip_patched.
+        """
+        from pathlib import Path
+
+        file_path = Path(__file__)
+
+
+        def pip_is_okay():
+            try:
+                return file_path.readlink() == file_path.with_name("pip_patched")
+            except OSError as e:
+                if e.strerror != "Invalid argument":
+                    raise
+            return False
+
+
+        def maybe_repair_after_pip_update():
+            if pip_is_okay():
+                return
+
+            venv_bin = file_path.parent
+            pip_patched = venv_bin / "pip_patched"
+            for pip in venv_bin.glob("pip*"):
+                if pip == pip_patched:
+                    continue
+                pip.unlink(missing_ok=True)
+                pip.symlink_to(venv_bin / "pip_patched")
+
+
+        import atexit
+
+        atexit.register(maybe_repair_after_pip_update)
         """
     )
 
@@ -164,11 +222,23 @@ def create_pip_script(venv_bin):
     # Python in the shebang. Use whichever Python was used to invoke
     # pyodide venv.
     host_python_path = venv_bin / f"python{get_pyversion()}-host"
+    pip_path = venv_bin / "pip_patched"
+
+    # To support the "--clear" and "--no-clear" args, we need to remove
+    # the existing symlinks before creating new ones.
+    host_python_path.unlink(missing_ok=True)
+    (venv_bin / "python-host").unlink(missing_ok=True)
+    for pip in venv_bin.glob("pip*"):
+        if pip == pip_path:
+            continue
+        pip.unlink(missing_ok=True)
+        pip.symlink_to(pip_path)
+
     host_python_path.symlink_to(sys.executable)
     # in case someone needs a Python-version-agnostic way to refer to python-host
     (venv_bin / "python-host").symlink_to(sys.executable)
 
-    (venv_bin / "pip").write_text(
+    pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
         f"#!{host_python_path} -s\n"
@@ -184,18 +254,7 @@ def create_pip_script(venv_bin):
             """
         )
     )
-    (venv_bin / "pip").chmod(0o777)
-
-    pyversion = get_pyversion()
-    other_pips = [
-        venv_bin / "pip3",
-        venv_bin / f"pip{pyversion}",
-        venv_bin / f"pip-{pyversion}",
-    ]
-
-    for pip in other_pips:
-        pip.unlink()
-        pip.symlink_to(venv_bin / "pip")
+    pip_path.chmod(0o777)
 
 
 def create_pyodide_script(venv_bin: Path) -> None:
@@ -239,7 +298,7 @@ def install_stdlib(venv_bin: Path) -> None:
                 from pyodide_js import loadPackage
                 from pyodide_js._api import lockfile_packages
                 from pyodide_js._api import lockfile_unvendored_stdlibs_and_test
-                shared_libs = [pkgname for (pkgname,pkg) in lockfile_packages.object_entries() if getattr(pkg, "package_type") == "shared_library"]
+                shared_libs = [pkgname for (pkgname,pkg) in lockfile_packages.object_entries() if getattr(pkg, "package_type", None) == "shared_library"]
 
                 to_load = [*lockfile_unvendored_stdlibs_and_test, *shared_libs, *{to_load!r}]
                 loadPackage(to_load);
@@ -253,17 +312,27 @@ def install_stdlib(venv_bin: Path) -> None:
     check_result(result, "ERROR: failed to install unvendored stdlib modules")
 
 
-def create_pyodide_venv(dest: Path) -> None:
+def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
     """Create a Pyodide virtualenv and store it into dest"""
     logger.info("Creating Pyodide virtualenv at %s", dest)
     from virtualenv import session_via_cli
 
-    if dest.exists():
-        logger.error("ERROR: dest directory '%s' already exists", dest)
-        sys.exit(1)
-
     interp_path = pyodide_dist_dir() / "python"
-    session = session_via_cli(["--no-wheel", "-p", str(interp_path), str(dest)])
+
+    cli_args = ["--python", str(interp_path)]
+
+    if virtualenv_args:
+        for arg in virtualenv_args:
+            if arg.startswith("--"):
+                # Check if the argument (or its prefix form) is supported.
+                arg_name = arg.split("=")[0] if "=" in arg else arg
+                if arg_name not in SUPPORTED_VIRTUALENV_OPTIONS:
+                    msg = f"Unsupported virtualenv option: {arg_name}"
+                    logger.warning(msg)
+
+        cli_args.extend(virtualenv_args)
+
+    session = session_via_cli(cli_args + [str(dest)])
     check_host_python_version(session)
 
     try:

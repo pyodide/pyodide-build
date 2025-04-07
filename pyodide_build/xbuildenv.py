@@ -1,11 +1,12 @@
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from pyodide_lock import PyodideLockSpec
 
-from pyodide_build import build_env
+from pyodide_build import build_env, uv_helper
 from pyodide_build.common import download_and_unpack_archive
 from pyodide_build.create_package_index import create_package_index
 from pyodide_build.logger import logger
@@ -207,7 +208,9 @@ class CrossBuildEnvManager:
             xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
             install_marker = download_path / ".installed"
             if not install_marker.exists():
-                logger.info("Installing Pyodide cross-build environment")
+                logger.info(
+                    "Installing Pyodide cross-build environment to %s", download_path
+                )
 
                 if not skip_install_cross_build_packages:
                     self._install_cross_build_packages(
@@ -240,7 +243,26 @@ class CrossBuildEnvManager:
         )
 
         if not latest:
-            raise ValueError("No compatible cross-build environment found")
+            # Check for Python version mismatch
+            python_versions = [
+                v.python_version_tuple[:2] for v in metadata.list_compatible_releases()
+            ]
+            pyver = tuple(int(x) for x in local["python"].split("."))
+            if pyver > python_versions[0]:
+                latest_supported = ".".join(str(x) for x in python_versions[0])
+                raise ValueError(
+                    f"Python version {local["python"]} is not yet supported. The newest supported version of Python is {latest_supported}."
+                )
+
+            if pyver < python_versions[-1]:
+                oldest_supported = ".".join(str(x) for x in python_versions[-1])
+                raise ValueError(
+                    f"Python version {local["python"]} is too old. The oldest supported version of Python is {oldest_supported}."
+                )
+
+            raise ValueError(
+                f"Python version {local["python"]} is not compatible with pyodide build version {local["pyodide-build"]}"
+            )
 
         return latest.version
 
@@ -265,15 +287,30 @@ class CrossBuildEnvManager:
         """
         host_site_packages = self._host_site_packages_dir(xbuildenv_pyodide_root)
         host_site_packages.mkdir(exist_ok=True, parents=True)
-        result = subprocess.run(
+
+        install_prefix = (
             [
+                uv_helper.find_uv_bin(),
+                "pip",
+                "install",
+            ]
+            if uv_helper.should_use_uv()
+            else [
+                sys.executable,
+                "-m",
                 "pip",
                 "install",
                 "--no-user",
-                "-t",
-                str(host_site_packages),
+            ]
+        )
+
+        result = subprocess.run(
+            [
+                *install_prefix,
                 "-r",
                 str(xbuildenv_root / "requirements.txt"),
+                "--target",
+                str(host_site_packages),
             ],
             capture_output=True,
             encoding="utf8",

@@ -15,18 +15,18 @@ license = {text = "MPL-2.0"}
 requires-python = ">=3.12"
 dependencies = [
     "build~=1.2.0",
-    "pyodide-cli~=0.2.1",
+    "pyodide-cli!=0.2.1,>=0.3.0",
     "pyodide-lock==0.1.0a7",
-    "auditwheel-emscripten~=0.0.9",
+    "auditwheel-emscripten==0.1.0",
     "pydantic>=2,<3",
-    "cmake>=3.24",
     "wheel",
     "ruamel.yaml",
     "packaging",
     "virtualenv",
     "requests",
-    "typer",
+    "typer>=0.13",
     "rich",
+    "platformdirs",
     # TODO: make this a extra dependency
     "resolvelib",
     "unearth~=0.6",
@@ -63,6 +63,9 @@ test = [
     "pytest-cov",
     "types-requests",
 ]
+uv = [
+  "build[uv]~=1.2.0",
+]
 
 [tool.hatch.version]
 source = "vcs"
@@ -70,6 +73,12 @@ source = "vcs"
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/pyodide_build/tests",
+]
+
+[tool.pytest.ini_options]
+addopts = "-vra --strict-markers"
+markers = [
+  "integration: mark a test as an integration test"
 ]
 
 [tool.mypy]
@@ -133,7 +142,7 @@ lint.select = [
 
 lint.logger-objects = ["pyodide_build.logger.logger"]
 
-lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038"]
+lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038", "PLR0912"]
 # line-length = 219  # E501: Recommended goal is 88 to match black
 target-version = "py312"
 

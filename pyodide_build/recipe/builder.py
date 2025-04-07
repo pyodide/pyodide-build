@@ -16,13 +16,17 @@ from pathlib import Path
 from typing import Any, cast
 
 import requests
+from packaging.utils import parse_wheel_filename
 
 from pyodide_build import common, pypabuild
 from pyodide_build.build_env import (
     RUST_BUILD_PRELUDE,
     BuildArgs,
+    _create_constraints_file,
     get_build_environment_vars,
     get_pyodide_root,
+    get_pyversion_major,
+    get_pyversion_minor,
     pyodide_tags,
     replace_so_abi_tags,
     wheel_platform,
@@ -32,10 +36,11 @@ from pyodide_build.common import (
     _get_sha256_checksum,
     chdir,
     exit_with_stdio,
-    find_matching_wheels,
+    find_matching_wheel,
     make_zip_archive,
     modify_wheel,
     retag_wheel,
+    retrying_rmtree,
 )
 from pyodide_build.logger import logger
 from pyodide_build.recipe.bash_runner import (
@@ -52,12 +57,16 @@ def _make_whlfile(
 
 
 shutil.register_archive_format("whl", _make_whlfile, description="Wheel file")
-shutil.register_unpack_format(
-    "whl",
-    [".whl", ".wheel"],
-    shutil._unpack_zipfile,  # type: ignore[attr-defined]
-    description="Wheel file",
-)
+try:
+    shutil.register_unpack_format(
+        "whl",
+        [".whl", ".wheel"],
+        shutil._unpack_zipfile,  # type: ignore[attr-defined]
+        description="Wheel file",
+    )
+except shutil.RegistryError:
+    # Error: .whl is already registered for "whl"
+    pass
 
 
 def _extract_tarballname(url: str, headers: dict) -> str:
@@ -72,6 +81,14 @@ def _extract_tarballname(url: str, headers: dict) -> str:
             tarballname = filename
 
     return tarballname
+
+
+def check_versions_match(pkg_name: str, wheel_name: str, version: str):
+    wheel_version = str(parse_wheel_filename(wheel_name)[1])
+    if wheel_version != version:
+        raise ValueError(
+            f"Version mismatch in {pkg_name}: version in meta.yaml is '{version}' but version from wheel name is '{wheel_version}'"
+        )
 
 
 class RecipeBuilder:
@@ -113,10 +130,16 @@ class RecipeBuilder:
         self.source_metadata = self.recipe.source
         self.build_metadata = self.recipe.build
         self.package_type = self.build_metadata.package_type
+        self.is_wheel = self.package_type in ["package", "cpython_module"]
 
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
+        if len(str(self.build_dir).split(maxsplit=1)) > 1:
+            raise ValueError(
+                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
+                "See https://github.com/pypa/pip/issues/13283"
+            )
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
             self.build_dir / self.fullname
@@ -170,7 +193,8 @@ class RecipeBuilder:
         try:
             self._build()
 
-            (self.build_dir / ".packaged").touch()
+            if not self.is_wheel:
+                (self.build_dir / ".packaged").touch()
         except (Exception, KeyboardInterrupt):
             success = False
             raise
@@ -193,7 +217,11 @@ class RecipeBuilder:
 
     def _build(self) -> None:
         if not self.force_rebuild and not needs_rebuild(
-            self.pkg_root, self.build_dir, self.source_metadata
+            self.pkg_root,
+            self.build_dir,
+            self.source_metadata,
+            self.is_wheel,
+            self.version,
         ):
             return
 
@@ -238,7 +266,7 @@ class RecipeBuilder:
 
         # clear the build directory
         if self.build_dir.resolve().is_dir():
-            shutil.rmtree(self.build_dir)
+            retrying_rmtree(self.build_dir)
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
@@ -313,6 +341,7 @@ class RecipeBuilder:
 
         # already built
         if tarballpath.suffix == ".whl":
+            check_versions_match(self.name, tarballpath.name, self.version)
             self.src_dist_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(tarballpath, self.src_dist_dir)
             return
@@ -336,6 +365,27 @@ class RecipeBuilder:
 
         shutil.move(self.build_dir / extract_dir_name, self.src_extract_dir)
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
+
+    def _create_constraints_file(self) -> str:
+        """
+        Creates a pip constraints file by concatenating global constraints (PIP_CONSTRAINT)
+        with constraints specific to this package.
+
+        returns the path to the new constraints file.
+        """
+        host_constraints = _create_constraints_file()
+
+        constraints = self.recipe.requirements.constraint
+        if not constraints:
+            # nothing to override
+            return host_constraints
+
+        new_constraints_file = self.build_dir / "constraints.txt"
+        with new_constraints_file.open("w") as f:
+            for constraint in constraints:
+                f.write(constraint + "\n")
+
+        return host_constraints + " " + str(new_constraints_file)
 
     def _compile(
         self,
@@ -383,9 +433,12 @@ class RecipeBuilder:
                     )
                     build_env = runner.env
 
-            pypabuild.build(
+            build_env["PIP_CONSTRAINT"] = str(self._create_constraints_file())
+
+            wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings
             )
+            check_versions_match(self.name, Path(wheel_path).name, self.version)
 
     def _patch(self) -> None:
         """
@@ -487,8 +540,7 @@ class RecipeBuilderPackage(RecipeBuilder):
             self._compile(bash_runner)
 
         self._package_wheel(bash_runner)
-        shutil.rmtree(self.dist_dir, ignore_errors=True)
-        shutil.copytree(self.src_dist_dir, self.dist_dir)
+        shutil.copytree(self.src_dist_dir, self.dist_dir, dirs_exist_ok=True)
 
     def _package_wheel(
         self,
@@ -496,7 +548,7 @@ class RecipeBuilderPackage(RecipeBuilder):
     ) -> None:
         """Package a wheel
 
-        This unpacks the wheel, unvendors tests if necessary, runs and "build.post"
+        This unpacks the wheel, runs and "build.post"
         script, and then repacks the wheel.
 
         Parameters
@@ -505,15 +557,19 @@ class RecipeBuilderPackage(RecipeBuilder):
             The runner we will use to execute our bash commands. Preserves
             environment variables from one invocation to the next.
         """
-        wheel, *rest = find_matching_wheels(
-            self.src_dist_dir.glob("*.whl"), pyodide_tags()
+        wheel = find_matching_wheel(
+            self.src_dist_dir.glob("*.whl"), pyodide_tags(), version=self.version
         )
-        if rest:
-            raise Exception(
-                f"Unexpected number of wheels {len(rest) + 1} when building {self.name}"
+        if not wheel:
+            raise RuntimeError(
+                f"Found no wheel while building {self.name}. Candidates:\n"
+                + "\n".join(f.name for f in self.src_dist_dir.glob("*.whl"))
             )
 
-        if "emscripten" in wheel.name:
+        if self.package_type == "cpython_module":
+            abi = f"cp{get_pyversion_major()}{get_pyversion_minor()}"
+            wheel = retag_wheel(wheel, wheel_platform(), python=abi, abi=abi)
+        elif "emscripten" in wheel.name:
             # Retag platformed wheels to pyodide
             wheel = retag_wheel(wheel, wheel_platform())
 
@@ -540,7 +596,14 @@ class RecipeBuilderPackage(RecipeBuilder):
             )
             if self.build_metadata.cross_build_env:
                 subprocess.run(
-                    ["pip", "install", "-t", str(host_site_packages), f"{name}=={ver}"],
+                    [
+                        "pip",
+                        "install",
+                        "--upgrade",
+                        "-t",
+                        str(host_site_packages),
+                        f"{name}=={ver}",
+                    ],
                     check=True,
                 )
 
@@ -549,18 +612,6 @@ class RecipeBuilderPackage(RecipeBuilder):
                     (wheel_dir / cross_build_file),
                     host_site_packages / cross_build_file,
                 )
-
-            try:
-                test_dir = self.src_dist_dir / "tests"
-                if self.build_metadata.unvendor_tests:
-                    nmoved = unvendor_tests(
-                        wheel_dir, test_dir, self.build_metadata.retain_test_patterns
-                    )
-                    if nmoved:
-                        with chdir(self.src_dist_dir):
-                            shutil.make_archive(f"{self.name}-tests", "tar", test_dir)
-            finally:
-                shutil.rmtree(test_dir, ignore_errors=True)
 
 
 class RecipeBuilderStaticLibrary(RecipeBuilder):
@@ -689,63 +740,13 @@ def copy_sharedlibs(
     return {}
 
 
-def unvendor_tests(
-    install_prefix: Path, test_install_prefix: Path, retain_test_patterns: list[str]
-) -> int:
-    """Unvendor test files and folders
-
-    This function recursively walks through install_prefix and moves anything
-    that looks like a test folder under test_install_prefix.
-
-
-    Parameters
-    ----------
-    install_prefix
-        the folder where the package was installed
-    test_install_prefix
-        the folder where to move the tests. If it doesn't exist, it will be
-        created.
-
-    Returns
-    -------
-    n_moved
-        number of files or folders moved
-    """
-    n_moved = 0
-    out_files = []
-    shutil.rmtree(test_install_prefix, ignore_errors=True)
-    for root, _dirs, files in os.walk(install_prefix):
-        root_rel = Path(root).relative_to(install_prefix)
-        if root_rel.name == "__pycache__" or root_rel.name.endswith(".egg_info"):
-            continue
-        if root_rel.name in ["test", "tests"]:
-            # This is a test folder
-            (test_install_prefix / root_rel).parent.mkdir(exist_ok=True, parents=True)
-            shutil.move(install_prefix / root_rel, test_install_prefix / root_rel)
-            n_moved += 1
-            continue
-        out_files.append(root)
-        for fpath in files:
-            if (
-                fnmatch.fnmatchcase(fpath, "test_*.py")
-                or fnmatch.fnmatchcase(fpath, "*_test.py")
-                or fpath == "conftest.py"
-            ):
-                if any(fnmatch.fnmatchcase(fpath, pat) for pat in retain_test_patterns):
-                    continue
-                (test_install_prefix / root_rel).mkdir(exist_ok=True, parents=True)
-                shutil.move(
-                    install_prefix / root_rel / fpath,
-                    test_install_prefix / root_rel / fpath,
-                )
-                n_moved += 1
-
-    return n_moved
-
-
 # TODO: move this to common.py or somewhere else
 def needs_rebuild(
-    pkg_root: Path, buildpath: Path, source_metadata: _SourceSpec
+    pkg_root: Path,
+    buildpath: Path,
+    source_metadata: _SourceSpec,
+    is_wheel: bool = True,
+    version: str | None = None,
 ) -> bool:
     """
     Determines if a package needs a rebuild because its meta.yaml, patches, or
@@ -762,14 +763,22 @@ def needs_rebuild(
     src_metadata
         The source section from meta.yaml.
     """
-    packaged_token = buildpath / ".packaged"
-    if not packaged_token.is_file():
-        logger.debug(
-            "%s needs rebuild because %s does not exist", pkg_root, packaged_token
+    dist_dir = pkg_root / "dist"
+    if is_wheel:
+        previous_wheel = find_matching_wheel(
+            dist_dir.glob("*.whl"), pyodide_tags(), version=version
         )
-        return True
-
-    package_time = packaged_token.stat().st_mtime
+        if not previous_wheel:
+            return True
+        package_time = previous_wheel.stat().st_mtime
+    else:
+        packaged_token = buildpath / ".packaged"
+        if not packaged_token.is_file():
+            logger.debug(
+                "%s needs rebuild because %s does not exist", pkg_root, packaged_token
+            )
+            return True
+        package_time = packaged_token.stat().st_mtime
 
     def source_files() -> Iterator[Path]:
         yield pkg_root / "meta.yaml"

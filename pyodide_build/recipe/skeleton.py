@@ -8,6 +8,7 @@ import urllib.request
 import warnings
 from collections.abc import Iterator
 from pathlib import Path
+from textwrap import indent
 from typing import Any, Literal, TypedDict
 from urllib import request
 
@@ -82,6 +83,84 @@ def _find_wheel(pypi_metadata: MetadataDict, native: bool = False) -> URLDict | 
     return None
 
 
+def _make_predictable_url(
+    package: str, version: str, source_type: Literal["wheel", "sdist"], filename: str
+) -> str | None:
+    """
+    Create a predictable URL for a PyPI package based on PyPI's conventions,
+    documented in https://docs.pypi.org/api/#predictable-urls.
+
+    Parameters
+    ----------
+    package
+        The package name
+    version
+        The package version
+    source_type
+        Either "wheel" or "sdist"
+    filename
+        The full filename (used for wheels to extract required tags)
+
+    Returns
+    -------
+    A predictable URL for the package file, or None if the URL could not be
+    constructed.
+    """
+    from packaging.utils import (
+        InvalidWheelFilename,
+        canonicalize_name,
+        parse_wheel_filename,
+    )
+
+    host = "https://files.pythonhosted.org"
+
+    # convert hyphens to underscores for the package name, as
+    # PyPI uses underscores in the URL and packaging does not
+    # handle this.
+    package_name = canonicalize_name(package)
+    package_url_name = package_name.replace("-", "_")
+
+    if source_type == "sdist":
+        return f"{host}/packages/source/{package_name[0]}/{package_url_name}/{package_url_name}-{version}.tar.gz"
+
+    elif source_type == "wheel":
+        try:
+            # Special case for universal wheels (py2.py3)
+            # we return early as packaging doesn't handle
+            # this case properly.
+            if "-py2.py3-none-any.whl" in filename:
+                python_tag = "py2.py3"
+                return f"{host}/packages/{python_tag}/{package_url_name[0]}/{package_url_name}/{filename}"
+
+            _, _, _, tags = parse_wheel_filename(filename)
+            python_tag = None
+            for tag in tags:
+                if (
+                    tag.interpreter.startswith("py")
+                    and tag.abi == "none"
+                    and tag.platform == "any"
+                ):
+                    python_tag = tag.interpreter
+                    break
+
+            if not python_tag:
+                msg = f"Not a pure Python wheel: {filename}"
+                logger.warning(msg)
+                return None
+
+            return f"{host}/packages/{python_tag}/{package_url_name[0]}/{package_url_name}/{filename}"
+
+        except InvalidWheelFilename:
+            # Let invalid wheel filenames bubble up
+            raise
+        except Exception as e:
+            msg = f"Error parsing wheel filename {filename}: {e}"
+            logger.warning(msg)
+            return None
+
+    return None
+
+
 def _find_dist(
     pypi_metadata: MetadataDict, source_types: list[Literal["wheel", "sdist"]]
 ) -> URLDict:
@@ -99,6 +178,17 @@ def _find_dist(
         if source == "sdist":
             result = _find_sdist(pypi_metadata)
         if result:
+            package_name = pypi_metadata["info"]["name"]
+            version = pypi_metadata["info"]["version"]
+            filename = result["filename"]
+
+            predictable_url = _make_predictable_url(
+                package_name, version, source, filename
+            )
+            if predictable_url:
+                result_copy = result.copy()
+                result_copy["url"] = predictable_url
+                return result_copy
             return result
 
     types_str = " or ".join(source_types)
@@ -144,11 +234,26 @@ def run_prettier(meta_path: str | Path) -> None:
         )
 
 
+def load_meta_yaml(yaml, meta_path: Path):
+    if not meta_path.exists():
+        package = meta_path.parent.name
+        logger.error("%s does not exist", meta_path)
+        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
+
+    return yaml.load(meta_path.read_bytes())
+
+
+def store_meta_yaml(yaml, meta_path: Path, yaml_content):
+    yaml.dump(yaml_content, meta_path)
+    run_prettier(meta_path)
+
+
 def make_package(
     packages_dir: Path,
     package: str,
     version: str | None = None,
     source_fmt: Literal["wheel", "sdist"] | None = None,
+    maintainer: str | None = None,
 ) -> None:
     """
     Creates a template that will work for most pure Python packages,
@@ -196,7 +301,9 @@ def make_package(
             "summary": summary,
             "license": license,
         },
-        "extra": {"recipe-maintainers": ["PUT_YOUR_GITHUB_USERNAME_HERE"]},
+        "extra": {
+            "recipe-maintainers": [maintainer or "PUT_YOUR_GITHUB_USERNAME_HERE"]
+        },
     }
 
     package_dir = packages_dir / package
@@ -207,9 +314,7 @@ def make_package(
         raise MkpkgFailedException(f"The package {package} already exists")
 
     yaml.representer.ignore_aliases = lambda *_: True
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
-
+    store_meta_yaml(yaml, meta_path, yaml_content)
     logger.success(f"Output written to {meta_path}")
 
 
@@ -225,11 +330,7 @@ def update_package(
     yaml = YAML()
 
     meta_path = root / package / "meta.yaml"
-    if not meta_path.exists():
-        logger.error("%s does not exist", meta_path)
-        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
-
-    yaml_content = yaml.load(meta_path.read_bytes())
+    yaml_content = load_meta_yaml(yaml, meta_path)
 
     build_info = yaml_content.get("build", {})
     ty = build_info.get("type", None)
@@ -321,8 +422,7 @@ def update_package(
     yaml_content["source"]["sha256"] = dist_metadata["digests"]["sha256"]
     yaml_content["package"]["version"] = pypi_metadata["info"]["version"]
 
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
+    store_meta_yaml(yaml, meta_path, yaml_content)
 
     logger.success(f"Updated {package} from {local_ver} to {pypi_ver}.")
 
@@ -331,11 +431,7 @@ def disable_package(recipe_dir: Path, package: str, message: str) -> None:
     yaml = YAML()
 
     meta_path = recipe_dir / package / "meta.yaml"
-    if not meta_path.exists():
-        logger.error("%s does not exist", meta_path)
-        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
-
-    yaml_content = yaml.load(meta_path.read_bytes())
+    yaml_content = load_meta_yaml(yaml, meta_path)
     pkg = yaml_content["package"]
     pkg_keys = list(pkg)
     # Insert after the version key
@@ -344,8 +440,7 @@ def disable_package(recipe_dir: Path, package: str, message: str) -> None:
     # Add message above it
     if message:
         pkg.yaml_set_comment_before_after_key("_disabled", before=message)
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
+    store_meta_yaml(yaml, meta_path, yaml_content)
 
 
 def remove_comment_on_line(pkg: Any, line: int):
@@ -366,9 +461,7 @@ def enable_package(recipe_dir: Path, package: str) -> None:
     yaml = YAML()
 
     meta_path = recipe_dir / package / "meta.yaml"
-    if not meta_path.exists():
-        logger.error("%s does not exist", meta_path)
-        raise MkpkgFailedException(f"{package} recipe not found at {meta_path}")
+    yaml_content = load_meta_yaml(yaml, meta_path)
 
     text_lines = meta_path.read_text().splitlines()
     for idx, line in enumerate(text_lines):  # noqa: B007
@@ -377,11 +470,57 @@ def enable_package(recipe_dir: Path, package: str) -> None:
     else:
         # Not disabled, let's return
         return
-    yaml_content = yaml.load(meta_path.read_bytes())
+
     pkg = yaml_content["package"]
     if text_lines[idx - 1].strip().startswith("#"):
         # There's a comment to remove, we have to hunt it down...
         remove_comment_on_line(pkg, idx - 1)
     del pkg["_disabled"]
-    yaml.dump(yaml_content, meta_path)
-    run_prettier(meta_path)
+
+    store_meta_yaml(yaml, meta_path, yaml_content)
+
+
+def pin_package(recipe_dir: Path, package: str, message: str) -> None:
+    yaml = YAML()
+    meta_path = recipe_dir / package / "meta.yaml"
+    # Try to restore the file to its original state. If git isn't installed or
+    # the file isn't tracked, just ignore the error.
+    subprocess.run(["git", "restore", meta_path], check=False, capture_output=True)
+    yaml_content = load_meta_yaml(yaml, meta_path)
+    pkg = yaml_content["package"]
+    pkg_keys = list(pkg)
+    # Insert after the version key
+    version_idx = pkg_keys.index("version") + 1
+    pkg.insert(version_idx, "pinned", True)
+    # Add message above it
+    if message:
+        pkg.yaml_set_comment_before_after_key("pinned", before=message)
+    store_meta_yaml(yaml, meta_path, yaml_content)
+
+
+def lookup_gh_username():
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"], text=True, check=False, capture_output=True
+        )
+    except FileNotFoundError:
+        raise MkpkgFailedException("gh cli is not installed") from None
+
+    def fail(msg):
+        if result.stdout:
+            msg += "\nstdout:\n"
+            msg += indent(result.stdout, "   ")
+        if result.stderr:
+            msg += "\nstderr:\n"
+            msg += indent(result.stderr, "   ")
+        raise MkpkgFailedException(msg)
+
+    if result.returncode:
+        fail(f"gh auth status failed with status {result.returncode}")
+
+    for line in result.stdout.splitlines():
+        if "github.com account" in line:
+            break
+    else:
+        fail("Did not find github.com account in gh auth status")
+    return line.partition(" account ")[-1].split()[0]

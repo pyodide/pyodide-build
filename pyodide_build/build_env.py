@@ -6,7 +6,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import nullcontext, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -14,7 +14,7 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import search_pyproject_toml, to_bool, xbuildenv_dirname
+from pyodide_build.common import default_xbuildenv_path, search_pyproject_toml, to_bool
 from pyodide_build.config import ConfigManager, CrossBuildEnvConfigManager
 
 RUST_BUILD_PRELUDE = """
@@ -74,7 +74,7 @@ def _init_xbuild_env(*, quiet: bool = False) -> Path:
     """
     from pyodide_build.xbuildenv import CrossBuildEnvManager  # avoid circular import
 
-    xbuildenv_path = Path(xbuildenv_dirname()).resolve()
+    xbuildenv_path = default_xbuildenv_path()
     context = redirect_stdout(StringIO()) if quiet else nullcontext()
     with context:
         manager = CrossBuildEnvManager(xbuildenv_path)
@@ -219,7 +219,7 @@ def wheel_platform() -> str:
     return f"pyodide_{abi_version}_wasm32"
 
 
-def pyodide_tags() -> Iterator[Tag]:
+def pyodide_tags_() -> Iterator[Tag]:
     """
     Returns the sequence of tag triples for the Pyodide interpreter.
 
@@ -233,6 +233,11 @@ def pyodide_tags() -> Iterator[Tag]:
     yield from compatible_tags(platforms=PLATFORMS, python_version=python_version)
     # Following line can be removed once packaging 22.0 is released and we update to it.
     yield Tag(interpreter=f"cp{PYMAJOR}{PYMINOR}", abi="none", platform="any")
+
+
+@functools.cache
+def pyodide_tags() -> Sequence[Tag]:
+    return list(pyodide_tags_())
 
 
 def replace_so_abi_tags(wheel_dir: Path) -> None:
@@ -300,3 +305,25 @@ def local_versions() -> dict[str, str]:
         "pyodide-build": __version__,
         # "emscripten": "TODO"
     }
+
+
+def _create_constraints_file() -> str:
+    try:
+        constraints = get_build_flag("PIP_CONSTRAINT")
+    except ValueError:
+        return ""
+
+    if not constraints:
+        return ""
+
+    if len(constraints.split(maxsplit=1)) > 1:
+        raise ValueError(
+            "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to pyodide has no spaces.\n"
+            "See https://github.com/pypa/pip/issues/13283"
+        )
+
+    constraints_file = Path(constraints)
+    if not constraints_file.is_file():
+        constraints_file.parent.mkdir(parents=True, exist_ok=True)
+        constraints_file.write_text("")
+    return constraints

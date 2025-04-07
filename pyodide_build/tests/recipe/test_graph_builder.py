@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import zipfile
 from pathlib import Path
@@ -53,7 +54,6 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
     pkg_map = graph_builder.generate_dependency_graph(
         RECIPE_DIR, {"pkg_1", "pkg_2", "libtest", "libtest_shared"}
     )
-    hashes = {}
     for pkg in pkg_map.values():
         if not pkg.file_name:
             match pkg.package_type:
@@ -63,10 +63,36 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
                     pkg.file_name = pkg.name + ".zip"
         # Write dummy package file for SHA-256 hash verification
         with zipfile.ZipFile(tmp_path / pkg.file_name, "w") as whlzip:
-            whlzip.writestr(pkg.file_name, data=pkg.file_name)
+            if pkg.package_type == "package":
+                # Make a proper .dist-info directory to make `python -m wheel pack/unpack` happy
+                dist_info_dir = f"{pkg.name}-{pkg.version}.dist-info"
+                metadata_content = f"name: {pkg.name}\nversion: {pkg.version}\n"
+                metadata_shasum = (
+                    base64.urlsafe_b64encode(
+                        hashlib.sha256(metadata_content.encode()).digest()
+                    )
+                    .decode()
+                    .rstrip("=")
+                )
+                wheel_content = "Wheel-Version: 1.0\nTag: py3-none-any\n"
+                wheel_shasum = (
+                    base64.urlsafe_b64encode(
+                        hashlib.sha256(wheel_content.encode()).digest()
+                    )
+                    .decode()
+                    .rstrip("=")
+                )
 
-        with open(tmp_path / pkg.file_name, "rb") as f:
-            hashes[pkg.name] = hashlib.sha256(f.read()).hexdigest()
+                whlzip.writestr(f"{dist_info_dir}/METADATA", metadata_content)
+                whlzip.writestr(f"{dist_info_dir}/WHEEL", wheel_content)
+                whlzip.writestr(
+                    f"{dist_info_dir}/RECORD",
+                    (
+                        f"{dist_info_dir}/METADATA,sha256={metadata_shasum},{len(metadata_content)}\n"
+                        f"{dist_info_dir}/WHEEL,sha256={wheel_shasum},{len(wheel_content)}\n"
+                        f"{dist_info_dir}/RECORD,,\n"
+                    ),
+                )
 
     package_data = graph_builder.generate_lockfile(tmp_path, pkg_map)
     assert package_data.info.arch == "wasm32"
@@ -89,7 +115,7 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
         imports=["pkg_1"],
         package_type="package",
         install_dir="site",
-        sha256=hashes["pkg_1"],
+        sha256=package_data.packages["pkg-1"].sha256,  # don't care
     )
 
     assert package_data.packages["libtest-shared"].package_type == "shared_library"
@@ -104,11 +130,10 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
 def test_build_dependencies(n_jobs, monkeypatch):
     build_list = []
 
-    class MockPackage(graph_builder.Package):
-        def build(self, args: Any, build_dir: Path) -> None:
-            build_list.append(self.name)
+    def mock_build(self, args: Any, build_dir: Path) -> None:
+        build_list.append(self.name)
 
-    monkeypatch.setattr(graph_builder, "Package", MockPackage)
+    monkeypatch.setattr(graph_builder.BasePackage, "build", mock_build)
 
     pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_1", "pkg_2"})
 
@@ -133,11 +158,10 @@ def test_build_dependencies(n_jobs, monkeypatch):
 def test_build_error(n_jobs, monkeypatch):
     """Try building all the dependency graph, without the actual build operations"""
 
-    class MockPackage(graph_builder.Package):
-        def build(self, args: Any, build_dir: Path) -> None:
-            raise ValueError("Failed build")
+    def mock_build(self, args: Any, build_dir: Path) -> None:
+        raise ValueError("Failed build")
 
-    monkeypatch.setattr(graph_builder, "Package", MockPackage)
+    monkeypatch.setattr(graph_builder.BasePackage, "build", mock_build)
 
     pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_1"})
 

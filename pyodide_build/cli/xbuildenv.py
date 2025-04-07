@@ -3,7 +3,7 @@ from pathlib import Path
 import typer
 
 from pyodide_build.build_env import local_versions
-from pyodide_build.common import xbuildenv_dirname
+from pyodide_build.common import default_xbuildenv_path
 from pyodide_build.views import MetadataView
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
@@ -11,7 +11,7 @@ from pyodide_build.xbuildenv_releases import (
     load_cross_build_env_metadata,
 )
 
-DIRNAME = xbuildenv_dirname()
+DEFAULT_PATH = default_xbuildenv_path()
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -35,7 +35,7 @@ def _install(
         None, help="version of cross-build environment to install"
     ),
     path: Path = typer.Option(
-        DIRNAME, help="path to cross-build environment directory"
+        DEFAULT_PATH, help="path to cross-build environment directory"
     ),
     url: str = typer.Option(None, help="URL to download cross-build environment from"),
     force_install: bool = typer.Option(
@@ -66,7 +66,7 @@ def _install(
 @app.command("version")
 def _version(
     path: Path = typer.Option(
-        DIRNAME, help="path to cross-build environment directory"
+        DEFAULT_PATH, help="path to cross-build environment directory"
     ),
 ) -> None:
     """
@@ -85,7 +85,7 @@ def _version(
 @app.command("versions")
 def _versions(
     path: Path = typer.Option(
-        DIRNAME, help="path to cross-build environment directory"
+        DEFAULT_PATH, help="path to cross-build environment directory"
     ),
 ) -> None:
     """
@@ -109,7 +109,7 @@ def _uninstall(
         None, help="version of cross-build environment to uninstall"
     ),
     path: Path = typer.Option(
-        DIRNAME, help="path to cross-build environment directory"
+        DEFAULT_PATH, help="path to cross-build environment directory"
     ),
 ) -> None:
     """
@@ -127,7 +127,7 @@ def _use(
         ..., help="version of cross-build environment to use"
     ),
     path: Path = typer.Option(
-        DIRNAME, help="path to cross-build environment directory"
+        DEFAULT_PATH, help="path to cross-build environment directory"
     ),
 ) -> None:
     """

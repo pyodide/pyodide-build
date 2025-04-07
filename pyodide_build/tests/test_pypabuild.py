@@ -18,21 +18,21 @@ def test_remove_avoided_requirements():
     ) == {"baz"}
 
 
-def test_install_reqs(tmp_path):
+def test_install_reqs(tmp_path, dummy_xbuildenv):
     env = MockIsolatedEnv(tmp_path)
 
     reqs = {"foo", "bar", "baz"}
 
-    pypabuild.install_reqs(env, reqs)  # type: ignore[arg-type]
+    pypabuild.install_reqs({}, env, reqs)  # type: ignore[arg-type]
     for req in reqs:
         assert req in env.installed
 
-    pypabuild.install_reqs(env, set(pypabuild.AVOIDED_REQUIREMENTS))  # type: ignore[arg-type]
+    pypabuild.install_reqs({}, env, set(pypabuild.AVOIDED_REQUIREMENTS))  # type: ignore[arg-type]
     for req in pypabuild.AVOIDED_REQUIREMENTS:
         assert req not in env.installed
 
 
-def test_make_command_wrapper_symlinks(tmp_path):
+def test_make_command_wrapper_symlinks(tmp_path, dummy_xbuildenv):
     symlink_dir = tmp_path
     env = pypabuild.make_command_wrapper_symlinks(symlink_dir)
 
@@ -77,6 +77,7 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         ldflags="",
         target_install_dir=str(tmp_path),
         exports="pyinit",
+        build_dir=tmp_path,
     )
 
     with build_env_ctx as env:

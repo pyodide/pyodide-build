@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from pyodide_build import build_env
-from pyodide_build.common import xbuildenv_dirname
+from pyodide_build import build_env, common
+from pyodide_build.common import default_xbuildenv_path
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
@@ -57,17 +57,20 @@ def reset_env_vars():
 
 @pytest.fixture(scope="function")
 def reset_cache():
-    # Will remove all caches before each test.
+    # Will remove all caches before and after each test.
 
     def _reset():
         build_env.get_pyodide_root.cache_clear()
         build_env.get_host_build_environment_vars.cache_clear()
         build_env.get_build_environment_vars.cache_clear()
         build_env.get_unisolated_packages.cache_clear()
+        common.default_xbuildenv_path.cache_clear()
 
     _reset()
 
     yield _reset
+
+    _reset()
 
 
 @pytest.fixture(scope="function")
@@ -88,7 +91,11 @@ def dummy_xbuildenv_url(httpserver):
 
 
 @pytest.fixture(scope="function")
-def dummy_xbuildenv(dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache):
+def dummy_xbuildenv(
+    dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache, monkeypatch
+):
+    import platformdirs
+
     """
     Downloads the dummy xbuildenv archive and installs it in the temporary directory.
 
@@ -96,7 +103,9 @@ def dummy_xbuildenv(dummy_xbuildenv_url, tmp_path, reset_env_vars, reset_cache):
     """
     assert "PYODIDE_ROOT" not in os.environ
 
-    manager = CrossBuildEnvManager(tmp_path / xbuildenv_dirname())
+    # use PYODIDE_XBUILDENV_PATH instead patching platformdirs after #114
+    monkeypatch.setattr(platformdirs, "user_cache_dir", lambda: tmp_path)
+    manager = CrossBuildEnvManager(default_xbuildenv_path())
     manager.install(
         version=None, url=dummy_xbuildenv_url, skip_install_cross_build_packages=True
     )

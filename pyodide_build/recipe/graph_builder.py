@@ -27,17 +27,18 @@ from rich.progress import BarColumn, Progress, TimeElapsedColumn
 from rich.spinner import Spinner
 from rich.table import Table
 
-from pyodide_build import build_env
+from pyodide_build import build_env, uv_helper
 from pyodide_build.build_env import BuildArgs
 from pyodide_build.common import (
+    download_and_unpack_archive,
     exit_with_stdio,
     extract_wheel_metadata_file,
-    find_matching_wheels,
+    find_matching_wheel,
     find_missing_executables,
     repack_zip_archive,
 )
 from pyodide_build.logger import console_stdout, logger
-from pyodide_build.recipe import loader
+from pyodide_build.recipe import loader, unvendor
 from pyodide_build.recipe.builder import needs_rebuild
 from pyodide_build.recipe.spec import MetaConfig, _BuildSpecTypes
 
@@ -64,10 +65,45 @@ class BasePackage:
     dependencies: set[str]  # run + host dependencies
     unbuilt_host_dependencies: set[str]
     host_dependents: set[str]
-    unvendored_tests: Path | None = None
+    unvendor_tests: bool = False
     file_name: str | None = None
     install_dir: str = "site"
     _queue_idx: int | None = None
+
+    def __init__(self, pkgdir: Path, config: MetaConfig):
+        self.pkgdir = pkgdir
+        self.meta = config.model_copy(deep=True)
+
+        self.name = self.meta.package.name
+        self.version = self.meta.package.version
+        self.disabled = self.meta.package.disabled
+        self.package_type = self.meta.build.package_type
+        self.is_wheel = self.package_type in ["package", "cpython_module"]
+
+        assert self.name == pkgdir.name, f"{self.name} != {pkgdir.name}"
+
+        self.run_dependencies = self.meta.requirements.run
+        self.host_dependencies = self.meta.requirements.host
+        self.executables_required = self.meta.requirements.executable
+        self.dependencies = set(self.run_dependencies + self.host_dependencies)
+        self.unbuilt_host_dependencies = set(self.host_dependencies)
+        self.host_dependents = set()
+
+    @classmethod
+    def from_recipe(
+        cls,
+        pkgdir: Path,
+        config: MetaConfig,
+    ) -> "BasePackage":
+        match config.build.package_type:
+            case "package" | "cpython_module":
+                return PythonPackage(pkgdir, config)
+            case "shared_library":
+                return SharedLibrary(pkgdir, config)
+            case "static_library":
+                return StaticLibrary(pkgdir, config)
+            case _:
+                raise ValueError(f"Unknown package type: {config.build.package_type}")
 
     # We use this in the priority queue, which pops off the smallest element.
     # So we want the smallest element to have the largest number of dependents
@@ -84,64 +120,22 @@ class BasePackage:
         return build_dir / self.name / "build"
 
     def needs_rebuild(self, build_dir: Path) -> bool:
-        return needs_rebuild(self.pkgdir, self.build_path(build_dir), self.meta.source)
+        res = needs_rebuild(
+            self.pkgdir,
+            self.build_path(build_dir),
+            self.meta.source,
+            self.is_wheel,
+            self.version,
+        )
+        return res
 
     def build(self, build_args: BuildArgs, build_dir: Path) -> None:
-        raise NotImplementedError()
-
-    def dist_artifact_path(self) -> Path:
-        raise NotImplementedError()
-
-    def tests_path(self) -> Path | None:
-        return None
-
-
-@dataclasses.dataclass
-class Package(BasePackage):
-    def __init__(self, pkgdir: Path, config: MetaConfig):
-        self.pkgdir = pkgdir
-        self.meta = config.model_copy(deep=True)
-
-        self.name = self.meta.package.name
-        self.version = self.meta.package.version
-        self.disabled = self.meta.package.disabled
-        self.package_type = self.meta.build.package_type
-
-        assert self.name == pkgdir.name, f"{self.name} != {pkgdir.name}"
-
-        self.run_dependencies = self.meta.requirements.run
-        self.host_dependencies = self.meta.requirements.host
-        self.executables_required = self.meta.requirements.executable
-        self.dependencies = set(self.run_dependencies + self.host_dependencies)
-        self.unbuilt_host_dependencies = set(self.host_dependencies)
-        self.host_dependents = set()
-
-    def dist_artifact_path(self) -> Path:
-        dist_dir = self.pkgdir / "dist"
-        if self.package_type == "shared_library":
-            candidates = list(dist_dir.glob("*.zip"))
-        else:
-            candidates = list(
-                find_matching_wheels(dist_dir.glob("*.whl"), build_env.pyodide_tags())
-            )
-
-        if len(candidates) != 1:
-            raise RuntimeError(
-                f"Unexpected number of wheels/archives {len(candidates)} when building {self.name}"
-            )
-
-        return candidates[0]
-
-    def tests_path(self) -> Path | None:
-        tests = list((self.pkgdir / "dist").glob("*-tests.tar"))
-        assert len(tests) <= 1
-        if tests:
-            return tests[0]
-        return None
-
-    def build(self, build_args: BuildArgs, build_dir: Path) -> None:
+        run_prefix = (
+            [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
+        )
         p = subprocess.run(
             [
+                *run_prefix,
                 "pyodide",
                 "build-recipes-no-deps",
                 self.name,
@@ -176,6 +170,57 @@ class Package(BasePackage):
                 msg.append("ERROR: No build log found.")
             msg.append(f"ERROR: cancelling buildall due to error building {self.name}")
             raise BuildError(p.returncode, "\n".join(msg))
+
+    def dist_artifact_path(self) -> Path | None:
+        """
+        Return the path to the distribution artifact of the package.
+        """
+        raise NotImplementedError()
+
+
+@dataclasses.dataclass
+class PythonPackage(BasePackage):
+    def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
+        super().__init__(pkgdir, config)
+
+        self.unvendor_tests = self.meta.build.unvendor_tests
+
+    def dist_artifact_path(self) -> Path | None:
+        dist_dir = self.pkgdir / "dist"
+        wheel = find_matching_wheel(
+            dist_dir.glob("*.whl"), build_env.pyodide_tags(), version=self.version
+        )
+        if not wheel:
+            raise RuntimeError(f"Found no wheel while building {self.name}")
+        return wheel
+
+
+@dataclasses.dataclass
+class SharedLibrary(BasePackage):
+    install_dir: str = "dynlib"
+
+    def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
+        super().__init__(pkgdir, config)
+
+    def dist_artifact_path(self) -> Path | None:
+        dist_dir = self.pkgdir / "dist"
+        candidates = list(dist_dir.glob("*.zip"))
+
+        if len(candidates) != 1:
+            raise RuntimeError(
+                f"Unexpected number of wheels/archives {len(candidates)} when building {self.name}"
+            )
+
+        return candidates[0]
+
+
+@dataclasses.dataclass
+class StaticLibrary(BasePackage):
+    def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
+        super().__init__(pkgdir, config)
+
+    def dist_artifact_path(self) -> Path | None:
+        return None
 
 
 class PackageStatus:
@@ -387,7 +432,7 @@ def generate_dependency_graph(
                 f"No metadata file found for the following package: {pkgname}"
             )
 
-        pkg = Package(packages_dir / pkgname, all_recipes[pkgname])
+        pkg = BasePackage.from_recipe(packages_dir / pkgname, all_recipes[pkgname])
         pkg_map[pkgname] = pkg
         graph[pkgname] = pkg.dependencies
         for dep in pkg.dependencies:
@@ -647,13 +692,23 @@ class _GraphBuilder:
                         self.build_queue.put((job_priority(dependent), dependent))
 
 
+def _run(cmd, *args, check=False, **kwargs):
+    result = subprocess.run(cmd, *args, **kwargs, check=check)
+    if result.returncode != 0:
+        logger.error("ERROR: command failed %s", " ".join(cmd))
+        exit_with_stdio(result)
+    return result
+
+
 def _ensure_rust_toolchain():
     rust_toolchain = build_env.get_build_flag("RUST_TOOLCHAIN")
-    result = subprocess.run(
-        ["rustup", "toolchain", "install", rust_toolchain], check=False
-    )
-    if result.returncode == 0:
-        result = subprocess.run(
+    _run(["rustup", "toolchain", "install", rust_toolchain])
+    _run(["rustup", "default", rust_toolchain])
+
+    url = build_env.get_build_flag("RUST_EMSCRIPTEN_TARGET_URL")
+    if not url:
+        # Install target with rustup target add
+        _run(
             [
                 "rustup",
                 "target",
@@ -661,12 +716,30 @@ def _ensure_rust_toolchain():
                 "wasm32-unknown-emscripten",
                 "--toolchain",
                 rust_toolchain,
-            ],
-            check=False,
+            ]
         )
-    if result.returncode != 0:
-        logger.error("ERROR: rustup toolchain install failed")
-        exit_with_stdio(result)
+        return
+
+    # Now we are going to delete the normal wasm32-unknown-emscripten sysroot
+    # and replace it with our wasm-eh version.
+    # We place the "install_token" to indicate that our custom sysroot has been
+    # installed and which URL we got it from.
+    result = _run(
+        ["rustup", "which", "--toolchain", rust_toolchain, "rustc"],
+        capture_output=True,
+        text=True,
+    )
+
+    toolchain_root = Path(result.stdout).parents[1]
+    rustlib = toolchain_root / "lib/rustlib"
+    install_token = rustlib / "wasm32-unknown-emscripten_install-url.txt"
+    if install_token.exists() and install_token.read_text() == url:
+        return
+    shutil.rmtree(rustlib / "wasm32-unknown-emscripten", ignore_errors=True)
+    download_and_unpack_archive(
+        url, rustlib, "wasm32-unknown-emscripten target", exists_ok=True
+    )
+    install_token.write_text(url)
 
 
 def build_from_graph(
@@ -747,7 +820,9 @@ def generate_packagedata(
 
         if not pkg.file_name or pkg.package_type == "static_library":
             continue
-        if not Path(output_dir, pkg.file_name).exists():
+
+        wheel_file = output_dir / pkg.file_name
+        if not wheel_file.exists():
             continue
         pkg_entry = PackageLockSpec(
             name=name,
@@ -757,12 +832,6 @@ def generate_packagedata(
             package_type=pkg.package_type,
         )
 
-        update_package_sha256(pkg_entry, output_dir / pkg.file_name)
-
-        pkg_type = pkg.package_type
-        if pkg_type == "shared_library":
-            pkg_entry.install_dir = "dynlib"
-
         pkg_entry.depends = [x.lower() for x in pkg.run_dependencies]
 
         if pkg.package_type not in ("static_library", "shared_library"):
@@ -770,23 +839,24 @@ def generate_packagedata(
                 pkg.meta.package.top_level if pkg.meta.package.top_level else [name]
             )
 
-        packages[normalized_name.lower()] = pkg_entry
-
-        if pkg.unvendored_tests:
-            packages[normalized_name.lower()].unvendored_tests = True
-
-            # Create the test package if necessary
-            pkg_entry = PackageLockSpec(
-                name=name + "-tests",
-                version=pkg.version,
-                depends=[name.lower()],
-                file_name=pkg.unvendored_tests.name,
-                install_dir=pkg.install_dir,
+        if pkg.unvendor_tests:
+            unvendored_test_file = unvendor.unvendor_tests_in_wheel(
+                wheel_file, pkg.meta.build.retain_test_patterns
             )
+            if unvendored_test_file:
+                pkg_entry.unvendored_tests = True
+                test_file_entry = PackageLockSpec(
+                    name=f"{name}-tests",
+                    version=pkg.version,
+                    depends=[name],
+                    file_name=unvendored_test_file.name,
+                    install_dir=pkg.install_dir,
+                )
+                update_package_sha256(test_file_entry, unvendored_test_file)
+                packages[normalized_name + "-tests"] = test_file_entry
 
-            update_package_sha256(pkg_entry, output_dir / pkg.unvendored_tests.name)
-
-            packages[normalized_name.lower() + "-tests"] = pkg_entry
+        update_package_sha256(pkg_entry, wheel_file)
+        packages[normalized_name] = pkg_entry
 
     # sort packages by name
     packages = dict(sorted(packages.items()))
@@ -820,25 +890,19 @@ def copy_packages_to_dist_dir(
     metadata_files: bool = False,
 ) -> None:
     for pkg in packages:
-        if pkg.package_type == "static_library":
-            continue
-
         dist_artifact_path = pkg.dist_artifact_path()
-
-        shutil.copy(dist_artifact_path, output_dir)
-        repack_zip_archive(
-            output_dir / dist_artifact_path.name, compression_level=compression_level
-        )
-
-        if metadata_files and dist_artifact_path.suffix == ".whl":
-            extract_wheel_metadata_file(
-                dist_artifact_path,
-                output_dir / f"{dist_artifact_path.name}.metadata",
+        if dist_artifact_path:
+            shutil.copy(dist_artifact_path, output_dir)
+            repack_zip_archive(
+                output_dir / dist_artifact_path.name,
+                compression_level=compression_level,
             )
 
-        test_path = pkg.tests_path()
-        if test_path:
-            shutil.copy(test_path, output_dir)
+            if metadata_files and dist_artifact_path.suffix == ".whl":
+                extract_wheel_metadata_file(
+                    dist_artifact_path,
+                    output_dir / f"{dist_artifact_path.name}.metadata",
+                )
 
 
 def build_packages(
@@ -857,13 +921,10 @@ def build_packages(
 
     build_from_graph(pkg_map, build_args, build_dir, n_jobs, force_rebuild)
     for pkg in pkg_map.values():
-        assert isinstance(pkg, Package)
+        dist_path = pkg.dist_artifact_path()
 
-        if pkg.package_type == "static_library":
-            continue
-
-        pkg.file_name = pkg.dist_artifact_path().name
-        pkg.unvendored_tests = pkg.tests_path()
+        if dist_path:
+            pkg.file_name = dist_path.name
 
     return pkg_map
 

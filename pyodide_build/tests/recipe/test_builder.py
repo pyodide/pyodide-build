@@ -8,7 +8,7 @@ import pydantic
 import pytest
 
 from pyodide_build import common
-from pyodide_build.build_env import BuildArgs
+from pyodide_build.build_env import BuildArgs, get_build_flag
 from pyodide_build.recipe import builder as _builder
 from pyodide_build.recipe.builder import (
     RecipeBuilder,
@@ -46,18 +46,18 @@ def test_constructor(tmp_path):
     )
 
     assert builder.name == "beautifulsoup4"
-    assert builder.version == "4.10.0"
-    assert builder.fullname == "beautifulsoup4-4.10.0"
+    assert builder.version == "4.13.3"
+    assert builder.fullname == "beautifulsoup4-4.13.3"
 
     assert builder.pkg_root == RECIPE_DIR / "beautifulsoup4"
     assert builder.build_dir == tmp_path / "beautifulsoup4" / "build"
     assert (
         builder.src_extract_dir
-        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.10.0"
+        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.13.3"
     )
     assert (
         builder.src_dist_dir
-        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.10.0" / "dist"
+        == tmp_path / "beautifulsoup4" / "build" / "beautifulsoup4-4.13.3" / "dist"
     )
     assert builder.dist_dir == RECIPE_DIR / "beautifulsoup4" / "dist"
     assert builder.library_install_prefix == tmp_path / ".libs"
@@ -175,45 +175,32 @@ def test_get_helper_vars(tmp_path):
     )
 
 
-def test_unvendor_tests(tmpdir):
-    def touch(path: Path) -> None:
-        if path.is_dir():
-            raise ValueError("Only files, not folders are supported")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.touch()
+def test_create_constraints_file_no_override(tmp_path, dummy_xbuildenv):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR
+        / "pkg_test_executable",  # constraints not set, so no override
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+    )
 
-    def rlist(input_dir):
-        """Recursively list files in input_dir"""
-        paths = sorted(input_dir.rglob("*"))
-        res = []
+    path = builder._create_constraints_file()
+    assert path == get_build_flag("PIP_CONSTRAINT")
 
-        for el in paths:
-            if el.is_file():
-                res.append(str(el.relative_to(input_dir)))
-        return res
 
-    install_prefix = Path(str(tmpdir / "install"))
-    test_install_prefix = Path(str(tmpdir / "install-tests"))
+def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_test_constraint",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+    )
 
-    # create the example package
-    touch(install_prefix / "ex1" / "base.py")
-    touch(install_prefix / "ex1" / "conftest.py")
-    touch(install_prefix / "ex1" / "test_base.py")
-    touch(install_prefix / "ex1" / "tests" / "data.csv")
-    touch(install_prefix / "ex1" / "tests" / "test_a.py")
+    paths = builder._create_constraints_file()
+    assert paths == get_build_flag("PIP_CONSTRAINT") + " " + str(
+        tmp_path / "constraints.txt"
+    )
 
-    n_moved = _builder.unvendor_tests(install_prefix, test_install_prefix, [])
-
-    assert rlist(install_prefix) == ["ex1/base.py"]
-    assert rlist(test_install_prefix) == [
-        "ex1/conftest.py",
-        "ex1/test_base.py",
-        "ex1/tests/data.csv",
-        "ex1/tests/test_a.py",
-    ]
-
-    # One test folder and two test file
-    assert n_moved == 3
+    data = Path(paths.split()[-1]).read_text().strip().split("\n")
+    assert data[-3:] == ["numpy < 2.0", "pytest == 7.0", "setuptools < 75"], data
 
 
 class MockSourceSpec(_SourceSpec):
@@ -222,11 +209,23 @@ class MockSourceSpec(_SourceSpec):
         return self
 
 
-def test_needs_rebuild(tmpdir):
+@pytest.mark.parametrize("is_wheel", [False, True])
+def test_needs_rebuild(tmpdir, is_wheel):
     pkg_root = Path(tmpdir)
     buildpath = pkg_root / "build"
     meta_yaml = pkg_root / "meta.yaml"
-    packaged = buildpath / ".packaged"
+    version = "12"
+    if is_wheel:
+        dist_dir = pkg_root / "dist"
+        dist_dir.mkdir()
+        # Build of current version with wrong abi
+        (dist_dir / "regex-12-cp311-cp311-pyodide_2024_0_wasm32.whl").touch()
+        # Build of old version with current abi
+        (dist_dir / "regex-11-cp312-cp312-pyodide_2024_0_wasm32.whl").touch()
+        # the version we're trying to build
+        packaged = dist_dir / "regex-12-cp312-cp312-pyodide_2024_0_wasm32.whl"
+    else:
+        packaged = buildpath / ".packaged"
 
     patch_file = pkg_root / "patch"
     extra_file = pkg_root / "extra"
@@ -251,39 +250,53 @@ def test_needs_rebuild(tmpdir):
     src_path_file.touch()
 
     # No .packaged file, rebuild
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # .packaged file exists, no rebuild
     packaged.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is False
+    assert not _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer meta.yaml file, rebuild
     packaged.touch()
     time.sleep(0.01)
     meta_yaml.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer patch file, rebuild
     packaged.touch()
     time.sleep(0.01)
     patch_file.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer extra file, rebuild
     packaged.touch()
     time.sleep(0.01)
     extra_file.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer source path, rebuild
     packaged.touch()
     time.sleep(0.01)
     src_path_file.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is True
+    assert _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
     # newer .packaged file, no rebuild
     packaged.touch()
-    assert _builder.needs_rebuild(pkg_root, buildpath, source_metadata) is False
+    assert not _builder.needs_rebuild(
+        pkg_root, buildpath, source_metadata, is_wheel, version
+    )
 
 
 def test_copy_sharedlib(tmp_path):
