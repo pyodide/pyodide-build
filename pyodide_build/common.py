@@ -66,10 +66,7 @@ def default_xbuildenv_path() -> Path:
         # we can skip to fallback options if the config path is empty
         # as Path("") returns Path("."), which is not what we want.
         if config_path_str:
-            config_path = Path(config_path_str)
-
-            if not config_path.is_absolute():
-                config_path = Path.cwd() / config_path
+            config_path = Path(config_path_str).resolve()
 
             if _has_write_access(config_path):
                 return config_path
