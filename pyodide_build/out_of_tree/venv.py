@@ -234,19 +234,9 @@ def create_pip_script(venv_bin):
         pip.unlink(missing_ok=True)
         pip.symlink_to(pip_path)
 
-    # We used to use a symlink here, but getpath.py failed when used with uv
-    # python. So now we do this instead.
-    host_python_path.write_text(
-        dedent(
-            f"""\
-            #!/bin/sh
-            exec {sys.executable} $@
-            """
-        )
-    )
-    host_python_path.chmod(0o777)
+    host_python_path.symlink_to(sys.executable)
     # in case someone needs a Python-version-agnostic way to refer to python-host
-    (venv_bin / "python-host").symlink_to(host_python_path)
+    (venv_bin / "python-host").symlink_to(sys.executable)
 
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
