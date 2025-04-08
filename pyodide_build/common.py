@@ -72,8 +72,7 @@ def default_xbuildenv_path() -> Path:
                 return config_path
             else:
                 logger.error(
-                    "The directory specified in pyproject.toml (%s) is not writable. "
-                    "Falling back to default locations.",
+                    "Error: the directory specified in pyproject.toml or PYODIDE_XBUILDENV_PATH (%s) is not writable. ",
                     config_path,
                 )
 
