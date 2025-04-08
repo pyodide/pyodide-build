@@ -200,3 +200,52 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
     reset_cache()
 
     os.environ.pop("XDG_CACHE_HOME", None)
+
+
+def test_default_xbuildenv_path_env_var(tmp_path, reset_cache, monkeypatch):
+    from pathlib import Path
+
+    # default case
+    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
+
+    import platformdirs
+
+    dirname = xbuildenv_dirname()
+
+    baseline_path = Path(platformdirs.user_cache_dir()) / dirname
+
+    assert default_xbuildenv_path() == baseline_path
+
+    reset_cache()
+
+    # custom path
+    custom_path = tmp_path / "custom_xbuildenv_path"
+    custom_path.mkdir(exist_ok=True)
+
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(custom_path))
+
+    assert default_xbuildenv_path() == custom_path.resolve()
+
+    reset_cache()
+
+    # relative path from cwd
+    relative_dir = Path("../relative/xbuildenv").resolve()
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(relative_dir))
+
+    expected_path = Path.cwd() / relative_dir
+    assert default_xbuildenv_path() == expected_path
+
+    reset_cache()
+
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", "")
+    assert default_xbuildenv_path() == baseline_path
+
+    # non-writable path; should fall back to default
+    reset_cache()
+    non_writable_path = tmp_path / "non_writable"
+    non_writable_path.mkdir(exist_ok=True)
+    non_writable_path.chmod(0o444)
+
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(non_writable_path))
+
+    assert default_xbuildenv_path() == baseline_path

@@ -20,6 +20,7 @@ PYODIDE_CONFIGS = {
     "cxxflags": "SIDE_MODULE_CXXFLAGS",
     "ldflags": "SIDE_MODULE_LDFLAGS",
     "meson_cross_file": "MESON_CROSS_FILE",
+    "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
 }
 
 
