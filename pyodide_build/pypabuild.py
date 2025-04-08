@@ -34,6 +34,7 @@ from pyodide_build.vendor._pypabuild import (
 AVOIDED_REQUIREMENTS = [
     # mesonpy installs patchelf in linux platform but we don't want it.
     "patchelf",
+    "oldest-supported-numpy",
 ]
 
 # corresponding env variables for symlinks
