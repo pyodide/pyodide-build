@@ -228,7 +228,7 @@ class PackageStatus:
         self, *, name: str, idx: int, thread: int, total_packages: int
     ) -> None:
         self.pkg_name = name
-        self.prefix = f"[{idx}/{total_packages}] " f"(thread {thread})"
+        self.prefix = f"[{idx}/{total_packages}] (thread {thread})"
         self.status = Spinner("dots", style="red", speed=0.2)
         self.table = Table.grid(padding=1)
         self.table.add_row(f"{self.prefix} building {self.pkg_name}", self.status)
