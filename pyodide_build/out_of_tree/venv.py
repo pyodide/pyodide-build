@@ -72,7 +72,7 @@ def create_pip_conf(venv_root: Path) -> None:
         # In the xbuildenv, we don't have the packages locally. We will include
         # in the xbuildenv a PEP 503 index for the vendored Pyodide packages
         # https://peps.python.org/pep-0503/
-        repo = f'extra-index-url=file:{get_pyodide_root()/"package_index"}'
+        repo = f"extra-index-url=file:{get_pyodide_root() / 'package_index'}"
     else:
         # In the Pyodide development environment, the Pyodide dist directory
         # should contain the needed wheels. find-links
@@ -234,9 +234,19 @@ def create_pip_script(venv_bin):
         pip.unlink(missing_ok=True)
         pip.symlink_to(pip_path)
 
-    host_python_path.symlink_to(sys.executable)
+    # We used to use a symlink here, but getpath.py failed when used with uv
+    # python. So now we do this instead.
+    host_python_path.write_text(
+        dedent(
+            f"""\
+            #!/bin/sh
+            exec {sys.executable} $@
+            """
+        )
+    )
+    host_python_path.chmod(0o777)
     # in case someone needs a Python-version-agnostic way to refer to python-host
-    (venv_bin / "python-host").symlink_to(sys.executable)
+    (venv_bin / "python-host").symlink_to(host_python_path)
 
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what

@@ -251,17 +251,17 @@ class CrossBuildEnvManager:
             if pyver > python_versions[0]:
                 latest_supported = ".".join(str(x) for x in python_versions[0])
                 raise ValueError(
-                    f"Python version {local["python"]} is not yet supported. The newest supported version of Python is {latest_supported}."
+                    f"Python version {local['python']} is not yet supported. The newest supported version of Python is {latest_supported}."
                 )
 
             if pyver < python_versions[-1]:
                 oldest_supported = ".".join(str(x) for x in python_versions[-1])
                 raise ValueError(
-                    f"Python version {local["python"]} is too old. The oldest supported version of Python is {oldest_supported}."
+                    f"Python version {local['python']} is too old. The oldest supported version of Python is {oldest_supported}."
                 )
 
             raise ValueError(
-                f"Python version {local["python"]} is not compatible with pyodide build version {local["pyodide-build"]}"
+                f"Python version {local['python']} is not compatible with pyodide build version {local['pyodide-build']}"
             )
 
         return latest.version

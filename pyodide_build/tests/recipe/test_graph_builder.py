@@ -122,7 +122,7 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
 
     sharedlib_imports = package_data.packages["libtest-shared"].imports
     assert not sharedlib_imports, (
-        "shared libraries should not have any imports, but got " f"{sharedlib_imports}"
+        f"shared libraries should not have any imports, but got {sharedlib_imports}"
     )
 
 
