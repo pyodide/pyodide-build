@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.30.0] - 2025/04/08
 
 ### Added
 
-- Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build` in `uv`-managed virtual environments will now work.
+- Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or
+  `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build`
+  in `uv`-managed virtual environments will now work.
   [#132](https://github.com/pyodide/pyodide-build/pull/132)
 
 - `pyodide build` now takes an additional `--xbuildenv-path` argument and corresponding
@@ -36,8 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Rust toolchain version has been updated to `nightly-2025-01-18`.
   [#103](https://github.com/pyodide/pyodide-build/pull/103)
 
-- Pyodide cross-build environment will now be installed in the user cache directory by default,
-  which is `<home>/.cache` in Linux systems and `/Users/<user>/Library/Caches` in macOS.
+- Pyodide cross-build environments will now be installed in the user cache directory by default,
+  which is `<home>/.cache` or XDG cache in Linux systems, and `/Users/<user>/Library/Caches` in macOS.
   [#148](https://github.com/pyodide/pyodide-build/pull/148)
 
 - Removed `cmake` dependency from the package.
