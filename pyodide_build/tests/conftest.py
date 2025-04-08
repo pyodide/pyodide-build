@@ -103,10 +103,14 @@ def dummy_xbuildenv(
 
     xbuildenv_dir = tmp_path / xbuildenv_dirname()
 
+    from pyodide_build.build_env import get_host_build_flag
+
+    original_get_host_build_flag = get_host_build_flag
+
     def mock_get_host_build_flag(flag_name):
         if flag_name == "PYODIDE_XBUILDENV_PATH":
             return str(xbuildenv_dir)
-        return ""
+        return original_get_host_build_flag(flag_name)
 
     monkeypatch.setattr(
         "pyodide_build.build_env.get_host_build_flag", mock_get_host_build_flag
