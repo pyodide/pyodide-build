@@ -605,7 +605,29 @@ class RecipeBuilderPackage(RecipeBuilder):
                     [
                         "pip",
                         "install",
+                        # Upgrade the package in the host environment if there is a
+                        # older or newer version of the package already installed.
+                        # However, we don't want to replace the dependencies of the package,
+                        # since they may contain cross-build files as well.
+                        # For instance, numpy and scipy are both cross-build packages, but scipy depends on numpy.
+                        # Therefore, if we install numpy first and then scipy, installing scipy
+                        # will overwrite the cross build files in numpy.
                         "--upgrade",
+                        "--no-deps",
+                        "-t",
+                        str(host_site_packages),
+                        f"{name}=={ver}",
+                    ],
+                    check=True,
+                )
+
+                # Call the same pip command again to install the dependencies
+                # but without the --upgrade flag. This will prevent pip from
+                # overwriting the dependencies in the host environment.
+                subprocess.run(
+                    [
+                        "pip",
+                        "install",
                         "-t",
                         str(host_site_packages),
                         f"{name}=={ver}",
