@@ -3,6 +3,7 @@ This directory contains a few curated recipes to test the build process of pyodi
 ### List of recipes and their purpose
 
 - numpy: The most popular and widely used library in the scientific computing community.
+- pywavelets: a library with C and Cython extensions that uses the NumPy-C API.
 - orjson: Tests rust extension modules.
 - zlib: Tests static libraries.
 - geos: Tests shared libraries.
