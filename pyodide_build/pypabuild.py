@@ -17,6 +17,7 @@ from packaging.requirements import Requirement
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_host_build_flag,
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
@@ -36,6 +37,11 @@ AVOIDED_REQUIREMENTS = [
     "patchelf",
     "oldest-supported-numpy",
 ]
+
+AVOIDED_REQUIREMENTS: list[str] = [
+    "patchelf",
+    "oldest-supported-numpy",
+] + get_host_build_flag("AVOIDED_BUILD_REQUIREMENTS").split()
 
 # corresponding env variables for symlinks
 SYMLINK_ENV_VARS = {

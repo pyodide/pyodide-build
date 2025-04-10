@@ -11,6 +11,7 @@ from pyodide_build.common import (
     search_pyproject_toml,
 )
 from pyodide_build.logger import logger
+from pyodide_build.pypabuild import AVOIDED_REQUIREMENTS
 
 
 class ConfigManager:
@@ -199,6 +200,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "avoided_build_requirements": "AVOIDED_BUILD_REQUIREMENTS",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -218,6 +220,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "build_dependency_index_url",
     "default_cross_build_env_url",
     "xbuildenv_path",
+    "avoided_build_requirements",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -235,11 +238,11 @@ DEFAULT_CONFIG: dict[str, str] = {
     "rust_toolchain": "nightly-2025-02-01",
     "rust_emscripten_target_url": "",
     # Other configuration
-    "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
     "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
     "default_cross_build_env_url": "",
     "xbuildenv_path": "",
+    "avoided_build_requirements": " ".join(AVOIDED_REQUIREMENTS),
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }

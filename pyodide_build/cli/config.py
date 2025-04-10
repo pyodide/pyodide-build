@@ -21,6 +21,7 @@ PYODIDE_CONFIGS = {
     "ldflags": "SIDE_MODULE_LDFLAGS",
     "meson_cross_file": "MESON_CROSS_FILE",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "avoided_build_requirements": "AVOIDED_BUILD_REQUIREMENTS",
 }
 
 
