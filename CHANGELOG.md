@@ -9,16 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `pyodide config` exposes new variables: `pyodide_root`, `pyodide_abi_version`, and `python_include_dir`
-  [#186](https://github.com/pyodide/pyodide-build/pull/186)
+- `pyodide config` exposes new variables: `pyodide_root`, `pyodide_abi_version`, and `python_include_dir`,
+  and `ignored_build_requirements`.
+  [#186](https://github.com/pyodide/pyodide-build/pull/186) and [#187](https://github.com/pyodide/pyodide-build/pull/187)
 
 ## [0.30.0] - 2025/04/08
 
 ### Added
 
-- Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or
-  `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build`
-  in `uv`-managed virtual environments will now work.
+- Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build` in `uv`-managed virtual environments will now work.
   [#132](https://github.com/pyodide/pyodide-build/pull/132)
 
 - `pyodide build` now takes an additional `--xbuildenv-path` argument and corresponding
