@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - We now allow configuring the list of build-time requirements to ignore when building a package, through
-  `avoided_build_requirements`, which takes a string of concatenated requirements.
+  `ignored_build_requirements`, which takes a string of concatenated requirements.
   [#187](https://github.com/pyodide/pyodide-build/pull/187)
 
 ## [0.30.0] - 2025/04/08
