@@ -1,3 +1,5 @@
+import sysconfig
+
 import typer
 
 from pyodide_build.build_env import (
@@ -22,6 +24,13 @@ PYODIDE_CONFIGS = {
     "meson_cross_file": "MESON_CROSS_FILE",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
 }
+
+# Load the values of sysconfig.get_paths() with a
+# "pyodide_sysconfig_" prefix to differentiate them
+# from other configuration variables
+PYODIDE_CONFIGS.update(
+    {f"pyodide_sysconfig_{k}": v for k, v in sysconfig.get_paths().items()}
+)
 
 
 @app.callback(no_args_is_help=True)
@@ -56,7 +65,7 @@ def get_config(
     ),
 ) -> None:
     """
-    Get a value of a single config variable used in pyodide
+    Get a value of a single config variable used in Pyodide
     """
     configs = _get_configs()
 
