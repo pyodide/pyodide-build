@@ -42,6 +42,7 @@ class TestConfigManager:
                                   default_cross_build_env_url = "https://example.com/cross_build_env.tar.gz"
                                   skip_emscripten_version_check = "1"
                                   xbuildenv_path = "my_custom/xbuildenv_path"
+                                  ignored_build_requirements = "cmake foo bar"
                                   """)
 
         config_manager = ConfigManager()
@@ -54,6 +55,7 @@ class TestConfigManager:
         )
         assert config["skip_emscripten_version_check"] == "1"
         assert config["xbuildenv_path"] == "my_custom/xbuildenv_path"
+        assert config["ignored_build_requirements"] == "cmake foo bar"
 
 
 class TestCrossBuildEnvConfigManager_OutOfTree:
@@ -126,12 +128,14 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             "CMAKE_TOOLCHAIN_FILE": "/path/to/toolchain",
             "MESON_CROSS_FILE": "/path/to/crossfile",
             "PYODIDE_XBUILDENV_PATH": "/path/to/xbuildenv",
+            "IGNORED_BUILD_REQUIREMENTS": "cmake foo bar",
         }
 
         config = config_manager._load_config_from_env(env)
         assert config["cmake_toolchain_file"] == "/path/to/toolchain"
         assert config["meson_cross_file"] == "/path/to/crossfile"
         assert config["xbuildenv_path"] == "/path/to/xbuildenv"
+        assert config["ignored_build_requirements"] == "cmake foo bar"
 
     def test_load_config_from_file(
         self, tmp_path, dummy_xbuildenv, reset_env_vars, reset_cache
@@ -151,6 +155,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
                                   meson_cross_file = "$(MESON_CROSS_FILE)"
                                   build_dependency_index_url = "https://example.com/simple"
                                   xbuildenv_path = "../my_custom/xbuildenv_path" # also helps check relative paths
+                                  ignored_build_requirements = "cmake foo bar"
                                   """)
 
         xbuildenv_manager = CrossBuildEnvManager(
@@ -169,6 +174,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert config["meson_cross_file"] == "/path/to/crossfile"
         assert config["build_dependency_index_url"] == "https://example.com/simple"
         assert config["xbuildenv_path"] == "../my_custom/xbuildenv_path"
+        assert config["ignored_build_requirements"] == "cmake foo bar"
 
     def test_config_all(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
