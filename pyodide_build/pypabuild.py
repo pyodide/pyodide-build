@@ -34,6 +34,7 @@ from pyodide_build.vendor._pypabuild import (
 AVOIDED_REQUIREMENTS = [
     # mesonpy installs patchelf in linux platform but we don't want it.
     "patchelf",
+    "oldest-supported-numpy",
 ]
 
 # corresponding env variables for symlinks
@@ -122,7 +123,7 @@ def remove_avoided_requirements(
     for reqstr in list(requires):
         req = Requirement(reqstr)
         for avoid_name in set(avoided_requirements):
-            if avoid_name in req.name.lower():
+            if avoid_name == req.name.lower():
                 requires.remove(reqstr)
     return requires
 
