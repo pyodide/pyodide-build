@@ -1,4 +1,5 @@
 from pyodide_build import pypabuild, pywasmcross
+from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
 
 
 class MockIsolatedEnv:
@@ -27,8 +28,8 @@ def test_install_reqs(tmp_path, dummy_xbuildenv):
     for req in reqs:
         assert req in env.installed
 
-    pypabuild.install_reqs({}, env, set(pypabuild.AVOIDED_REQUIREMENTS))  # type: ignore[arg-type]
-    for req in pypabuild.AVOIDED_REQUIREMENTS:
+    pypabuild.install_reqs({}, env, set(BASE_IGNORED_REQUIREMENTS))  # type: ignore[arg-type]
+    for req in BASE_IGNORED_REQUIREMENTS:
         assert req not in env.installed
 
 

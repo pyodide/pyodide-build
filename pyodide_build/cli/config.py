@@ -21,6 +21,7 @@ PYODIDE_CONFIGS = {
     "ldflags": "SIDE_MODULE_LDFLAGS",
     "meson_cross_file": "MESON_CROSS_FILE",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
 }
 
 
@@ -46,7 +47,7 @@ def list_config():
     configs = _get_configs()
 
     for k, v in configs.items():
-        typer.echo(f"{k}={v}")
+        typer.echo(f'{k}="{v}"')
 
 
 @app.command("get")

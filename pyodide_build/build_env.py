@@ -15,7 +15,6 @@ from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
 from pyodide_build.common import default_xbuildenv_path, search_pyproject_toml, to_bool
-from pyodide_build.config import ConfigManager, CrossBuildEnvConfigManager
 
 RUST_BUILD_PRELUDE = """
 rustup default ${RUST_TOOLCHAIN}
@@ -123,11 +122,20 @@ def in_xbuildenv() -> bool:
     return pyodide_root.name == "pyodide-root"
 
 
+def _load_config_manager():
+    """Lazily load ConfigManager so that we can avoid circular imports."""
+    from pyodide_build.config import ConfigManager, CrossBuildEnvConfigManager
+
+    return ConfigManager, CrossBuildEnvConfigManager
+
+
 @functools.cache
 def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
     """
     Get common environment variables for the in-tree and out-of-tree build.
     """
+    _, CrossBuildEnvConfigManager = _load_config_manager()
+
     config_manager = CrossBuildEnvConfigManager(pyodide_root)
     env = config_manager.to_env()
 
@@ -147,6 +155,7 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
 
 @functools.cache
 def get_host_build_environment_vars() -> dict[str, str]:
+    ConfigManager, _ = _load_config_manager()
     manager = ConfigManager()
     return manager.to_env()
 
