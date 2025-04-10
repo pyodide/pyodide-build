@@ -23,6 +23,7 @@ dependencies = [
     "ruamel.yaml",
     "packaging",
     "virtualenv",
+    "nodejs-wheel",
     "requests",
     "typer>=0.13",
     "rich",
