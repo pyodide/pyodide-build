@@ -1,8 +1,10 @@
 from pyodide_build import common
 from pyodide_build.config import (
     BUILD_KEY_TO_VAR,
+    BUILD_VAR_TO_KEY,
     DEFAULT_CONFIG,
     DEFAULT_CONFIG_COMPUTED,
+    PYODIDE_CLI_CONFIGS,
     ConfigManager,
     CrossBuildEnvConfigManager,
 )
@@ -190,3 +192,10 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         env = config_manager.to_env()
         for env_var in BUILD_KEY_TO_VAR.values():
             assert env_var in env
+
+
+def test_cli_config_subset():
+    for value in PYODIDE_CLI_CONFIGS.values():
+        assert value in BUILD_VAR_TO_KEY, (
+            f"All cli config values should be in build var to key mapping, but {value} is not"
+        )

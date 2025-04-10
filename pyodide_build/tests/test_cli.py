@@ -17,6 +17,7 @@ from pyodide_build.cli import (
     py_compile,
     skeleton,
 )
+from pyodide_build.config import PYODIDE_CLI_CONFIGS
 
 runner = CliRunner()
 
@@ -250,11 +251,11 @@ def test_config_list(dummy_xbuildenv):
     envs = result.stdout.splitlines()
     keys = [env.split("=")[0] for env in envs]
 
-    for cfg_name in config.PYODIDE_CONFIGS.keys():
+    for cfg_name in PYODIDE_CLI_CONFIGS:
         assert cfg_name in keys
 
 
-@pytest.mark.parametrize("cfg_name,env_var", config.PYODIDE_CONFIGS.items())
+@pytest.mark.parametrize("cfg_name,env_var", PYODIDE_CLI_CONFIGS.items())
 def test_config_get(cfg_name, env_var, dummy_xbuildenv):
     result = runner.invoke(
         config.app,

@@ -262,3 +262,21 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     "host_site_packages": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages",
     "numpy_lib": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages/numpy/",
 }
+
+
+# A dictionary of config variables that are exposed through pyodide config CLI.
+PYODIDE_CLI_CONFIGS = {
+    "emscripten_version": "PYODIDE_EMSCRIPTEN_VERSION",
+    "python_version": "PYVERSION",
+    "rustflags": "RUSTFLAGS",
+    "cmake_toolchain_file": "CMAKE_TOOLCHAIN_FILE",
+    "rust_toolchain": "RUST_TOOLCHAIN",
+    "cflags": "SIDE_MODULE_CFLAGS",
+    "cxxflags": "SIDE_MODULE_CXXFLAGS",
+    "ldflags": "SIDE_MODULE_LDFLAGS",
+    "meson_cross_file": "MESON_CROSS_FILE",
+    "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "pyodide_abi_version": "PYODIDE_ABI_VERSION",
+    "pyodide_root": "PYODIDE_ROOT",
+    "python_include_dir": "PYTHONINCLUDE",
+}
