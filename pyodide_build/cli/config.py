@@ -32,7 +32,7 @@ def list_config():
     configs = _get_configs()
 
     for k, v in configs.items():
-        typer.echo(f"{k}={v}")
+        typer.echo(f'{k}="{v}"')
 
 
 @app.command("get")
