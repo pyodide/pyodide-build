@@ -17,7 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build` in `uv`-managed virtual environments will now work.
+- Added basic support for uv. `uv tool install pyodide-cli --with pyodide-build`, or
+  `uvx --from pyodide-cli --with pyodide-build pyodide --help`, or using `pyodide-build`
+  in `uv`-managed virtual environments will now work.
   [#132](https://github.com/pyodide/pyodide-build/pull/132)
 
 - `pyodide build` now takes an additional `--xbuildenv-path` argument and corresponding
