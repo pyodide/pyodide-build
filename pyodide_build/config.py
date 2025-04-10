@@ -10,8 +10,8 @@ from pyodide_build.common import (
     exit_with_stdio,
     search_pyproject_toml,
 )
+from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
 from pyodide_build.logger import logger
-from pyodide_build.pypabuild import AVOIDED_REQUIREMENTS
 
 
 class ConfigManager:
@@ -200,7 +200,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
-    "avoided_build_requirements": "AVOIDED_BUILD_REQUIREMENTS",
+    "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -220,7 +220,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "build_dependency_index_url",
     "default_cross_build_env_url",
     "xbuildenv_path",
-    "avoided_build_requirements",
+    "ignored_build_requirements",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -242,7 +242,8 @@ DEFAULT_CONFIG: dict[str, str] = {
     "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
     "default_cross_build_env_url": "",
     "xbuildenv_path": "",
-    "avoided_build_requirements": " ".join(AVOIDED_REQUIREMENTS),
+    # A list of PEP508 build-time requirements to be ignored when building a wheel
+    "ignored_build_requirements": " ".join(BASE_IGNORED_REQUIREMENTS),
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }
