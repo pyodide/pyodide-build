@@ -238,6 +238,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "rust_toolchain": "nightly-2025-02-01",
     "rust_emscripten_target_url": "",
     # Other configuration
+    "pyodide_jobs": "1",
     "skip_emscripten_version_check": "0",
     "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
     "default_cross_build_env_url": "",
