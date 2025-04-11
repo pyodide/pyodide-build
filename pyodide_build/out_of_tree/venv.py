@@ -222,7 +222,7 @@ def create_pip_script(venv_bin):
     # Python in the shebang. Use whichever Python was used to invoke
     # pyodide venv.
     host_python_path = venv_bin / f"python{get_pyversion()}-host"
-    host_python_path_no_version = venv_bin / f"python-host"
+    host_python_path_no_version = venv_bin / "python-host"
     pip_path = venv_bin / "pip_patched"
     python_host_link = venv_bin / "python-host-link"
 
