@@ -222,12 +222,14 @@ def create_pip_script(venv_bin):
     # Python in the shebang. Use whichever Python was used to invoke
     # pyodide venv.
     host_python_path = venv_bin / f"python{get_pyversion()}-host"
+    host_python_path_no_version = venv_bin / f"python-host"
     pip_path = venv_bin / "pip_patched"
     python_host_link = venv_bin / "python-host-link"
 
     # To support the "--clear" and "--no-clear" args, we need to remove
     # the existing symlinks before creating new ones.
     host_python_path.unlink(missing_ok=True)
+    host_python_path_no_version.unlink(missing_ok=True)
     python_host_link.unlink(missing_ok=True)
     for pip in venv_bin.glob("pip*"):
         if pip == pip_path:
@@ -253,7 +255,7 @@ def create_pip_script(venv_bin):
         )
     )
     host_python_path.chmod(0o777)
-    (venv_bin / "python-host").symlink_to(host_python_path)
+    host_python_path_no_version.symlink_to(host_python_path)
 
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
