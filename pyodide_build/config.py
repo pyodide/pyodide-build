@@ -284,4 +284,5 @@ PYODIDE_CLI_CONFIGS = {
     "pyodide_abi_version": "PYODIDE_ABI_VERSION",
     "pyodide_root": "PYODIDE_ROOT",
     "python_include_dir": "PYTHONINCLUDE",
+    "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
 }
