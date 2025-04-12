@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `pyodide config` exposes new variables: `pyodide_root`, `pyodide_abi_version`, and `python_include_dir`
-  [#186](https://github.com/pyodide/pyodide-build/pull/186)
+- `pyodide config` exposes new variables: `pyodide_root`, `pyodide_abi_version`, and `python_include_dir`,
+  and `ignored_build_requirements`.
+  [#186](https://github.com/pyodide/pyodide-build/pull/186) and [#187](https://github.com/pyodide/pyodide-build/pull/187)
 
 ## [0.30.0] - 2025/04/08
 

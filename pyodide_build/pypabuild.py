@@ -17,6 +17,7 @@ from packaging.requirements import Requirement
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_host_build_flag,
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
@@ -30,12 +31,6 @@ from pyodide_build.vendor._pypabuild import (
     _handle_build_error,
     _ProjectBuilder,
 )
-
-AVOIDED_REQUIREMENTS = [
-    # mesonpy installs patchelf in linux platform but we don't want it.
-    "patchelf",
-    "oldest-supported-numpy",
-]
 
 # corresponding env variables for symlinks
 SYMLINK_ENV_VARS = {
@@ -97,6 +92,8 @@ def _gen_runner(
 
 
 def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
+    from pyodide_build.build_env import get_build_flag, get_unisolated_packages
+
     pyversion = get_pyversion()
     site_packages_path = f"lib/{pyversion}/site-packages"
     env_site_packages = Path(env.path) / site_packages_path
@@ -131,6 +128,9 @@ def remove_avoided_requirements(
 def install_reqs(
     build_env: Mapping[str, str], env: DefaultIsolatedEnv, reqs: set[str]
 ) -> None:
+    IGNORED_BUILD_REQUIREMENTS = [
+        pkg.strip() for pkg in get_host_build_flag("IGNORED_BUILD_REQUIREMENTS").split()
+    ]
     # propagate PIP config from build_env to current environment
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
@@ -138,7 +138,7 @@ def install_reqs(
         env.install(
             remove_avoided_requirements(
                 reqs,
-                get_unisolated_packages() + AVOIDED_REQUIREMENTS,
+                get_unisolated_packages() + IGNORED_BUILD_REQUIREMENTS,
             )
         )
 
@@ -256,7 +256,6 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     -------
     The dictionary of compiler environment variables that points to the symlinks.
     """
-
     # For maintainers:
     # - you can set "_f2c_fixes_wrapper" variable in pyproject.toml
     # in order to change the script to use when cross-compiling
@@ -315,6 +314,7 @@ def get_build_env(
     Returns a dict of environment variables that should be used when building
     a package with pypa/build.
     """
+    from pyodide_build.build_env import get_build_flag
 
     kwargs = {
         "pkgname": pkgname,
