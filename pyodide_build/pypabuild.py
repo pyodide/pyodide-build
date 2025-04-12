@@ -128,9 +128,9 @@ def remove_avoided_requirements(
 def install_reqs(
     build_env: Mapping[str, str], env: DefaultIsolatedEnv, reqs: set[str]
 ) -> None:
-    IGNORED_BUILD_REQUIREMENTS = [pkg.strip() for pkg in get_host_build_flag(
-        "IGNORED_BUILD_REQUIREMENTS"
-    ).split()]
+    IGNORED_BUILD_REQUIREMENTS = [
+        pkg.strip() for pkg in get_host_build_flag("IGNORED_BUILD_REQUIREMENTS").split()
+    ]
     # propagate PIP config from build_env to current environment
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
