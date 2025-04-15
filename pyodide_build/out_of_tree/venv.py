@@ -250,7 +250,7 @@ def create_pip_script(venv_bin):
         dedent(
             f"""\
             #!/bin/sh
-            exec env PYTHONHOME={pythonhome} {sys.executable} $@
+            exec env PYTHONHOME={pythonhome} {python_host_link} $@
             """
         )
     )
