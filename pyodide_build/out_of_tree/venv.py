@@ -260,7 +260,7 @@ def create_pip_script(venv_bin):
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
-        f"#!/usr/bin/env {host_python_path} -s\n"
+        f"#!/usr/bin/env -S {host_python_path} -s\n"
         + get_pip_monkeypatch(venv_bin)
         + dedent(
             """
