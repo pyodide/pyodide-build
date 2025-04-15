@@ -9,7 +9,7 @@ from pyodide_build.build_env import BuildArgs, init_environment
 from pyodide_build.common import get_num_cores
 from pyodide_build.logger import logger
 from pyodide_build.recipe import graph_builder, loader
-from pyodide_build.recipe.builder import RecipeBuilder
+from pyodide_build.recipe.builder import RecipeBuilder, _load_recipe
 
 
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
@@ -143,7 +143,18 @@ def build_recipes_no_deps_impl(
 
     for package in packages:
         package_path = args.recipe_dir / package
-        package_build_dir = args.build_dir / package / "build"
+        _, recipe_config = _load_recipe(package_path)
+        # If a custom directory is specified, use it; otherwise
+        # we'll use the default
+        if recipe_config.build.directory:
+            custom_dir = Path(recipe_config.build.directory)
+
+            if not custom_dir.is_absolute():
+                custom_dir = (package_path / custom_dir).resolve()
+            package_build_dir = custom_dir
+        else:
+            package_build_dir = args.build_dir / package / "build"
+
         builder = RecipeBuilder.get_builder(
             package_path,
             args.build_args,
