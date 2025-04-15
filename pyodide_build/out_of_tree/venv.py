@@ -222,26 +222,45 @@ def create_pip_script(venv_bin):
     # Python in the shebang. Use whichever Python was used to invoke
     # pyodide venv.
     host_python_path = venv_bin / f"python{get_pyversion()}-host"
+    host_python_path_no_version = venv_bin / "python-host"
     pip_path = venv_bin / "pip_patched"
+    python_host_link = venv_bin / "python-host-link"
 
     # To support the "--clear" and "--no-clear" args, we need to remove
     # the existing symlinks before creating new ones.
     host_python_path.unlink(missing_ok=True)
-    (venv_bin / "python-host").unlink(missing_ok=True)
+    host_python_path_no_version.unlink(missing_ok=True)
+    python_host_link.unlink(missing_ok=True)
     for pip in venv_bin.glob("pip*"):
         if pip == pip_path:
             continue
         pip.unlink(missing_ok=True)
         pip.symlink_to(pip_path)
 
-    host_python_path.symlink_to(sys.executable)
-    # in case someone needs a Python-version-agnostic way to refer to python-host
-    (venv_bin / "python-host").symlink_to(sys.executable)
+    # Weird hack to work around:
+    # https://github.com/astral-sh/python-build-standalone/issues/380
+    # If we resolve the symlink all the way, the python-host interpreter works
+    # but won't install into our pyodide venv. If we don't resolve the symlink,
+    # sys.prefix is calculated incorrectly. To ensure that we get the right
+    # sys.prefix, we explicitly set it with the PYTHONHOME environment variable
+    # and then call the symlink.
+    python_host_link.symlink_to(sys.executable)
+    pythonhome = Path(sys._base_executable).parents[1]
+    host_python_path.write_text(
+        dedent(
+            f"""\
+            #!/bin/sh
+            exec env PYTHONHOME={pythonhome} {python_host_link} $@
+            """
+        )
+    )
+    host_python_path.chmod(0o777)
+    host_python_path_no_version.symlink_to(host_python_path)
 
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
-        f"#!{host_python_path} -s\n"
+        f"#!/usr/bin/env -S {host_python_path} -s\n"
         + get_pip_monkeypatch(venv_bin)
         + dedent(
             """
