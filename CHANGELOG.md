@@ -5,13 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.30.1] - 2025/04/25
 
 ### Added
 
 - `pyodide config` exposes new variables: `pyodide_root`, `pyodide_abi_version`, and `python_include_dir`,
   and `ignored_build_requirements`.
   [#186](https://github.com/pyodide/pyodide-build/pull/186) and [#187](https://github.com/pyodide/pyodide-build/pull/187)
+
+### Fixed
+
+- `pyodide venv` now works in uv-managed environments.
+  See [issue #143](https://github.com/pyodide/pyodide-build/issues/143).
+  [#185](https://github.com/pyodide/pyodide-build/pull/185)
 
 ## [0.30.0] - 2025/04/08
 
