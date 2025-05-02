@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+from textwrap import dedent
 
 import pytest
 
@@ -256,3 +257,34 @@ def test_pip_downgrade(base_test_dir):
     assert result.returncode == 0, result.stderr
     assert result.stdout.startswith("pip 24.0")
     assert venv_pip_path.readlink() == venv_pip_path.with_name("pip_patched")
+
+
+def test_pytest_invoke(base_test_dir):
+    venv_path = base_test_dir / "test_venv"
+    venv.create_pyodide_venv(venv_path, [])
+    pip = venv_path / "bin" / "pip"
+    subprocess.run(
+        [
+            pip,
+            "install",
+            "pytest",
+        ],
+        check=True,
+    )
+    pytest = venv_path / "bin" / "pytest"
+
+    (base_test_dir / "test_a.py").write_text(
+        dedent(
+            """\
+            from pyodide.code import run_js
+
+            def test_run_js():
+                assert run_js("(x) => x + 1")(7) == 8
+            """
+        )
+    )
+    subprocess.run(
+        [pytest, base_test_dir / "test_a.py"],
+        check=True,
+        env=os.environ | {"_PYODIDE_EXTRA_MOUNTS": str(base_test_dir)},
+    )

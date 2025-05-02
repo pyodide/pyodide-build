@@ -134,8 +134,11 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
         # to return the value with the host suffix removed.
         """
         from pip._vendor.distlib import scripts
+        EXECUTABLE_SUFFIX = "-host-link"
         def get_executable():
-            return sys.executable.removesuffix("-host")
+            if not sys.executable.endswith(EXECUTABLE_SUFFIX):
+                raise RuntimeError(f'Internal Pyodide error: expected sys.executable="{sys.executable}" to end with "{EXECUTABLE_SUFFIX}"')
+            return sys.executable.removesuffix(EXECUTABLE_SUFFIX)
 
         scripts.get_executable = get_executable
 
