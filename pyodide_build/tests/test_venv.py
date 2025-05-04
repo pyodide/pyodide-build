@@ -260,6 +260,7 @@ def test_pip_downgrade(base_test_dir):
     assert venv_pip_path.readlink() == venv_pip_path.with_name("pip_patched")
 
 
+@pytest.mark.integration
 def test_pytest_invoke(base_test_dir):
     if platform.system() == "Darwin":
         pytest.skip("TODO: Why doesn't this work on Mac OS?")
