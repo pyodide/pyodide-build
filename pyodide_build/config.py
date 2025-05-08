@@ -202,7 +202,6 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
-    "pyodide_interpreter": "PYODIDE_INTERPRETER",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
