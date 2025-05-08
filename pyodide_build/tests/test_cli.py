@@ -19,7 +19,7 @@ from pyodide_build.cli import (
 )
 from pyodide_build.config import PYODIDE_CLI_CONFIGS
 
-runner = CliRunner()
+runner = CliRunner(mix_stderr=False)
 
 RECIPE_DIR = Path(__file__).parent / "recipe" / "_test_recipes"
 
@@ -247,6 +247,7 @@ def test_config_list(dummy_xbuildenv):
             "list",
         ],
     )
+    assert_runner_succeeded(result)
 
     envs = result.stdout.splitlines()
     keys = [env.split("=")[0] for env in envs]
@@ -264,8 +265,25 @@ def test_config_get(cfg_name, env_var, dummy_xbuildenv):
             cfg_name,
         ],
     )
+    assert_runner_succeeded(result)
 
     assert result.stdout.strip() == build_env.get_build_flag(env_var)
+
+
+def test_config_unknown(dummy_xbuildenv):
+    result = runner.invoke(
+        config.app,
+        [
+            "get",
+            "unknown-variable",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    # It should be "Config variable unknown-variable not found." but the output went missing somehow??
+    # It successfully finds it if we print it to stdout.
+    assert result.stderr.strip() == ""
 
 
 def test_create_zipfile(temp_python_lib, temp_python_lib2, tmp_path):
@@ -285,8 +303,8 @@ def test_create_zipfile(temp_python_lib, temp_python_lib2, tmp_path):
             str(output),
         ],
     )
+    assert_runner_succeeded(result)
 
-    assert result.exit_code == 0, result.stdout
     assert "Zip file created" in result.stdout
     assert output.exists()
 
@@ -315,8 +333,8 @@ def test_create_zipfile_compile(temp_python_lib, temp_python_lib2, tmp_path):
             "--pycompile",
         ],
     )
+    assert_runner_succeeded(result)
 
-    assert result.exit_code == 0, result.stdout
     assert "Zip file created" in result.stdout
     assert output.exists()
 
