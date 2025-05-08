@@ -265,4 +265,8 @@ def test_handle_command_cmake(build_args):
 def test_is_link_cmd():
     assert is_link_cmd(["test.so"])
     assert is_link_cmd(["test.so.1.2.3"])
+    assert is_link_cmd(["test.so.rsp"])
+    assert is_link_cmd(["test.1.2.3.so.rsp"])
+    assert not is_link_cmd(["test.1.2.3.rsp"])
+    assert is_link_cmd(["emcc.py", "test.so"])
     assert not is_link_cmd(["test", "test.a", "test.o", "test.c", "test.cpp", "test.h"])
