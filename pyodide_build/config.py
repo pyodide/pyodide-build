@@ -162,6 +162,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "host_install_dir": "HOSTINSTALLDIR",
     "host_site_packages": "HOSTSITEPACKAGES",
     "numpy_lib": "NUMPY_LIB",
+    "pyodide_interpreter": "PYODIDE_INTERPETER",
     "platform_triplet": "PLATFORM_TRIPLET",
     "pip_constraint": "PIP_CONSTRAINT",
     "pymajor": "PYMAJOR",
@@ -201,6 +202,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
+    "pyodide_interpreter": "PYODIDE_INTERPRETER",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -266,6 +268,7 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     "host_install_dir": "$(PYODIDE_ROOT)/packages/.artifacts",
     "host_site_packages": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages",
     "numpy_lib": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages/numpy/",
+    "pyodide_interpreter": "$(PYODIDE_ROOT)/dist/python"
 }
 
 
@@ -285,4 +288,5 @@ PYODIDE_CLI_CONFIGS = {
     "pyodide_root": "PYODIDE_ROOT",
     "python_include_dir": "PYTHONINCLUDE",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
+    "interpreter": "PYODIDE_INTERPRETER"
 }
