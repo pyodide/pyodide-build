@@ -162,6 +162,8 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "host_install_dir": "HOSTINSTALLDIR",
     "host_site_packages": "HOSTSITEPACKAGES",
     "numpy_lib": "NUMPY_LIB",
+    "pyodide_interpreter": "PYODIDE_INTERPRETER",
+    "pyodide_package_index": "PYODIDE_PACKAGE_INDEX",
     "platform_triplet": "PLATFORM_TRIPLET",
     "pip_constraint": "PIP_CONSTRAINT",
     "pymajor": "PYMAJOR",
@@ -266,6 +268,8 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     "host_install_dir": "$(PYODIDE_ROOT)/packages/.artifacts",
     "host_site_packages": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages",
     "numpy_lib": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages/numpy/",
+    "pyodide_interpreter": "$(PYODIDE_ROOT)/dist/python",
+    "pyodide_package_index": "$(PYODIDE_ROOT)/package_index",
 }
 
 
@@ -285,4 +289,6 @@ PYODIDE_CLI_CONFIGS = {
     "pyodide_root": "PYODIDE_ROOT",
     "python_include_dir": "PYTHONINCLUDE",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
+    "interpreter": "PYODIDE_INTERPRETER",
+    "package_index": "PYODIDE_PACKAGE_INDEX",
 }
