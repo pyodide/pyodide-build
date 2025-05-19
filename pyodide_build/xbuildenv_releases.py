@@ -216,11 +216,13 @@ def cross_build_env_metadata_url() -> str:
     # This has two purposes:
     # 1. When running tests, we can set this variable to use a local metadata file
     # 2. If we change the URL for the metadata file, people can set this variable to use the new URL
-    url = os.environ.get(CROSS_BUILD_ENV_METADATA_URL_ENV_VAR)
-    if url is not None:
-        return url
 
-    return DEFAULT_CROSS_BUILD_ENV_METADATA_URL
+    url = os.environ.get(
+        key=CROSS_BUILD_ENV_METADATA_URL_ENV_VAR,
+        default=DEFAULT_CROSS_BUILD_ENV_METADATA_URL,
+    )
+
+    return url
 
 
 @cache
