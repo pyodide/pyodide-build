@@ -6,7 +6,9 @@ from functools import cache
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
-DEFAULT_CROSS_BUILD_ENV_METADATA_URL = "https://raw.githubusercontent.com/pyodide/pyodide/main/pyodide-cross-build-environments.json"
+DEFAULT_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide/api/pyodide-cross-build-environments.json"
+)
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
 
 
