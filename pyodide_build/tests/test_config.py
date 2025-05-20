@@ -23,12 +23,16 @@ class TestConfigManager:
             "CMAKE_TOOLCHAIN_FILE": "/path/to/toolchain",
             "MESON_CROSS_FILE": "/path/to/crossfile",
             "PYODIDE_XBUILDENV_PATH": "/path/to/xbuildenv",
+            "PYODIDE_INTERPRETER": "/path/to/python",
+            "PYODIDE_PACKAGE_INDEX": "/path/to/package_index",
         }
 
         config = config_manager._load_config_from_env(env)
         assert config["cmake_toolchain_file"] == "/path/to/toolchain"
         assert config["meson_cross_file"] == "/path/to/crossfile"
         assert config["xbuildenv_path"] == "/path/to/xbuildenv"
+        assert config["pyodide_interpreter"] == "/path/to/python"
+        assert config["pyodide_package_index"] == "/path/to/package_index"
 
     def test_load_config_from_file(self, tmp_path, reset_env_vars, reset_cache):
         pyproject_file = tmp_path / "pyproject.toml"
@@ -43,6 +47,8 @@ class TestConfigManager:
                                   skip_emscripten_version_check = "1"
                                   xbuildenv_path = "my_custom/xbuildenv_path"
                                   ignored_build_requirements = "cmake foo bar"
+                                  "interpreter" = "$(PYODIDE_INTERPRETER)"
+                                  "package_index" = "$(PYODIDE_PACKAGE_INDEX)"
                                   """)
 
         config_manager = ConfigManager()
@@ -129,6 +135,8 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             "MESON_CROSS_FILE": "/path/to/crossfile",
             "PYODIDE_XBUILDENV_PATH": "/path/to/xbuildenv",
             "IGNORED_BUILD_REQUIREMENTS": "cmake foo bar",
+            "PYODIDE_INTERPRETER": "/path/to/python",
+            "PYODIDE_PACKAGE_INDEX": "/path/to/package_index",
         }
 
         config = config_manager._load_config_from_env(env)
@@ -136,6 +144,8 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert config["meson_cross_file"] == "/path/to/crossfile"
         assert config["xbuildenv_path"] == "/path/to/xbuildenv"
         assert config["ignored_build_requirements"] == "cmake foo bar"
+        assert config["pyodide_interpreter"] == "/path/to/python"
+        assert config["pyodide_package_index"] == "/path/to/package_index"
 
     def test_load_config_from_file(
         self, tmp_path, dummy_xbuildenv, reset_env_vars, reset_cache
