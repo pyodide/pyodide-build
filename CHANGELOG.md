@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.30.4] - 2025/05/20
 
+- Fixed compatibility with `virtualenv` 20.31 and later. The Pyodide virtual environment via `pyodide venv` no longer seeds
+  `wheel`, i.e., the `--wheel`/`--no-wheel` options are not available anymore.
+  [#208](https://github.com/pyodide/pyodide-build/pull/208)
+
+
 - The default cross-build metadata URL was changed to https://pyodide.github.io/pyodide/api/pyodide-cross-build-environments.json to
   circumvent rate limits imposed by GitHub. It remains overridable by setting the `PYODIDE_CROSS_BUILD_ENV_METADATA_URL` environment variable.
   [#206](https://github.com/pyodide/pyodide-build/pull/206)
