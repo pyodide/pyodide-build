@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.4] - 2025/05/20
+
+- The default cross-build metadata URL was changed to https://pyodide.github.io/pyodide/api/pyodide-cross-build-environments.json to
+  circumvent rate limits imposed by GitHub. It remains overridable by setting the `PYODIDE_CROSS_BUILD_ENV_METADATA_URL` environment variable.
+  [#206](https://github.com/pyodide/pyodide-build/pull/206)
+
 ## [0.30.3] - 2025/05/17
 
 - Added `interpreter` and `pacakge_index` to the variables available via `pyodide config get`.
