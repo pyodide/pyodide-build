@@ -52,7 +52,6 @@ def base_test_dir(tmp_path_factory):
         (["--no-vcs-ignore"], ["--no-vcs-ignore"]),
         (["--pip", "23.0.1"], ["--pip", "23.0.1"]),
         (["--no-setuptools"], ["--no-setuptools"]),
-        (["--no-wheel"], ["--no-wheel"]),
         (["--no-periodic-update"], ["--no-periodic-update"]),
         # TODO: enable when they are supported
         # (["--symlink-app-data"], ["--symlink-app-data"]),
@@ -132,7 +131,6 @@ def test_supported_virtualenv_options():
         "--pip",
         "--setuptools",
         "--no-setuptools",
-        "--no-wheel",
         "--no-periodic-update",
     ]
 
@@ -154,9 +152,8 @@ def test_supported_virtualenv_options():
             ["--no-setuptools"],
             lambda path: not list(path.glob("**/setuptools-*.dist-info")),
         ),
-        (["--no-wheel"], lambda path: not list(path.glob("**/wheel-*.dist-info"))),
     ],
-    ids=["default", "clear", "no-vcs-ignore", "no-setuptools", "no-wheel"],
+    ids=["default", "clear", "no-vcs-ignore", "no-setuptools"],
 )
 def test_venv_creation(base_test_dir, options, check_function):
     venv_path = base_test_dir / "test_venv"
@@ -174,7 +171,6 @@ def test_venv_creation(base_test_dir, options, check_function):
     [
         ("pip", "23.0.1"),
         ("setuptools", "67.6.0"),
-        ("wheel", "0.40.0"),
     ],
 )
 def test_installation_of_seed_package_versions(base_test_dir, package, version):

@@ -30,12 +30,12 @@ def main(
         False,
         "--no-download",
         "--never-download",
-        help="Disable download of the latest pip/setuptools/wheel from PyPI",
+        help="Disable download of the latest pip/setuptools from PyPI",
     ),
     download: bool = typer.Option(
         False,
         "--download/--no-download",
-        help="Enable download of the latest pip/setuptools/wheel from PyPI",
+        help="Enable download of the latest pip/setuptools from PyPI",
     ),
     extra_search_dir: list[str] = typer.Option(
         None,
@@ -55,7 +55,6 @@ def main(
     no_setuptools: bool = typer.Option(
         False, "--no-setuptools", help="Do not install setuptools"
     ),
-    no_wheel: bool = typer.Option(True, "--no-wheel", help="Do not install wheel"),
     no_periodic_update: bool = typer.Option(
         False,
         "--no-periodic-update",
@@ -94,8 +93,6 @@ def main(
         venv_args.extend(["--pip", pip])
     if setuptools is not None:
         venv_args.extend(["--setuptools", setuptools])
-    if no_wheel:
-        venv_args.append("--no-wheel")
     if no_setuptools:
         venv_args.append("--no-setuptools")
 
