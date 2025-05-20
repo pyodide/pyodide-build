@@ -114,7 +114,7 @@ module = [
   "tomli",
   "tomllib",
   "typer",
-  "virtualenv",
+  "virtualenv>=20.31.2",
   "auditwheel_emscripten.*"
 ]
 ignore_missing_imports = true
