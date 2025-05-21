@@ -47,8 +47,6 @@ class TestConfigManager:
                                   skip_emscripten_version_check = "1"
                                   xbuildenv_path = "my_custom/xbuildenv_path"
                                   ignored_build_requirements = "cmake foo bar"
-                                  "interpreter" = "$(PYODIDE_INTERPRETER)"
-                                  "package_index" = "$(PYODIDE_PACKAGE_INDEX)"
                                   """)
 
         config_manager = ConfigManager()
