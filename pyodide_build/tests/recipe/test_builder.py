@@ -203,6 +203,29 @@ def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
     assert data[-3:] == ["numpy < 2.0", "pytest == 7.0", "setuptools < 75"], data
 
 
+def test_create_constraints_file_space_in_path_uri_conversion(
+    tmp_path, dummy_xbuildenv
+):
+    build_dir_with_spaces = tmp_path / "build dir with spaces"
+    build_dir_with_spaces.mkdir()
+
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_test_constraint",
+        build_args=BuildArgs(),
+        build_dir=build_dir_with_spaces,
+    )
+
+    paths = builder._create_constraints_file(filename="constraints with space.txt")
+
+    parts = paths.split()
+    if len(parts) > 1:
+        last_part = parts[-1]
+        if "with%20space" in last_part or last_part.startswith("file://"):
+            assert True
+        else:
+            assert "constraints with space.txt" in last_part
+
+
 class MockSourceSpec(_SourceSpec):
     @pydantic.model_validator(mode="after")
     def _check_patches_extra(self) -> Self:

@@ -14,7 +14,12 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import default_xbuildenv_path, search_pyproject_toml, to_bool
+from pyodide_build.common import (
+    default_xbuildenv_path,
+    path_to_uri_if_spaces,
+    search_pyproject_toml,
+    to_bool,
+)
 
 RUST_BUILD_PRELUDE = """
 rustup default ${RUST_TOOLCHAIN}
@@ -334,13 +339,9 @@ def _create_constraints_file() -> str:
     if not constraints:
         return ""
 
-    if len(constraints.split(maxsplit=1)) > 1:
-        raise ValueError(
-            "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to pyodide has no spaces.\n"
-            "See https://github.com/pypa/pip/issues/13283"
-        )
-
     constraints_file = Path(constraints)
+    constraints = path_to_uri_if_spaces(constraints_file)
+
     if not constraints_file.is_file():
         constraints_file.parent.mkdir(parents=True, exist_ok=True)
         constraints_file.write_text("")

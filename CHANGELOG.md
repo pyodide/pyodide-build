@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
 - Fixed a regression in quoting of pip arguments introduced in
   [#185](https://github.com/pyodide/pyodide-build/pull/185).
   [#209](https://github.com/pyodide/pyodide-build/pull/209)
+
+- `pyodide-build` now correctly works with file paths with spaces passed to the `PIP_CONSTRAINT` environment variable.
+  [#210](https://github.com/pyodide/pyodide-build/pull/210)
 
 ## [0.30.4] - 2025/05/20
 

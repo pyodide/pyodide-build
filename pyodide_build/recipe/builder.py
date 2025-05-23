@@ -40,6 +40,7 @@ from pyodide_build.common import (
     find_matching_wheel,
     make_zip_archive,
     modify_wheel,
+    path_to_uri_if_spaces,
     retag_wheel,
     retrying_rmtree,
 )
@@ -136,11 +137,9 @@ class RecipeBuilder:
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
-        if len(str(self.build_dir).split(maxsplit=1)) > 1:
-            raise ValueError(
-                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
-                "See https://github.com/pypa/pip/issues/13283"
-            )
+        # If a path to a file specified PIP_CONSTRAINT contains spaces, pip will misinterpret
+        # it as multiple files; see https://github.com/pypa/pip/issues/13283
+        # We work around this by converting the path to a URI when needed.
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
             self.build_dir / self.fullname
@@ -367,7 +366,7 @@ class RecipeBuilder:
         shutil.move(self.build_dir / extract_dir_name, self.src_extract_dir)
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
-    def _create_constraints_file(self) -> str:
+    def _create_constraints_file(self, filename: str = "constraints.txt") -> str:
         """
         Creates a pip constraints file by concatenating global constraints (PIP_CONSTRAINT)
         with constraints specific to this package.
@@ -381,12 +380,17 @@ class RecipeBuilder:
             # nothing to override
             return host_constraints
 
-        new_constraints_file = self.build_dir / "constraints.txt"
+        new_constraints_file = self.build_dir / filename
         with new_constraints_file.open("w") as f:
             for constraint in constraints:
                 f.write(constraint + "\n")
 
-        return host_constraints + " " + str(new_constraints_file)
+        new_constraints_str = path_to_uri_if_spaces(new_constraints_file)
+
+        if host_constraints:
+            return host_constraints + " " + new_constraints_str
+        else:
+            return new_constraints_str
 
     def _compile(
         self,

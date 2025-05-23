@@ -646,3 +646,24 @@ def retrying_rmtree(d):
             else:
                 raise
     raise RuntimeError(f"shutil.rmtree('{d}') failed with ENOTEMPTY three times")
+
+
+def path_to_uri_if_spaces(path: str | Path) -> str:
+    """
+    Convert a file path to a URI if it contains spaces, otherwise return as string.
+
+    This works around a pip bug where paths with spaces in PIP_CONSTRAINT are
+    misinterpreted as multiple files; see https://github.com/pypa/pip/issues/13283
+
+    Parameters
+    ----------
+    path
+        The file path to potentially convert
+
+    Returns
+    -------
+    str
+        The path as a URI if it contains spaces, or otherwise as a string.
+    """
+    path_obj = Path(path)
+    return path_obj.as_uri() if " " in str(path_obj) else str(path_obj)
