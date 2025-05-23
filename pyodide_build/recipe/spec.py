@@ -92,6 +92,14 @@ class _BuildSpec(BaseModel):
     vendor_sharedlib: bool = Field(False, alias="vendor-sharedlib")
     cross_build_env: bool = Field(False, alias="cross-build-env")
     cross_build_files: list[str] = Field([], alias="cross-build-files")
+    directory: str | None = (
+        Field(
+            None,
+            description="Custom build directory path. Can be absolute or relative to the package directory. "
+            "If specified, this directory will not be cleaned between builds, allowing multiple "
+            "packages to share build artifacts and cache.",
+        ),
+    )
     model_config = ConfigDict(extra="forbid")
 
     @pydantic.model_validator(mode="after")
@@ -108,6 +116,7 @@ class _BuildSpec(BaseModel):
             "script",
             "exports",
             "unvendor_tests",
+            "directory",
         }
 
         typ = self.package_type
@@ -218,6 +227,7 @@ class MetaConfig(BaseModel):
                 "exports",
                 "unvendor_tests",
                 "package_type",
+                "directory",
             }
             for key in self.build.model_fields_set:
                 if key not in allowed_keys:
