@@ -237,3 +237,23 @@ def test_wheel_paths(dummy_xbuildenv):
             f"{current_version}-none-any",
         ]
     )
+
+
+def test_create_constraints_file_with_spaces(tmp_path, monkeypatch, reset_cache):
+    from pyodide_build.build_env import _create_constraints_file
+
+    constraints_dir = tmp_path / "path with spaces"
+    constraints_dir.mkdir()
+    constraints_file = constraints_dir / "constraints.txt"
+    constraints_file.write_text("numpy==1.0\n")
+
+    def mock_get_build_flag(name):
+        if name == "PIP_CONSTRAINT":
+            return str(constraints_file)
+
+    monkeypatch.setattr("pyodide_build.build_env.get_build_flag", mock_get_build_flag)
+
+    result = _create_constraints_file()
+
+    assert result.startswith("file://")
+    assert "path%20with%20spaces" in result or "path with spaces" in result
