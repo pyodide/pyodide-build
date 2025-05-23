@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Fixed a regression in quoting of pip arguments introduced in
+  [#185](https://github.com/pyodide/pyodide-build/pull/185).
+  [#209](https://github.com/pyodide/pyodide-build/pull/209)
+
 ## [0.30.4] - 2025/05/20
 
 - Fixed compatibility with `virtualenv` 20.31 and later. The Pyodide virtual environment via `pyodide venv` no longer seeds
