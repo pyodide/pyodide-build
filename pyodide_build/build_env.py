@@ -334,13 +334,16 @@ def _create_constraints_file() -> str:
     if not constraints:
         return ""
 
-    if len(constraints.split(maxsplit=1)) > 1:
-        raise ValueError(
-            "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to pyodide has no spaces.\n"
-            "See https://github.com/pypa/pip/issues/13283"
-        )
-
+    # If a path to a file specified PIP_CONSTRAINT contains spaces, pip will misinterpret
+    # it as multiple files; see https://github.com/pypa/pip/issues/13283
+    # We work around this by converting the path to a URI.
     constraints_file = Path(constraints)
+    constraints = (
+        constraints_file.as_uri()
+        if " " in str(constraints_file)
+        else str(constraints_file)
+    )
+
     if not constraints_file.is_file():
         constraints_file.parent.mkdir(parents=True, exist_ok=True)
         constraints_file.write_text("")
