@@ -384,19 +384,7 @@ class RecipeBuilder:
             for constraint in constraints:
                 f.write(constraint + "\n")
 
-        # If a path to a file specified PIP_CONSTRAINT contains spaces, pip will misinterpret
-        # it as multiple files; see https://github.com/pypa/pip/issues/13283
-        # We work around this by converting the path to a URI.
-        new_constraints_str = (
-            new_constraints_file.as_uri()
-            if " " in str(new_constraints_file)
-            else str(new_constraints_file)
-        )
-
-        if host_constraints:
-            return host_constraints + " " + new_constraints_str
-        else:
-            return new_constraints_str
+        return host_constraints + " " + str(new_constraints_file)
 
     def _compile(
         self,
