@@ -139,6 +139,14 @@ class RecipeBuilder:
         # If a path to a file specified PIP_CONSTRAINT contains spaces, pip will misinterpret
         # it as multiple files; see https://github.com/pypa/pip/issues/13283
         # We work around this by converting the path to a URI when needed.
+        if " " in str(self.build_dir):
+            logger.info(
+                "The value of PIP_CONSTRAINT contains spaces, and pip will interpret it as "
+                "multiple files. If you are using a single constraints file and it has spaces "
+                "in its file path, please convert it to a URI instead. Please ignore this "
+                "message if you are using multiple constraints files."
+            )
+
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
             self.build_dir / self.fullname
