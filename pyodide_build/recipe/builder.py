@@ -365,7 +365,7 @@ class RecipeBuilder:
         shutil.move(self.build_dir / extract_dir_name, self.src_extract_dir)
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
-    def _create_constraints_file(self, filename: str = "constraints.txt") -> str:
+    def _create_constraints_file(self) -> str:
         """
         Creates a pip constraints file by concatenating global constraints (PIP_CONSTRAINT)
         with constraints specific to this package.
@@ -379,7 +379,7 @@ class RecipeBuilder:
             # nothing to override
             return host_constraints
 
-        new_constraints_file = self.build_dir / filename
+        new_constraints_file = self.build_dir / "constraints.txt"
         with new_constraints_file.open("w") as f:
             for constraint in constraints:
                 f.write(constraint + "\n")
