@@ -183,7 +183,7 @@ def test_create_constraints_file_no_override(tmp_path, dummy_xbuildenv):
         build_dir=tmp_path,
     )
 
-    path = builder._create_constraints_file()
+    path = builder._create_combined_constraints_file()
     assert path == get_build_flag("PIP_CONSTRAINT")
 
 
@@ -194,7 +194,7 @@ def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
         build_dir=tmp_path,
     )
 
-    paths = builder._create_constraints_file()
+    paths = builder._create_combined_constraints_file()
     assert paths == get_build_flag("PIP_CONSTRAINT") + " " + str(
         tmp_path / "constraints.txt"
     )
