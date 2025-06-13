@@ -18,7 +18,7 @@ from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 from typing import Any, NoReturn
 from urllib.request import urlopen
 from zipfile import ZipFile
