@@ -133,9 +133,17 @@ class RecipeBuilder:
         self.package_type = self.build_metadata.package_type
         self.is_wheel = self.package_type in ["package", "cpython_module"]
 
-        self.build_dir = (
-            Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
-        )
+        if self.build_metadata.directory:
+            custom_dir = Path(self.build_metadata.directory)
+
+            if not custom_dir.is_absolute():
+                custom_dir = (self.pkg_root / custom_dir).resolve()
+            self.build_dir = custom_dir
+        else:
+            self.build_dir = (
+                Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
+            )
+
         if len(str(self.build_dir).split(maxsplit=1)) > 1:
             raise ValueError(
                 "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
@@ -235,8 +243,22 @@ class RecipeBuilder:
         self._redirect_stdout_stderr_to_logfile()
 
         if not self.continue_:
-            self._prepare_source()
-            self._patch()
+            # Check if we're using a shared build directory
+            # with existing extracted sources
+            is_shared_dir = (
+                self.build_metadata.directory
+                and self.src_extract_dir.exists()
+                and (self.src_extract_dir / ".patched").exists()
+            )
+
+            if is_shared_dir:
+                logger.info(
+                    "Using existing source in shared build directory: %s",
+                    self.src_extract_dir,
+                )
+            else:
+                self._prepare_source()
+                self._patch()
 
         with (
             chdir(self.pkg_root),
@@ -265,11 +287,27 @@ class RecipeBuilder:
         from, then get the source into the build directory.
         """
 
-        # clear the build directory
-        if self.build_dir.resolve().is_dir():
+        # Only clear the build directory if it's not a custom shared one, as
+        # This allows multiple packages to share the same build directory.
+        if not self.build_metadata.directory and self.build_dir.resolve().is_dir():
             retrying_rmtree(self.build_dir)
 
         self.build_dir.mkdir(parents=True, exist_ok=True)
+
+        # Skip the extraction if both are satisfied
+        # 1. we're using a custom build directory
+        # 2. the source directory already exists
+        # i.e., another package has already extracted it
+        if (
+            self.build_metadata.directory
+            and self.src_extract_dir.exists()
+            and self.src_dist_dir.exists()
+        ):
+            logger.info(
+                "Using existing source directory in shared build dir: %s",
+                self.src_extract_dir,
+            )
+            return
 
         if self.source_metadata.url is not None:
             self._download_and_extract()
@@ -447,6 +485,7 @@ class RecipeBuilder:
         """
         token_path = self.src_extract_dir / ".patched"
         if token_path.is_file():
+            logger.debug("Source already patched, skipping patch step")
             return
 
         patches = self.source_metadata.patches
