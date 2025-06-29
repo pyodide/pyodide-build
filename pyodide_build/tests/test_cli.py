@@ -72,7 +72,7 @@ def test_skeleton_pypi(tmp_path):
         skeleton.app, ["pypi", test_pkg, "--recipe-dir", str(tmp_path)]
     )
     assert result.exit_code != 0
-    assert "already exists" in str(result.stdout)
+    assert "already exists" in str(result.stderr)
     assert isinstance(result.exception, SystemExit)
 
 
