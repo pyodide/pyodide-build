@@ -8,10 +8,17 @@ with wrappers that adjusting include paths and flags as necessary for
 cross-compiling and then pass the command long to emscripten.
 """
 
+import functools
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
+import tempfile
+from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import Literal, NamedTuple
 
 from __main__ import __file__ as INVOKED_PATH_STR
 
@@ -55,11 +62,6 @@ if IS_COMPILER_INVOCATION:
     )
     # restore __name__ so that relative imports work as we expect
     __name__ = PYWASMCROSS_ARGS.pop("orig__name__")
-
-
-import subprocess
-from collections.abc import Iterable, Iterator
-from typing import Literal, NamedTuple
 
 
 class CrossCompileArgs(NamedTuple):
@@ -349,8 +351,6 @@ def _calculate_object_exports_readobj_parse(output: str) -> list[str]:
 
 
 def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
-    import shutil
-
     # This works for bootstrapped Emscripten via GitHub sources.
     # llvm-readobj might not be available this way with Homebrew
     # or conda-forge distributions of Emscripten.
@@ -458,8 +458,6 @@ def get_export_flags(
         export_list = exports
 
     prefixed_exports = ["_" + x for x in export_list]
-
-    import tempfile
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
         # Use a response file to avoid command line length limits
