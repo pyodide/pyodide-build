@@ -24,7 +24,7 @@ from __main__ import __file__ as INVOKED_PATH_STR
 
 SHAREDLIB_REGEX = re.compile(r"\.so(.\d+)*$")
 
-SYMLINKS = {
+SYMLINKS = (
     "cc",
     "c++",
     "ld",
@@ -39,9 +39,9 @@ SYMLINKS = {
     "meson",
     "install_name_tool",
     "otool",
-}
+)
 
-EXCLUDED_LINKER_OPTS = {
+EXCLUDED_LINKER_OPTS = (
     "-Bsymbolic-functions",
     # breaks emscripten see https://github.com/emscripten-core/emscripten/issues/14460
     "--strip-all",
@@ -52,10 +52,10 @@ EXCLUDED_LINKER_OPTS = {
     # macOS-specific linker flags that wasm-ld doesn't understand
     "-headerpad_max_install_names",
     "-dead_strip_dylibs",
-}
+)
 
 # fmt: off
-EXCLUDED_ARGUMENTS = {
+EXCLUDED_ARGUMENTS = (
     # threading is disabled for now
     "-pthread",
     # this only applies to compiling fortran code, but we already f2c'd
@@ -75,20 +75,20 @@ EXCLUDED_ARGUMENTS = {
     "-mno-sse2", # warning: argument unused during compilation
     "-mno-avx2", # warning: argument unused during compilation
     "-std=legacy", # fortran flag that clang does not support
-}
+)
 # fmt: on
 
-EXCLUDED_LINKER_PREFIXES = {
+EXCLUDED_LINKER_PREFIXES = (
     "--sysroot=",  # ignore unsupported --sysroot compile argument used in conda
     "--version-script=",
     "-R/",  # wasm-ld does not accept -R (runtime libraries)
     "-R.",  # wasm-ld does not accept -R (runtime libraries)
     "--exclude-libs=",
-}
+)
 
-EXCLUDED_ARG_PREFIXES = {
+EXCLUDED_ARG_PREFIXES = (
     "-J",  # fortran flag that clang does not support
-}
+)
 
 SYS_PREFIX_INCLUDE = sys.prefix + "/include/python"
 SYS_BASE_PREFIX_INCLUDE = sys.base_prefix + "/include/python"
@@ -508,9 +508,9 @@ def handle_command_generate_args(  # noqa: C901
         return ["emcc", "-v"]
 
     cmd = line[0]
-    if cmd in {"c++", "g++"}:
+    if cmd in ("c++", "g++"):
         new_args = ["em++"]
-    elif cmd in {"cc", "gcc", "ld", "lld"}:
+    elif cmd in ("cc", "gcc", "ld", "lld"):
         new_args = ["emcc"]
         # distutils doesn't use the c++ compiler when compiling c++ <sigh>
         if any(arg.endswith((".cpp", ".cc")) for arg in line):
@@ -543,7 +543,7 @@ def handle_command_generate_args(  # noqa: C901
             ]
 
         return line
-    elif cmd in {"install_name_tool", "otool"}:
+    elif cmd in ("install_name_tool", "otool"):
         # In MacOS, meson tries to run install_name_tool to fix the rpath of the shared library
         # assuming that it is a ELF file. We need to skip this step.
         # See: https://github.com/mesonbuild/meson/issues/8027
