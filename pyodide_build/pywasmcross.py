@@ -110,10 +110,7 @@ def replay_genargs_handle_dashl(arg: str, used_libs: set[str], abi: str) -> str 
     """
     assert arg.startswith("-l")
 
-    if arg == "-lffi":
-        return None
-
-    if arg == "-lgfortran":
+    if arg in ("-lffi", "-lgfortran"):
         return None
 
     # Some Emscripten libraries that use setjmp/longjmp.
