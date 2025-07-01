@@ -22,7 +22,7 @@ from typing import Literal, NamedTuple
 
 from __main__ import __file__ as INVOKED_PATH_STR
 
-INVOKED_PATH = Path(INVOKED_PATH_STR)
+SHAREDLIB_REGEX = re.compile(r"\.so(.\d+)*$")
 
 SYMLINKS = {
     "cc",
@@ -88,14 +88,7 @@ def is_link_cmd(line: list[str]) -> bool:
     """
     Check if the command is a linker invocation.
     """
-    import re
-
-    SHAREDLIB_REGEX = re.compile(r"\.so(.\d+)*$")
-    for arg in line:
-        if not arg.startswith("-") and SHAREDLIB_REGEX.search(arg):
-            return True
-
-    return False
+    return any(not arg.startswith("-") and SHAREDLIB_REGEX.search(arg) for arg in line)
 
 
 def replay_genargs_handle_dashl(arg: str, used_libs: set[str], abi: str) -> str | None:
