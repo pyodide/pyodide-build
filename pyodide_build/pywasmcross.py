@@ -90,8 +90,6 @@ EXCLUDED_ARG_PREFIXES = (
     "-J",  # fortran flag that clang does not support
 )
 
-SYS_PREFIX_INCLUDE = sys.prefix + "/include/python"
-SYS_BASE_PREFIX_INCLUDE = sys.base_prefix + "/include/python"
 
 INVOKED_PATH = Path(INVOKED_PATH_STR)
 IS_COMPILER_INVOCATION = INVOKED_PATH.name in SYMLINKS
@@ -208,10 +206,10 @@ def replay_genargs_handle_dashI(arg: str, target_install_dir: str) -> str | None
     # Replace local Python include paths with the cross compiled ones
     include_path = str(Path(include_path_str).resolve())
 
-    if include_path.startswith(SYS_PREFIX_INCLUDE):
+    if include_path.startswith(sys.prefix + "/include/python"):
         return arg.replace("-I" + sys.prefix, "-I" + target_install_dir)
 
-    if include_path.startswith(SYS_BASE_PREFIX_INCLUDE):
+    if include_path.startswith(sys.base_prefix + "/include/python"):
         return arg.replace("-I" + sys.base_prefix, "-I" + target_install_dir)
 
     return arg
