@@ -54,6 +54,30 @@ EXCLUDED_LINKER_OPTS = {
     "-dead_strip_dylibs",
 }
 
+# fmt: off
+EXCLUDED_ARGUMENTS = {
+    # threading is disabled for now
+    "-pthread",
+    # this only applies to compiling fortran code, but we already f2c'd
+    "-ffixed-form",
+    "-fallow-argument-mismatch",
+    # On Mac, we need to omit some darwin-specific arguments
+    "-bundle",
+    "-undefined",
+    "dynamic_lookup",
+    # This flag is needed to build numpy with SIMD optimization which we currently disable
+    "-mpopcnt",
+    # gcc flag that clang does not support
+    "-Bsymbolic-functions",
+    "-fno-second-underscore",
+    "-fstack-protector",  # doesn't work?
+    "-fno-strict-overflow",  # warning: argument unused during compilation
+    "-mno-sse2", # warning: argument unused during compilation
+    "-mno-avx2", # warning: argument unused during compilation
+    "-std=legacy", # fortran flag that clang does not support
+}
+# fmt: on
+
 EXCLUDED_LINKER_PREFIXES = {
     "--sysroot=",  # ignore unsupported --sysroot compile argument used in conda
     "--version-script=",
@@ -62,6 +86,14 @@ EXCLUDED_LINKER_PREFIXES = {
     "--exclude-libs=",
 }
 
+EXCLUDED_ARG_PREFIXES = {
+    "-J",  # fortran flag that clang does not support
+}
+
+SYS_PREFIX_INCLUDE = sys.prefix + "/include/python"
+SYS_BASE_PREFIX_INCLUDE = sys.base_prefix + "/include/python"
+
+INVOKED_PATH = Path(INVOKED_PATH_STR)
 IS_COMPILER_INVOCATION = INVOKED_PATH.name in SYMLINKS
 
 if IS_COMPILER_INVOCATION:
@@ -229,34 +261,12 @@ def replay_genargs_handle_argument(arg: str) -> str | None:
     if arg.startswith("-L/usr"):
         return None
 
-    # fmt: off
-    if arg in [
-        # threading is disabled for now
-        "-pthread",
-        # this only applies to compiling fortran code, but we already f2c'd
-        "-ffixed-form",
-        "-fallow-argument-mismatch",
-        # On Mac, we need to omit some darwin-specific arguments
-        "-bundle", "-undefined", "dynamic_lookup",
-        # This flag is needed to build numpy with SIMD optimization which we currently disable
-        "-mpopcnt",
-        # gcc flag that clang does not support
-        "-Bsymbolic-functions",
-        '-fno-second-underscore',
-        '-fstack-protector',  # doesn't work?
-        '-fno-strict-overflow',  # warning: argument unused during compilation
-        "-mno-sse2", # warning: argument unused during compilation
-        "-mno-avx2", # warning: argument unused during compilation
-        "-std=legacy", # fortran flag that clang does not support
-    ]:
+    if arg in EXCLUDED_ARGUMENTS:
         return None
 
-    if arg.startswith((
-        "-J",  # fortran flag that clang does not support
-    )):
+    if arg.startswith(EXCLUDED_ARG_PREFIXES):
         return None
 
-    # fmt: on
     return arg
 
 
