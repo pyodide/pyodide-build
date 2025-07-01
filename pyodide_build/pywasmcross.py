@@ -270,11 +270,13 @@ def replay_genargs_handle_argument(arg: str) -> str | None:
     return arg
 
 
+@functools.cache
 def get_cmake_compiler_flags() -> list[str]:
     """
-    GeneraTe cmake compiler flags.
+    Generate cmake compiler flags.
     emcmake will set these values to emcc, em++, ...
     but we need to set them to cc, c++, in order to make them pass to pywasmcross.
+
     Returns
     -------
     The commandline flags to pass to cmake.
