@@ -40,6 +40,28 @@ SYMLINKS = {
     "install_name_tool",
     "otool",
 }
+
+EXCLUDED_LINKER_OPTS = {
+    "-Bsymbolic-functions",
+    # breaks emscripten see https://github.com/emscripten-core/emscripten/issues/14460
+    "--strip-all",
+    "-strip-all",
+    # wasm-ld does not recognize some link flags
+    "--sort-common",
+    "--as-needed",
+    # macOS-specific linker flags that wasm-ld doesn't understand
+    "-headerpad_max_install_names",
+    "-dead_strip_dylibs",
+}
+
+EXCLUDED_LINKER_PREFIXES = {
+    "--sysroot=",  # ignore unsupported --sysroot compile argument used in conda
+    "--version-script=",
+    "-R/",  # wasm-ld does not accept -R (runtime libraries)
+    "-R.",  # wasm-ld does not accept -R (runtime libraries)
+    "--exclude-libs=",
+}
+
 IS_COMPILER_INVOCATION = INVOKED_PATH.name in SYMLINKS
 
 if IS_COMPILER_INVOCATION:
@@ -170,41 +192,20 @@ def replay_genargs_handle_linker_opts(arg: str) -> str | None:
     because arg may be something like "-Wl,-xxx,-yyy" where we only want
     to ignore "-xxx" but not "-yyy".
     """
-
     assert arg.startswith("-Wl")
     link_opts = arg.split(",")[1:]
     new_link_opts = ["-Wl"]
+
     for opt in link_opts:
-        if opt in [
-            "-Bsymbolic-functions",
-            # breaks emscripten see https://github.com/emscripten-core/emscripten/issues/14460
-            "--strip-all",
-            "-strip-all",
-            # wasm-ld does not recognize some link flags
-            "--sort-common",
-            "--as-needed",
-            # macOS-specific linker flags that wasm-ld doesn't understand
-            "-headerpad_max_install_names",
-            "-dead_strip_dylibs",
-        ]:
+        if opt in EXCLUDED_LINKER_OPTS:
             continue
 
-        if opt.startswith(
-            (
-                "--sysroot=",  # ignore unsupported --sysroot compile argument used in conda
-                "--version-script=",
-                "-R/",  # wasm-ld does not accept -R (runtime libraries)
-                "-R.",  # wasm-ld does not accept -R (runtime libraries)
-                "--exclude-libs=",
-            )
-        ):
+        if opt.startswith(EXCLUDED_LINKER_PREFIXES):
             continue
 
         new_link_opts.append(opt)
-    if len(new_link_opts) > 1:
-        return ",".join(new_link_opts)
-    else:
-        return None
+
+    return ",".join(new_link_opts) if len(new_link_opts) > 1 else None
 
 
 def replay_genargs_handle_argument(arg: str) -> str | None:
