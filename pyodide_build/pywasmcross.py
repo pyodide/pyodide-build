@@ -84,22 +84,20 @@ def is_link_cmd(line: list[str]) -> bool:
     Check if the command is a linker invocation.
     """
     for arg in line:
-        if not arg.startswith("-") and arg.endswith(".so"):
+        if not arg or arg[0] == "-":
+            continue
+
+        if arg.endswith(".so"):
             return True
-        # Check for versioned .so files, like .so.1.2.3.
-        if not arg.startswith("-") and ".so." in arg:
-            parts = arg.split(".so.")
-            if len(parts) == 2:
-                version_part = parts[1]
-                # Check if version part matches patterns like "1", "1.2", "1.2.3", and
-                # rnsure it doesn't start or end with dot and no consecutive dots.
-                if version_part and all(c.isdigit() or c == "." for c in version_part):
-                    if (
-                        not version_part.startswith(".")
-                        and not version_part.endswith(".")
-                        and ".." not in version_part
-                    ):
-                        return True
+
+        dot_so_pos = arg.find(".so.")
+        if dot_so_pos != -1:
+            version = arg[dot_so_pos + 4 :]
+            # versioned shared libraries start with a digit, and consist of only digits and dots.
+            if version and version[0].isdigit():
+                if all(c.isdigit() or c == "." for c in version):
+                    return True
+
     return False
 
 
