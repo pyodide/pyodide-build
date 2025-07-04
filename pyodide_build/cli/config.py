@@ -1,3 +1,5 @@
+import sys
+
 import typer
 
 from pyodide_build.build_env import (
@@ -47,7 +49,7 @@ def get_config(
     configs = _get_configs()
 
     if config_var not in configs:
-        typer.echo(f"Config variable {config_var} not found.")
-        typer.Exit(1)
+        print(f"Config variable {config_var} not found.", file=sys.stderr)
+        raise typer.Exit(1)
 
     typer.echo(configs[config_var])
