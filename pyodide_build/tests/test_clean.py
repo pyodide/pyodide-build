@@ -1,11 +1,10 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import typer
 from typer.testing import CliRunner
 
 from pyodide_build.cli import build_recipes
-
 
 runner = CliRunner()
 
@@ -82,5 +81,3 @@ def test_clean_include_dist_removes_dist(tmp_path):
     assert not dist_dir.exists()
     assert not (pkg_root / "build.log").exists()
     assert not install_dir.exists()
-
-

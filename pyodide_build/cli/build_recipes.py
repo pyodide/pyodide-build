@@ -1,22 +1,21 @@
 import dataclasses
-import sys
 import shutil
+import sys
 from pathlib import Path
 
+import click
 import typer
 
 from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs, init_environment
 from pyodide_build.common import get_num_cores
+from pyodide_build.errors import ActionableError
 from pyodide_build.logger import logger
 from pyodide_build.recipe import graph_builder, loader
 from pyodide_build.recipe.builder import RecipeBuilder
-from pyodide_build.errors import ActionableError
-import click
 
 # Typer application for `pyodide build-recipes`
-app = typer.Typer(
-    no_args_is_help=False, help="Build and manage Pyodide recipes.")
+app = typer.Typer(no_args_is_help=False, help="Build and manage Pyodide recipes.")
 
 
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
@@ -321,10 +320,10 @@ def clean(
     """
     cwd = Path.cwd()
     root = build_env.search_pyodide_root(cwd) or cwd
-    recipe_dir_path = root / "packages" if not recipe_dir else Path(recipe_dir).resolve()
-    build_dir_path = (
-        recipe_dir_path if not build_dir else Path(build_dir).resolve()
+    recipe_dir_path = (
+        root / "packages" if not recipe_dir else Path(recipe_dir).resolve()
     )
+    build_dir_path = recipe_dir_path if not build_dir else Path(build_dir).resolve()
     install_dir_path = root / "dist" if not install_dir else Path(install_dir).resolve()
 
     if not recipe_dir_path.is_dir():
@@ -431,15 +430,11 @@ def _default(
     ),
     target_install_dir: str = typer.Option(
         "",
-        help=(
-            "The path to the target Python installation. Default: TARGETINSTALLDIR"
-        ),
+        help=("The path to the target Python installation. Default: TARGETINSTALLDIR"),
     ),
     host_install_dir: str = typer.Option(
         "",
-        help=(
-            "Directory for installing built host packages. Default: HOSTINSTALLDIR"
-        ),
+        help=("Directory for installing built host packages. Default: HOSTINSTALLDIR"),
     ),
     log_dir: str = typer.Option(None, help="Directory to place log files"),
     force_rebuild: bool = typer.Option(
