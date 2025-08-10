@@ -1,5 +1,6 @@
 import dataclasses
 import sys
+import shutil
 from pathlib import Path
 
 import typer
@@ -10,6 +11,12 @@ from pyodide_build.common import get_num_cores
 from pyodide_build.logger import logger
 from pyodide_build.recipe import graph_builder, loader
 from pyodide_build.recipe.builder import RecipeBuilder
+from pyodide_build.errors import ActionableError
+import click
+
+# Typer application for `pyodide build-recipes`
+app = typer.Typer(
+    no_args_is_help=False, help="Build and manage Pyodide recipes.")
 
 
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
@@ -261,6 +268,221 @@ def build_recipes(
     build_recipes_impl(packages, args, log_dir_, install_options)
 
 
+# Register subcommands to the Typer app
+app.command("no-deps")(build_recipes_no_deps)
+app.command("build")(build_recipes)
+
+
+@app.command("clean")
+def clean(
+    targets: list[str] | None = typer.Argument(
+        None,
+        help=(
+            "Packages or tags to clean. Use '*' to select all packages. "
+            "Supports 'tag:<name>' just like the build command."
+        ),
+    ),
+    recipe_dir: str = typer.Option(
+        None,
+        help=(
+            "The directory containing the recipe of packages. "
+            "If not specified, the default is './packages'"
+        ),
+    ),
+    build_dir: str = typer.Option(
+        None,
+        envvar="PYODIDE_RECIPE_BUILD_DIR",
+        help=(
+            "The directory where build directories for packages are created. "
+            "Default: recipe_dir."
+        ),
+    ),
+    install_dir: str = typer.Option(
+        None,
+        help=(
+            "Path to install built packages and pyodide-lock.json. "
+            "If not specified, the default is './dist'."
+        ),
+    ),
+    include_dist: bool = typer.Option(
+        False,
+        "--include-dist",
+        help=(
+            "Also remove dist directories (per-package and the install dist). "
+            "By default, dist directories are preserved."
+        ),
+    ),
+):
+    """
+    Clean up temporary files in the build directory for the selected packages.
+
+    By default, only the per-package 'build' directories and build logs are removed.
+    The 'dist' directories are preserved unless --include-dist is specified.
+    """
+    cwd = Path.cwd()
+    root = build_env.search_pyodide_root(cwd) or cwd
+    recipe_dir_path = root / "packages" if not recipe_dir else Path(recipe_dir).resolve()
+    build_dir_path = (
+        recipe_dir_path if not build_dir else Path(build_dir).resolve()
+    )
+    install_dir_path = root / "dist" if not install_dir else Path(install_dir).resolve()
+
+    if not recipe_dir_path.is_dir():
+        raise FileNotFoundError(f"Recipe directory {recipe_dir_path} not found")
+
+    # Resolve target package names from names/tags; default '*' if none provided
+    selected: list[str]
+    if not targets:
+        selected = list(loader.load_recipes(recipe_dir_path, ["*"]).keys())
+    else:
+        selected = list(loader.load_recipes(recipe_dir_path, targets).keys())
+
+    # Perform cleanup
+    removed_any = False
+    for pkg in selected:
+        pkg_build_root = build_dir_path / pkg / "build"
+        pkg_recipe_root = recipe_dir_path / pkg
+        pkg_log = pkg_recipe_root / "build.log"
+
+        # Remove build directory for package
+        if pkg_build_root.exists():
+            logger.info("Removing %s", str(pkg_build_root))
+            shutil.rmtree(pkg_build_root, ignore_errors=True)
+            removed_any = True
+
+        # Remove build log if exists
+        if pkg_log.is_file():
+            try:
+                pkg_log.unlink()
+                removed_any = True
+            except Exception:
+                pass
+
+        # Optionally remove per-package dist directory
+        if include_dist:
+            pkg_dist = pkg_recipe_root / "dist"
+            if pkg_dist.exists():
+                logger.info("Removing %s", str(pkg_dist))
+                shutil.rmtree(pkg_dist, ignore_errors=True)
+                removed_any = True
+
+    # Optionally remove install dist (global dist) when include_dist is set
+    if include_dist and install_dir_path.exists():
+        logger.info("Removing %s", str(install_dir_path))
+        shutil.rmtree(install_dir_path, ignore_errors=True)
+        removed_any = True
+
+    if not removed_any:
+        typer.echo("Nothing to clean.")
+    else:
+        typer.echo("Clean complete.")
+
+
+@app.callback(invoke_without_command=True)
+def _default(
+    ctx: typer.Context,
+    packages: list[str] = typer.Argument(
+        None,
+        help="Packages to build, or '*' for all packages in recipe directory",
+    ),
+    recipe_dir: str = typer.Option(
+        None,
+        help=(
+            "The directory containing the recipe of packages. "
+            "If not specified, the default is './packages'"
+        ),
+    ),
+    build_dir: str = typer.Option(
+        None,
+        envvar="PYODIDE_RECIPE_BUILD_DIR",
+        help=(
+            "The directory where build directories for packages are created. "
+            "Default: recipe_dir."
+        ),
+    ),
+    install: bool = typer.Option(
+        False,
+        help=(
+            "If true, install the built packages into the install_dir. "
+            "If false, build packages without installing."
+        ),
+    ),
+    install_dir: str = typer.Option(
+        None,
+        help=(
+            "Path to install built packages and pyodide-lock.json. "
+            "If not specified, the default is './dist'."
+        ),
+    ),
+    metadata_files: bool = typer.Option(
+        False,
+        help=(
+            "If true, extract the METADATA file from the built wheels to a matching *.whl.metadata file."
+        ),
+    ),
+    cflags: str | None = typer.Option(
+        None, help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS"
+    ),
+    cxxflags: str | None = typer.Option(
+        None, help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS"
+    ),
+    ldflags: str | None = typer.Option(
+        None, help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS"
+    ),
+    target_install_dir: str = typer.Option(
+        "",
+        help=(
+            "The path to the target Python installation. Default: TARGETINSTALLDIR"
+        ),
+    ),
+    host_install_dir: str = typer.Option(
+        "",
+        help=(
+            "Directory for installing built host packages. Default: HOSTINSTALLDIR"
+        ),
+    ),
+    log_dir: str = typer.Option(None, help="Directory to place log files"),
+    force_rebuild: bool = typer.Option(
+        False,
+        help=(
+            "Force rebuild of all packages regardless of whether they appear to have been updated"
+        ),
+    ),
+    n_jobs: int = typer.Option(
+        None,
+        help=(
+            "Number of packages to build in parallel  (default: # of cores in the system)"
+        ),
+    ),
+    compression_level: int = typer.Option(
+        6,
+        envvar="PYODIDE_ZIP_COMPRESSION_LEVEL",
+        help="Level of zip compression to apply when installing. 0 means no compression.",
+    ),
+) -> None:
+    """Default behavior: if no subcommand is provided, run the build command."""
+    if ctx.invoked_subcommand is None:
+        # Fallback to legacy behavior: `pyodide build-recipes ...` builds
+        build_recipes(
+            packages or [],
+            recipe_dir,  # type: ignore[arg-type]
+            build_dir,  # type: ignore[arg-type]
+            install,
+            install_dir,  # type: ignore[arg-type]
+            metadata_files,
+            False,  # no_deps removed, keep False
+            cflags,
+            cxxflags,
+            ldflags,
+            target_install_dir,
+            host_install_dir,
+            log_dir,
+            force_rebuild,
+            n_jobs,  # type: ignore[arg-type]
+            compression_level,
+        )
+
+
 def build_recipes_impl(
     packages: list[str],
     args: Args,
@@ -274,14 +496,17 @@ def build_recipes_impl(
     else:
         targets = ",".join(packages)
 
-    pkg_map = graph_builder.build_packages(
-        args.recipe_dir,
-        targets=targets,
-        build_args=args.build_args,
-        build_dir=args.build_dir,
-        n_jobs=args.n_jobs,
-        force_rebuild=args.force_rebuild,
-    )
+    try:
+        pkg_map = graph_builder.build_packages(
+            args.recipe_dir,
+            targets=targets,
+            build_args=args.build_args,
+            build_dir=args.build_dir,
+            n_jobs=args.n_jobs,
+            force_rebuild=args.force_rebuild,
+        )
+    except ActionableError as e:
+        raise click.ClickException(str(e))
 
     if log_dir:
         graph_builder.copy_logs(pkg_map, log_dir)
