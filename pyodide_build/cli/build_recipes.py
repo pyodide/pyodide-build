@@ -9,10 +9,11 @@ import typer
 from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs, init_environment
 from pyodide_build.common import get_num_cores
-from pyodide_build.errors import ActionableError
 from pyodide_build.logger import logger
 from pyodide_build.recipe import graph_builder, loader
 from pyodide_build.recipe.builder import RecipeBuilder
+from pyodide_build.errors import ActionableError
+import click
 
 # Typer application for `pyodide build-recipes`
 app = typer.Typer(no_args_is_help=False, help="Build and manage Pyodide recipes.")
@@ -380,10 +381,6 @@ def clean(
 @app.callback(invoke_without_command=True)
 def _default(
     ctx: typer.Context,
-    packages: list[str] = typer.Argument(
-        None,
-        help="Packages to build, or '*' for all packages in recipe directory",
-    ),
     recipe_dir: str = typer.Option(
         None,
         help=(
@@ -458,8 +455,10 @@ def _default(
     """Default behavior: if no subcommand is provided, run the build command."""
     if ctx.invoked_subcommand is None:
         # Fallback to legacy behavior: `pyodide build-recipes ...` builds
+        # Note: packages argument removed from callback to avoid conflicts with subcommands
+        # Legacy usage: `pyodide build-recipes` without subcommand will build all packages
         build_recipes(
-            packages or [],
+            [],  # Build all packages when no subcommand is specified
             recipe_dir,  # type: ignore[arg-type]
             build_dir,  # type: ignore[arg-type]
             install,
@@ -501,7 +500,7 @@ def build_recipes_impl(
             force_rebuild=args.force_rebuild,
         )
     except ActionableError as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(str(e)) from e
 
     if log_dir:
         graph_builder.copy_logs(pkg_map, log_dir)
