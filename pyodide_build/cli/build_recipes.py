@@ -1,5 +1,4 @@
 import dataclasses
-import shutil
 import sys
 from pathlib import Path
 
@@ -261,72 +260,6 @@ def build_recipes(
     )
     log_dir_ = Path(log_dir).resolve() if log_dir else None
     build_recipes_impl(packages, args, log_dir_, install_options)
-
-
-
-    By default, only the per-package 'build' directories and build logs are removed.
-    The 'dist' directories are preserved unless --include-dist is specified.
-    """
-    cwd = Path.cwd()
-    root = build_env.search_pyodide_root(cwd) or cwd
-    recipe_dir_path = (
-        root / "packages" if not recipe_dir else Path(recipe_dir).resolve()
-    )
-    build_dir_path = recipe_dir_path if not build_dir else Path(build_dir).resolve()
-    install_dir_path = root / "dist" if not install_dir else Path(install_dir).resolve()
-
-    if not recipe_dir_path.is_dir():
-        raise FileNotFoundError(f"Recipe directory {recipe_dir_path} not found")
-
-    # Resolve target package names from names/tags; default '*' if none provided
-    selected: list[str]
-    if not targets:
-        selected = list(loader.load_recipes(recipe_dir_path, ["*"]).keys())
-    else:
-        selected = list(loader.load_recipes(recipe_dir_path, targets).keys())
-
-    # Perform cleanup
-    removed_any = False
-    for pkg in selected:
-        pkg_build_root = build_dir_path / pkg / "build"
-        pkg_recipe_root = recipe_dir_path / pkg
-        pkg_log = pkg_recipe_root / "build.log"
-
-        # Remove build directory for package
-        if pkg_build_root.exists():
-            logger.info("Removing %s", str(pkg_build_root))
-            shutil.rmtree(pkg_build_root, ignore_errors=True)
-            removed_any = True
-
-        # Remove build log if exists
-        if pkg_log.is_file():
-            try:
-                pkg_log.unlink()
-                removed_any = True
-            except Exception:
-                pass
-
-        # Optionally remove per-package dist directory
-        if include_dist:
-            pkg_dist = pkg_recipe_root / "dist"
-            if pkg_dist.exists():
-                logger.info("Removing %s", str(pkg_dist))
-                shutil.rmtree(pkg_dist, ignore_errors=True)
-                removed_any = True
-
-    # Optionally remove install dist (global dist) when include_dist is set
-    if include_dist and install_dir_path.exists():
-        logger.info("Removing %s", str(install_dir_path))
-        shutil.rmtree(install_dir_path, ignore_errors=True)
-        removed_any = True
-
-    if not removed_any:
-        typer.echo("Nothing to clean.")
-    else:
-        typer.echo("Clean complete.")
-
-
-
 def build_recipes_impl(
     packages: list[str],
     args: Args,
