@@ -13,6 +13,7 @@ from pyodide_build.recipe.builder import RecipeBuilder
 
 # Typer application for `pyodide build-recipes`
 
+
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
 class Args:
     recipe_dir: Path
@@ -260,6 +261,8 @@ def build_recipes(
     )
     log_dir_ = Path(log_dir).resolve() if log_dir else None
     build_recipes_impl(packages, args, log_dir_, install_options)
+
+
 def build_recipes_impl(
     packages: list[str],
     args: Args,
@@ -274,13 +277,13 @@ def build_recipes_impl(
         targets = ",".join(packages)
 
     pkg_map = graph_builder.build_packages(
-            args.recipe_dir,
-            targets=targets,
-            build_args=args.build_args,
-            build_dir=args.build_dir,
-            n_jobs=args.n_jobs,
-            force_rebuild=args.force_rebuild,
-        )
+        args.recipe_dir,
+        targets=targets,
+        build_args=args.build_args,
+        build_dir=args.build_dir,
+        n_jobs=args.n_jobs,
+        force_rebuild=args.force_rebuild,
+    )
     if log_dir:
         graph_builder.copy_logs(pkg_map, log_dir)
 
