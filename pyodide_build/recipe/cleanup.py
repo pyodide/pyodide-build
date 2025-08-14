@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from pyodide_build.logger import logger
 from pyodide_build.recipe import loader
@@ -116,5 +116,3 @@ def perform_recipe_cleanup(
             removed_count += 1
 
     return removed_count
-
-

@@ -1,16 +1,17 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 from pyodide_build.recipe.cleanup import (
     perform_recipe_cleanup,
     resolve_targets,
 )
 
-
 RECIPE_DIR = Path(__file__).parent / "recipe" / "_test_recipes"
 
 
-def _make_pkg_with_artifacts(pkg: str, install_dir: Path | None = None) -> tuple[Path, Path, Path]:
+def _make_pkg_with_artifacts(
+    pkg: str, install_dir: Path | None = None
+) -> tuple[Path, Path, Path]:
     pkg_root = RECIPE_DIR / pkg
     build_dir = RECIPE_DIR / pkg / "build"
     dist_dir = RECIPE_DIR / pkg / "dist"
@@ -49,7 +50,9 @@ def test_perform_cleanup_preserves_dist_by_default(tmp_path: Path):
 def test_perform_cleanup_include_dist_removes_dist(tmp_path: Path):
     install_dir = tmp_path / "dist"
     pkg = "pkg_test_graph1"
-    pkg_root, build_dir, dist_dir = _make_pkg_with_artifacts(pkg, install_dir=install_dir)
+    pkg_root, build_dir, dist_dir = _make_pkg_with_artifacts(
+        pkg, install_dir=install_dir
+    )
 
     removed = perform_recipe_cleanup(
         recipe_dir=RECIPE_DIR,
@@ -70,5 +73,3 @@ def test_resolve_targets_star_selects_all():
     all_targets = set(resolve_targets(RECIPE_DIR, ["*"]))
     assert "pkg_test_graph1" in all_targets
     assert "pkg_test_graph3" in all_targets
-
-
