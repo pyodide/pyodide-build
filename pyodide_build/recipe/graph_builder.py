@@ -89,6 +89,9 @@ class BasePackage:
         self.unbuilt_host_dependencies = set(self.host_dependencies)
         self.host_dependents = set()
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.version))
+
     @classmethod
     def from_recipe(
         cls,
