@@ -26,91 +26,75 @@ def resolve_targets(
     return list(recipes.keys())
 
 
-def remove_package_build(recipe_dir: Path, build_dir_base: Path, package: str) -> bool:
-    """
-    Remove the per-package build directory if it exists.
-
-    Returns True if anything was removed.
-    """
-    pkg_build = build_dir_base / package / "build"
-    if pkg_build.exists():
-        logger.info("Removing %s", str(pkg_build))
-        import shutil
-
-        shutil.rmtree(pkg_build, ignore_errors=True)
-        return True
-    return False
-
-
-def remove_package_log(recipe_dir: Path, package: str) -> bool:
-    """Remove the per-package build log file if it exists."""
-    pkg_log = recipe_dir / package / "build.log"
-    if pkg_log.is_file():
-        try:
-            pkg_log.unlink()
-            return True
-        except Exception:
-            return False
-    return False
-
-
-def remove_package_dist(recipe_dir: Path, package: str) -> bool:
-    """Remove the per-package dist directory if it exists."""
-    pkg_dist = recipe_dir / package / "dist"
-    if pkg_dist.exists():
-        logger.info("Removing %s", str(pkg_dist))
-        import shutil
-
-        shutil.rmtree(pkg_dist, ignore_errors=True)
-        return True
-    return False
-
-
-def remove_install_dist(install_dir: Path) -> bool:
-    """Remove the global install dist directory if it exists."""
-    if install_dir and install_dir.exists():
-        logger.info("Removing %s", str(install_dir))
-        import shutil
-
-        shutil.rmtree(install_dir, ignore_errors=True)
-        return True
-    return False
-
-
-def perform_recipe_cleanup(
-    *,
+def _locate_cleanup_paths_for_package(
     recipe_dir: Path,
-    build_dir: Path | None,
-    install_dir: Path | None,
+    build_dir_base: Path,
+    package: str,
+    *,
+    include_dist: bool = False,
+) -> list[Path]:
+    """
+    Locate filesystem paths to remove for a single package.
+    """
+    paths: list[Path] = []
+    # Per-package build directory
+    paths.append(build_dir_base / package / "build")
+    # Per-package build log
+    paths.append(recipe_dir / package / "build.log")
+    # Per-package dist directory (optional)
+    if include_dist:
+        paths.append(recipe_dir / package / "dist")
+    return paths
+
+
+def _remove_path(path: Path) -> None:
+    """
+    Remove a file or directory if it exists. Best-effort, ignore errors.
+    """
+    try:
+        if path.is_dir():
+            import shutil
+
+            if path.exists():
+                logger.info("Removing %s", str(path))
+                shutil.rmtree(path, ignore_errors=True)
+        elif path.is_file():
+            logger.info("Removing %s", str(path))
+            path.unlink(missing_ok=True)  # type: ignore[call-arg]
+        else:
+            # Path does not exist; nothing to do
+            return
+    except Exception:
+        # Best-effort cleanup; ignore failures
+        return
+
+
+def clean_recipes(
+    recipe_dir: Path,
     targets: Iterable[str] | None,
+    *,
+    build_dir: Path | None = None,
+    install_dir: Path | None = None,
     include_dist: bool = False,
     include_always_tag: bool = False,
-) -> int:
+) -> None:
     """
     Clean recipe build artifacts and optionally dist directories.
-
-    Returns the number of items removed.
     """
     if not recipe_dir.is_dir():
         raise FileNotFoundError(f"Recipe directory {recipe_dir} not found")
 
     build_base = build_dir or recipe_dir
-    removed_count = 0
 
     selected = resolve_targets(
         recipe_dir, targets, include_always_tag=include_always_tag
     )
 
     for pkg in selected:
-        if remove_package_build(recipe_dir, build_base, pkg):
-            removed_count += 1
-        if remove_package_log(recipe_dir, pkg):
-            removed_count += 1
-        if include_dist and remove_package_dist(recipe_dir, pkg):
-            removed_count += 1
+        for path in _locate_cleanup_paths_for_package(
+            recipe_dir, build_base, pkg, include_dist=include_dist
+        ):
+            _remove_path(path)
 
     if include_dist and install_dir is not None:
-        if remove_install_dist(install_dir):
-            removed_count += 1
-
-    return removed_count
+        _remove_path(install_dir)
