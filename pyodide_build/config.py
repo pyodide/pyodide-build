@@ -280,6 +280,7 @@ PYODIDE_CLI_CONFIGS = {
     "rustflags": "RUSTFLAGS",
     "cmake_toolchain_file": "CMAKE_TOOLCHAIN_FILE",
     "rust_toolchain": "RUST_TOOLCHAIN",
+    "rust_emscripten_target_url": "RUST_EMSCRIPTEN_TARGET_URL",
     "cflags": "SIDE_MODULE_CFLAGS",
     "cxxflags": "SIDE_MODULE_CXXFLAGS",
     "ldflags": "SIDE_MODULE_LDFLAGS",

@@ -129,6 +129,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             "MESON_CROSS_FILE": "/path/to/crossfile",
             "PYODIDE_XBUILDENV_PATH": "/path/to/xbuildenv",
             "IGNORED_BUILD_REQUIREMENTS": "cmake foo bar",
+            "RUST_EMSCRIPTEN_TARGET_URL": "https://example.com/rust_wasm32_emscripten_target.tar.gz",
         }
 
         config = config_manager._load_config_from_env(env)
@@ -136,6 +137,10 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert config["meson_cross_file"] == "/path/to/crossfile"
         assert config["xbuildenv_path"] == "/path/to/xbuildenv"
         assert config["ignored_build_requirements"] == "cmake foo bar"
+        assert (
+            config["rust_emscripten_target_url"]
+            == "https://example.com/rust_wasm32_emscripten_target.tar.gz"
+        )
 
     def test_load_config_from_file(
         self, tmp_path, dummy_xbuildenv, reset_env_vars, reset_cache
@@ -145,6 +150,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         env = {
             "MESON_CROSS_FILE": "/path/to/crossfile",
             "CFLAGS_BASE": "-O2",
+            "RUST_EMSCRIPTEN_TARGET_URL": "https://example.com/rust_wasm32_emscripten_target.tar.gz",
         }
 
         pyproject_file.write_text("""[tool.pyodide.build]
@@ -156,6 +162,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
                                   build_dependency_index_url = "https://example.com/simple"
                                   xbuildenv_path = "../my_custom/xbuildenv_path" # also helps check relative paths
                                   ignored_build_requirements = "cmake foo bar"
+                                  rust_emscripten_target_url = "$(RUST_EMSCRIPTEN_TARGET_URL)"
                                   """)
 
         xbuildenv_manager = CrossBuildEnvManager(
@@ -175,6 +182,10 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert config["build_dependency_index_url"] == "https://example.com/simple"
         assert config["xbuildenv_path"] == "../my_custom/xbuildenv_path"
         assert config["ignored_build_requirements"] == "cmake foo bar"
+        assert (
+            config["rust_emscripten_target_url"]
+            == "https://example.com/rust_wasm32_emscripten_target.tar.gz"
+        )
 
     def test_config_all(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
