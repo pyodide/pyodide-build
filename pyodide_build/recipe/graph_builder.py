@@ -10,7 +10,6 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from functools import total_ordering
 from graphlib import TopologicalSorter
 from pathlib import Path
 from queue import PriorityQueue, Queue
@@ -50,7 +49,41 @@ class BuildError(Exception):
         super().__init__()
 
 
-@total_ordering
+@dataclasses.dataclass
+class _PackagePriorityWrapper:
+    """
+    Wrapper for BasePackage to handle priority queue ordering.
+
+    This separates priority queue logic from object equality, allowing
+    us to use BasePackage to have semantic equality while maintaining
+    the existing priority behaviour for the build queue.
+    """
+
+    package: "BasePackage"
+    job_priority: int
+
+    def __lt__(self, other: Any) -> bool:
+        if self.job_priority != other.job_priority:
+            return self.job_priority < other.job_priority
+
+        return len(self.package.host_dependents) > len(other.package.host_dependents)
+
+    def __eq__(self, other: Any) -> bool:
+        return self.job_priority == other.job_priority and len(
+            self.package.host_dependents
+        ) == len(other.package.host_dependents)
+
+    # Note: This hash may change during the build process as host_dependents
+    # can change, but it's fine since these objects are only used temporarily
+    # in the priority queue.
+    def __hash__(self) -> int:
+        """
+        Hash based on the wrapped package's hash and job priority.
+
+        """
+        return hash((self.package, self.job_priority))
+
+
 @dataclasses.dataclass(eq=False, repr=False)
 class BasePackage:
     pkgdir: Path
@@ -92,6 +125,12 @@ class BasePackage:
     def __hash__(self) -> int:
         return hash((self.name, self.version))
 
+    def __eq__(self, other: Any) -> bool:
+        return self.name == other.name and self.version == other.version
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.name})"
+
     @classmethod
     def from_recipe(
         cls,
@@ -107,17 +146,6 @@ class BasePackage:
                 return StaticLibrary(pkgdir, config)
             case _:
                 raise ValueError(f"Unknown package type: {config.build.package_type}")
-
-    # We use this in the priority queue, which pops off the smallest element.
-    # So we want the smallest element to have the largest number of dependents
-    def __lt__(self, other: Any) -> bool:
-        return len(self.host_dependents) > len(other.host_dependents)
-
-    def __eq__(self, other: Any) -> bool:
-        return len(self.host_dependents) == len(other.host_dependents)
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.name})"
 
     def build_path(self, build_dir: Path) -> Path:
         return build_dir / self.name / "build"
@@ -568,7 +596,7 @@ class _GraphBuilder:
         self.build_args: BuildArgs = build_args
         self.build_dir: Path = build_dir
         self.needs_build: set[str] = needs_build
-        self.build_queue: PriorityQueue[tuple[int, BasePackage]] = PriorityQueue()
+        self.build_queue: PriorityQueue[_PackagePriorityWrapper] = PriorityQueue()
         self.built_queue: Queue[tuple[BasePackage, BaseException | None]] = Queue()
         self.lock: Lock = Lock()
         self.building_rust_pkg: bool = False
@@ -594,7 +622,7 @@ class _GraphBuilder:
                 # Note that if there are only rust packages left in the queue,
                 # this will keep pushing and popping packages until the current rust package
                 # is built. This is not ideal but presumably the overhead is negligible.
-                self.build_queue.put((job_priority(pkg), pkg))
+                self.build_queue.put(_PackagePriorityWrapper(pkg, job_priority(pkg)))
                 yield None
                 return
             if is_rust_pkg:
@@ -645,7 +673,8 @@ class _GraphBuilder:
     def _builder(self, n: int) -> None:
         """This is the logic that controls a thread in the thread pool."""
         while True:
-            pkg = self.build_queue.get()[1]
+            pkg_wrapper = self.build_queue.get()
+            pkg = pkg_wrapper.package
             with self._queue_index(pkg) as idx:
                 if idx is None:
                     # Rust package and we're already building one.
@@ -672,7 +701,7 @@ class _GraphBuilder:
         for pkg_name in self.needs_build:
             pkg = self.pkg_map[pkg_name]
             if len(pkg.unbuilt_host_dependencies) == 0:
-                self.build_queue.put((job_priority(pkg), pkg))
+                self.build_queue.put(_PackagePriorityWrapper(pkg, job_priority(pkg)))
 
         num_built = len(already_built)
         with Live(self.progress_formatter, console=console_stdout):
@@ -692,7 +721,9 @@ class _GraphBuilder:
                     dependent = self.pkg_map[_dependent]
                     dependent.unbuilt_host_dependencies.remove(pkg.name)
                     if len(dependent.unbuilt_host_dependencies) == 0:
-                        self.build_queue.put((job_priority(dependent), dependent))
+                        self.build_queue.put(
+                            _PackagePriorityWrapper(dependent, job_priority(dependent))
+                        )
 
 
 def _run(cmd, *args, check=False, **kwargs):
