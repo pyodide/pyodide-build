@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
-from pyodide_build.common import run
+from pyodide_build.common import run_command
 from pyodide_build.logger import logger
 
 # A subset of supported virtualenv options that make sense in Pyodide's context.
@@ -88,7 +88,7 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
 
     The code returned is injected at the beginning of the pip script.
     """
-    result = run(
+    result = run_command(
         [
             venv_bin / "python",
             "-c",
@@ -299,7 +299,7 @@ def install_stdlib(venv_bin: Path) -> None:
 
     # Other stuff we need to load with loadPackage
     to_load = ["micropip"]
-    run(
+    run_command(
         [
             venv_bin / "python",
             "-c",

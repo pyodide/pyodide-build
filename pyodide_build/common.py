@@ -293,7 +293,7 @@ def exit_with_stdio(result: subprocess.CompletedProcess[str]) -> NoReturn:
     raise SystemExit(result.returncode)
 
 
-def run(
+def run_command(
     cmd: list[str],
     *,
     text: bool = True,
@@ -438,7 +438,7 @@ def unpack_wheel(
 ) -> None:
     if target_dir is None:
         target_dir = wheel_path.parent
-    run(
+    run_command(
         [sys.executable, "-m", "wheel", "unpack", wheel_path, "-d", target_dir],
         capture_output=not verbose,
         err_msg=("ERROR: Unpacking wheel %s failed", wheel_path.name),
@@ -448,7 +448,7 @@ def unpack_wheel(
 def pack_wheel(wheel_dir: Path, target_dir: Path | None = None, verbose=True) -> None:
     if target_dir is None:
         target_dir = wheel_dir.parent
-    run(
+    run_command(
         [sys.executable, "-m", "wheel", "pack", wheel_dir, "-d", target_dir],
         capture_output=not verbose,
         err_msg=("ERROR: Packing wheel %s failed", wheel_dir),
@@ -488,7 +488,7 @@ def retag_wheel(
         extra_flags += ["--python-tag", python]
     if abi:
         extra_flags += ["--abi-tag", abi]
-    result = run(
+    result = run_command(
         [
             sys.executable,
             "-m",
