@@ -34,7 +34,7 @@ from pyodide_build.common import (
     find_matching_wheel,
     find_missing_executables,
     repack_zip_archive,
-    run,
+    run_command,
 )
 from pyodide_build.logger import console_stdout, logger
 from pyodide_build.recipe import loader, unvendor
@@ -728,13 +728,13 @@ class _GraphBuilder:
 
 def _ensure_rust_toolchain():
     rust_toolchain = build_env.get_build_flag("RUST_TOOLCHAIN")
-    run(["rustup", "toolchain", "install", rust_toolchain])
-    run(["rustup", "default", rust_toolchain])
+    run_command(["rustup", "toolchain", "install", rust_toolchain])
+    run_command(["rustup", "default", rust_toolchain])
 
     url = build_env.get_build_flag("RUST_EMSCRIPTEN_TARGET_URL")
     if not url:
         # Install target with rustup target add
-        run(
+        run_command(
             [
                 "rustup",
                 "target",
@@ -750,7 +750,7 @@ def _ensure_rust_toolchain():
     # and replace it with our wasm-eh version.
     # We place the "install_token" to indicate that our custom sysroot has been
     # installed and which URL we got it from.
-    result = run(
+    result = run_command(
         ["rustup", "which", "--toolchain", rust_toolchain, "rustc"],
     )
 

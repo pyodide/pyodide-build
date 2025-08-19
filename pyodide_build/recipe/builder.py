@@ -41,7 +41,7 @@ from pyodide_build.common import (
     modify_wheel,
     retag_wheel,
     retrying_rmtree,
-    run,
+    run_command,
 )
 from pyodide_build.logger import logger
 from pyodide_build.recipe.bash_runner import (
@@ -459,7 +459,7 @@ class RecipeBuilder:
         # Apply all the patches
         for patch in patches:
             patch_abspath = self.pkg_root / patch
-            run(
+            run_command(
                 ["patch", "-p1", "--binary", "--verbose", "-i", patch_abspath],
                 cwd=self.src_extract_dir,
                 err_msg=("ERROR: Patch %s failed", patch_abspath),
