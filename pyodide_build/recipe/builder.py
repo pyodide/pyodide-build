@@ -36,12 +36,12 @@ from pyodide_build.common import (
     _environment_substitute_str,
     _get_sha256_checksum,
     chdir,
-    exit_with_stdio,
     find_matching_wheel,
     make_zip_archive,
     modify_wheel,
     retag_wheel,
     retrying_rmtree,
+    run,
 )
 from pyodide_build.logger import logger
 from pyodide_build.recipe.bash_runner import (
@@ -459,15 +459,11 @@ class RecipeBuilder:
         # Apply all the patches
         for patch in patches:
             patch_abspath = self.pkg_root / patch
-            result = subprocess.run(
+            run(
                 ["patch", "-p1", "--binary", "--verbose", "-i", patch_abspath],
-                check=False,
-                encoding="utf-8",
                 cwd=self.src_extract_dir,
+                err_msg=("ERROR: Patch %s failed", patch_abspath),
             )
-            if result.returncode != 0:
-                logger.error("ERROR: Patch %s failed", patch_abspath)
-                exit_with_stdio(result)
 
         # Add any extra files
         for src, dst in extras:

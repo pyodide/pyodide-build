@@ -1,5 +1,4 @@
 import os
-import subprocess
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
@@ -7,7 +6,7 @@ from types import MappingProxyType
 
 from pyodide_build.common import (
     _environment_substitute_str,
-    exit_with_stdio,
+    run,
     search_pyproject_toml,
 )
 from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
@@ -123,19 +122,11 @@ class CrossBuildEnvConfigManager(ConfigManager):
         Load environment variables from Makefile.envs
         """
         environment = {}
-        result = subprocess.run(
+        result = run(
             ["make", "-f", str(self.pyodide_root / "Makefile.envs"), ".output_vars"],
-            capture_output=True,
-            text=True,
             env={"PYODIDE_ROOT": str(self.pyodide_root)},
-            check=False,
+            err_msg="ERROR: Failed to load environment variables from Makefile.envs",
         )
-
-        if result.returncode != 0:
-            logger.error(
-                "ERROR: Failed to load environment variables from Makefile.envs"
-            )
-            exit_with_stdio(result)
 
         for line in result.stdout.splitlines():
             equalPos = line.find("=")

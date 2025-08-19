@@ -293,6 +293,34 @@ def exit_with_stdio(result: subprocess.CompletedProcess[str]) -> NoReturn:
     raise SystemExit(result.returncode)
 
 
+def run(
+    cmd: list[str],
+    *,
+    text: bool = True,
+    err_msg: str | tuple[str, ...] | None = None,
+    capture_output: bool = True,
+    **kwargs,
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run command. If it returns a nonzero status code, log an error message and
+    exit.
+    """
+    result = subprocess.run(
+        cmd, text=text, capture_output=capture_output, check=False, **kwargs
+    )
+
+    if result.returncode == 0:
+        return result
+
+    if err_msg is None:
+        err_msg = ("ERROR: command failed %s", " ".join(cmd))
+    elif not isinstance(err_msg, tuple):
+        err_msg = ("ERROR: %s", err_msg)
+
+    logger.error(*err_msg)
+    exit_with_stdio(result)
+
+
 def find_missing_executables(executables: list[str]) -> list[str]:
     return list(filter(lambda exe: shutil.which(exe) is None, executables))
 
@@ -410,29 +438,21 @@ def unpack_wheel(
 ) -> None:
     if target_dir is None:
         target_dir = wheel_path.parent
-    result = subprocess.run(
+    run(
         [sys.executable, "-m", "wheel", "unpack", wheel_path, "-d", target_dir],
-        check=False,
-        encoding="utf-8",
         capture_output=not verbose,
+        err_msg=("ERROR: Unpacking wheel %s failed", wheel_path.name),
     )
-    if result.returncode != 0:
-        logger.error("ERROR: Unpacking wheel %s failed", wheel_path.name)
-        exit_with_stdio(result)
 
 
 def pack_wheel(wheel_dir: Path, target_dir: Path | None = None, verbose=True) -> None:
     if target_dir is None:
         target_dir = wheel_dir.parent
-    result = subprocess.run(
+    run(
         [sys.executable, "-m", "wheel", "pack", wheel_dir, "-d", target_dir],
-        check=False,
-        encoding="utf-8",
         capture_output=not verbose,
+        err_msg=("ERROR: Packing wheel %s failed", wheel_dir),
     )
-    if result.returncode != 0:
-        logger.error("ERROR: Packing wheel %s failed", wheel_dir)
-        exit_with_stdio(result)
 
 
 @contextmanager
@@ -468,7 +488,7 @@ def retag_wheel(
         extra_flags += ["--python-tag", python]
     if abi:
         extra_flags += ["--abi-tag", abi]
-    result = subprocess.run(
+    result = run(
         [
             sys.executable,
             "-m",
@@ -480,13 +500,8 @@ def retag_wheel(
             "--remove",
             *extra_flags,
         ],
-        check=False,
-        encoding="utf-8",
-        capture_output=True,
+        err_msg=("ERROR: Retagging wheel %s to %s failed", wheel_path, platform),
     )
-    if result.returncode != 0:
-        logger.error("ERROR: Retagging wheel %s to %s failed", wheel_path, platform)
-        exit_with_stdio(result)
     return wheel_path.parent / result.stdout.splitlines()[-1].strip()
 
 

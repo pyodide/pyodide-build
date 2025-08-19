@@ -30,11 +30,11 @@ from pyodide_build import build_env, uv_helper
 from pyodide_build.build_env import BuildArgs
 from pyodide_build.common import (
     download_and_unpack_archive,
-    exit_with_stdio,
     extract_wheel_metadata_file,
     find_matching_wheel,
     find_missing_executables,
     repack_zip_archive,
+    run,
 )
 from pyodide_build.logger import console_stdout, logger
 from pyodide_build.recipe import loader, unvendor
@@ -726,23 +726,15 @@ class _GraphBuilder:
                         )
 
 
-def _run(cmd, *args, check=False, **kwargs):
-    result = subprocess.run(cmd, *args, **kwargs, check=check)
-    if result.returncode != 0:
-        logger.error("ERROR: command failed %s", " ".join(cmd))
-        exit_with_stdio(result)
-    return result
-
-
 def _ensure_rust_toolchain():
     rust_toolchain = build_env.get_build_flag("RUST_TOOLCHAIN")
-    _run(["rustup", "toolchain", "install", rust_toolchain])
-    _run(["rustup", "default", rust_toolchain])
+    run(["rustup", "toolchain", "install", rust_toolchain])
+    run(["rustup", "default", rust_toolchain])
 
     url = build_env.get_build_flag("RUST_EMSCRIPTEN_TARGET_URL")
     if not url:
         # Install target with rustup target add
-        _run(
+        run(
             [
                 "rustup",
                 "target",
@@ -758,10 +750,8 @@ def _ensure_rust_toolchain():
     # and replace it with our wasm-eh version.
     # We place the "install_token" to indicate that our custom sysroot has been
     # installed and which URL we got it from.
-    result = _run(
+    result = run(
         ["rustup", "which", "--toolchain", rust_toolchain, "rustc"],
-        capture_output=True,
-        text=True,
     )
 
     toolchain_root = Path(result.stdout).parents[1]
