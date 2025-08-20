@@ -6,7 +6,7 @@ from types import MappingProxyType
 
 from pyodide_build.common import (
     _environment_substitute_str,
-    run,
+    run_command,
     search_pyproject_toml,
 )
 from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
@@ -122,7 +122,7 @@ class CrossBuildEnvConfigManager(ConfigManager):
         Load environment variables from Makefile.envs
         """
         environment = {}
-        result = run(
+        result = run_command(
             ["make", "-f", str(self.pyodide_root / "Makefile.envs"), ".output_vars"],
             env={"PYODIDE_ROOT": str(self.pyodide_root)},
             err_msg="ERROR: Failed to load environment variables from Makefile.envs",
