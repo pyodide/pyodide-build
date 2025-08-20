@@ -1,12 +1,11 @@
 import shutil
-import subprocess
 import sys
 import textwrap
 from pathlib import Path
 from typing import Any
 
 from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
-from pyodide_build.common import exit_with_stdio
+from pyodide_build.common import run_command
 from pyodide_build.logger import logger
 
 # A subset of supported virtualenv options that make sense in Pyodide's context.
@@ -28,13 +27,6 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--no-setuptools",
     "--no-periodic-update",
 ]
-
-
-def check_result(result: subprocess.CompletedProcess[str], msg: str) -> None:
-    """Abort if the process returns a nonzero error code"""
-    if result.returncode != 0:
-        logger.error(msg)
-        exit_with_stdio(result)
 
 
 def dedent(s: str) -> str:
@@ -96,7 +88,7 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
 
     The code returned is injected at the beginning of the pip script.
     """
-    result = subprocess.run(
+    result = run_command(
         [
             venv_bin / "python",
             "-c",
@@ -113,11 +105,8 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
                 """
             ),
         ],
-        capture_output=True,
-        encoding="utf8",
-        check=False,
+        err_msg="ERROR: failed to invoke Pyodide",
     )
-    check_result(result, "ERROR: failed to invoke Pyodide")
     platform_data = result.stdout
     sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
     return dedent(
@@ -310,7 +299,7 @@ def install_stdlib(venv_bin: Path) -> None:
 
     # Other stuff we need to load with loadPackage
     to_load = ["micropip"]
-    result = subprocess.run(
+    run_command(
         [
             venv_bin / "python",
             "-c",
@@ -326,11 +315,8 @@ def install_stdlib(venv_bin: Path) -> None:
                 """
             ),
         ],
-        capture_output=True,
-        encoding="utf8",
-        check=False,
+        err_msg="ERROR: failed to install unvendored stdlib modules",
     )
-    check_result(result, "ERROR: failed to install unvendored stdlib modules")
 
 
 def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
