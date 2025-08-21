@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
+import shutil
 
 from pyodide_build.logger import logger
 from pyodide_build.recipe import loader
@@ -53,8 +54,6 @@ def _remove_path(path: Path) -> None:
     """
     try:
         if path.is_dir():
-            import shutil
-
             if path.exists():
                 logger.info("Removing %s", str(path))
                 shutil.rmtree(path, ignore_errors=True)
@@ -63,9 +62,11 @@ def _remove_path(path: Path) -> None:
             path.unlink(missing_ok=True)  # type: ignore[call-arg]
         else:
             # Path does not exist; nothing to do
+            logger.debug("Path does not exist: %s", str(path))
             return
-    except Exception:
+    except Exception as exc:
         # Best-effort cleanup; ignore failures
+        logger.debug("Failed to remove %s: %s", str(path), exc, exc_info=True)
         return
 
 
