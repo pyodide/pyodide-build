@@ -10,18 +10,14 @@ from pyodide_build.recipe.cleanup import (
 def _write_meta(recipe_dir: Path, pkg: str) -> Path:
     pkg_root = recipe_dir / pkg
     pkg_root.mkdir(parents=True, exist_ok=True)
-    meta = (
-        "package:\n"
-        f"  name: {pkg}\n"
-        "  version: '1.0.0'\n"
-        "source:\n"
-        "  path: .\n"
-    )
+    meta = f"package:\n  name: {pkg}\n  version: '1.0.0'\nsource:\n  path: .\n"
     (pkg_root / "meta.yaml").write_text(meta, encoding="utf-8")
     return pkg_root
 
 
-def _make_pkg_with_artifacts(recipe_dir: Path, pkg: str, install_dir: Path | None = None) -> tuple[Path, Path, Path]:
+def _make_pkg_with_artifacts(
+    recipe_dir: Path, pkg: str, install_dir: Path | None = None
+) -> tuple[Path, Path, Path]:
     pkg_root = _write_meta(recipe_dir, pkg)
     build_dir = pkg_root / "build"
     dist_dir = pkg_root / "dist"

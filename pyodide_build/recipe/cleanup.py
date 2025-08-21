@@ -1,6 +1,6 @@
+import shutil
 from collections.abc import Iterable
 from pathlib import Path
-import shutil
 
 from pyodide_build.logger import logger
 from pyodide_build.recipe import loader
