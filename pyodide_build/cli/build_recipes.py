@@ -11,6 +11,8 @@ from pyodide_build.logger import logger
 from pyodide_build.recipe import graph_builder, loader
 from pyodide_build.recipe.builder import RecipeBuilder
 
+# Typer application for `pyodide build-recipes`
+
 
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
 class Args:
@@ -282,7 +284,6 @@ def build_recipes_impl(
         n_jobs=args.n_jobs,
         force_rebuild=args.force_rebuild,
     )
-
     if log_dir:
         graph_builder.copy_logs(pkg_map, log_dir)
 
