@@ -285,5 +285,5 @@ PYODIDE_CLI_CONFIGS = {
     "python_include_dir": "PYTHONINCLUDE",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     "interpreter": "PYODIDE_INTERPRETER",
-    "package_index": "PYODIDE_PACKAGE_INDEX"
+    "package_index": "PYODIDE_PACKAGE_INDEX",
 }
