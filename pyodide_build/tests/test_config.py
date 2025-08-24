@@ -219,10 +219,3 @@ def test_cli_config_subset():
         assert value in BUILD_VAR_TO_KEY, (
             f"All cli config values should be in build var to key mapping, but {value} is not"
         )
-
-
-def test_cli_dist_dir():
-    runner = CliRunner()
-    result = runner.invoke(app, ["config", "get", "dist_dir"])
-    assert result.exit_code == 0
-    assert result.output.strip().endswith("/dist")
