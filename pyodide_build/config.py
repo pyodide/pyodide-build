@@ -193,6 +193,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "dist_dir": "PYODIDE_DIST_DIR",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
@@ -261,6 +262,7 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     "numpy_lib": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages/numpy/",
     "pyodide_interpreter": "$(PYODIDE_ROOT)/dist/python",
     "pyodide_package_index": "$(PYODIDE_ROOT)/package_index",
+    "dist_dir": "$(PYODIDE_ROOT)/dist",
 }
 
 
@@ -279,6 +281,7 @@ PYODIDE_CLI_CONFIGS = {
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
     "pyodide_abi_version": "PYODIDE_ABI_VERSION",
     "pyodide_root": "PYODIDE_ROOT",
+    "dist_dir": "PYODIDE_DIST_DIR",
     "python_include_dir": "PYTHONINCLUDE",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     "interpreter": "PYODIDE_INTERPRETER",
