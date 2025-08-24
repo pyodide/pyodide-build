@@ -1,7 +1,4 @@
-from typer.testing import CliRunner
-
 from pyodide_build import common
-from pyodide_build.cli import app
 from pyodide_build.config import (
     BUILD_KEY_TO_VAR,
     BUILD_VAR_TO_KEY,
