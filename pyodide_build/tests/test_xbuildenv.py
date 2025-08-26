@@ -393,13 +393,11 @@ class TestCrossBuildEnvManager:
         build_env._init_xbuild_env(xbuildenv_path=tmp_path)
         manager = CrossBuildEnvManager(tmp_path)
 
-        class VersionInfo:
-            major = 3
-            minor = 13
+        VersionInfo = namedtuple("VersionInfo", ("major", "minor"))
 
-        monkeypatch.setattr(sys, "version_info", VersionInfo)
+        monkeypatch.setattr(sys, "version_info", VersionInfo(3, 13))
         assert manager.current_version >= "0.28.2"
-        VersionInfo.minor = 12
+        monkeypatch.setattr(sys, "version_info", VersionInfo(3, 12))
         build_env._init_xbuild_env(xbuildenv_path=tmp_path)
         assert manager.current_version >= "0.27.7"
 
