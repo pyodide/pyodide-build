@@ -86,10 +86,13 @@ def _init_xbuild_env(
     context = redirect_stdout(StringIO()) if quiet else nullcontext()
     with context:
         manager = CrossBuildEnvManager(xbuildenv_path)
-        if manager.current_version is None:
+        matches, _ = manager.check_version_marker()
+        if not matches:
             manager.install()
+        matches, errmsg = manager.check_version_marker()
+        if not matches:
+            raise ValueError(errmsg)
 
-        manager.check_version_marker()
 
         return manager.pyodide_root
 
