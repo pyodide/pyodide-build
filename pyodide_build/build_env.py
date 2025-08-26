@@ -93,7 +93,6 @@ def _init_xbuild_env(
         if not matches:
             raise ValueError(errmsg)
 
-
         return manager.pyodide_root
 
 

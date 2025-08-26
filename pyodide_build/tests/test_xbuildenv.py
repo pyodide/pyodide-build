@@ -4,6 +4,7 @@ from collections import namedtuple
 
 import pytest
 
+from pyodide_build import build_env
 from pyodide_build.common import download_and_unpack_archive
 from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
 
@@ -378,15 +379,29 @@ class TestCrossBuildEnvManager:
         ).read_text() == f"{sys.version_info.major}.{sys.version_info.minor}"
 
         # No error
-        assert manager.check_version_marker() is None
+        assert manager.version_marker_matches() == (True, None)
 
         (manager.symlink_dir / ".build-python-version").write_text("2.7.10")
 
-        with pytest.raises(
-            ValueError,
-            match="does not match the Python version",
-        ):
-            manager.check_version_marker()
+        res, err = manager.version_marker_matches()
+        assert not res
+        assert "does not match the Python version" in err
+
+    def test__init_xbuild_env(
+        self, monkeypatch, monkeypatch_subprocess_run_pip, tmp_path
+    ):
+        build_env._init_xbuild_env(xbuildenv_path=tmp_path)
+        manager = CrossBuildEnvManager(tmp_path)
+
+        class VersionInfo:
+            major = 3
+            minor = 13
+
+        monkeypatch.setattr(sys, "version_info", VersionInfo)
+        assert manager.current_version >= "0.28.2"
+        VersionInfo.minor = 12
+        build_env._init_xbuild_env(xbuildenv_path=tmp_path)
+        assert manager.current_version >= "0.27.7"
 
 
 @pytest.mark.parametrize(
