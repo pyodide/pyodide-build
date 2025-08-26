@@ -414,23 +414,24 @@ class CrossBuildEnvManager:
         version_file = self.symlink_dir / PYTHON_VERSION_MARKER_FILE
         version_file.write_text(build_env.local_versions()["python"])
 
-    def check_version_marker(self):
+    def version_marker_matches(self) -> tuple[bool, str | None]:
         if not self.symlink_dir.is_dir():
-            raise ValueError("cross-build env directory does not exist")
+            return False, "cross-build env directory does not exist"
 
         version_file = self.symlink_dir / PYTHON_VERSION_MARKER_FILE
         if not version_file.exists():
-            raise ValueError("Python version marker file not found")
+            return False, "Python version marker file not found"
 
         version_local = build_env.local_versions()["python"]
         version_on_install = version_file.read_text().strip()
         if version_on_install != version_local:
-            raise ValueError(
+            return False, (
                 f"local Python version ({version_local}) does not match the Python version ({version_on_install}) "
                 "used to create the Pyodide cross-build environment. "
                 "Please switch back to the original Python version, "
                 "or reinstall the xbuildenv, by running `pyodide xbuildenv uninstall` and then `pyodide xbuildenv install`"
             )
+        return True, None
 
 
 def _url_to_version(url: str) -> str:
