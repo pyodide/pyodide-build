@@ -86,10 +86,10 @@ def _init_xbuild_env(
     context = redirect_stdout(StringIO()) if quiet else nullcontext()
     with context:
         manager = CrossBuildEnvManager(xbuildenv_path)
-        matches, _ = manager.check_version_marker()
+        matches, _ = manager.version_marker_matches()
         if not matches:
             manager.install()
-        matches, errmsg = manager.check_version_marker()
+        matches, errmsg = manager.version_marker_matches()
         if not matches:
             raise ValueError(errmsg)
 
