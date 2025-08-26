@@ -390,12 +390,10 @@ class TestCrossBuildEnvManager:
     def test__init_xbuild_env(
         self, monkeypatch, monkeypatch_subprocess_run_pip, tmp_path
     ):
-        build_env._init_xbuild_env(xbuildenv_path=tmp_path)
         manager = CrossBuildEnvManager(tmp_path)
-
         VersionInfo = namedtuple("VersionInfo", ("major", "minor"))
-
         monkeypatch.setattr(sys, "version_info", VersionInfo(3, 13))
+        build_env._init_xbuild_env(xbuildenv_path=tmp_path)
         assert manager.current_version >= "0.28.2"
         monkeypatch.setattr(sys, "version_info", VersionInfo(3, 12))
         build_env._init_xbuild_env(xbuildenv_path=tmp_path)
