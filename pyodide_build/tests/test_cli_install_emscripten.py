@@ -4,7 +4,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from typer.testing import CliRunner
 
 from pyodide_build.cli import xbuildenv
