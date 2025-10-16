@@ -485,13 +485,17 @@ class CrossBuildEnvManager:
 
         # Install the specified Emscripten version
         subprocess.run(
-            ["./emsdk", "install", "--build=Release", emscripten_version],
+            [
+                "./emsdk",
+                "install",
+                "--build=Release",
+                emscripten_version
+            ],
             cwd=emsdk_dir,
             check=True,
         )
 
         # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
-        # Patches are applied after install but before activate
         subprocess.run(
             f"cat {patches_dir}/*.patch | patch -p1 --verbose",
             check=True,
