@@ -485,12 +485,7 @@ class CrossBuildEnvManager:
 
         # Install the specified Emscripten version
         subprocess.run(
-            [
-                "./emsdk",
-                "install",
-                "--build=Release",
-                emscripten_version
-            ],
+            ["./emsdk", "install", "--build=Release", emscripten_version],
             cwd=emsdk_dir,
             check=True,
         )
