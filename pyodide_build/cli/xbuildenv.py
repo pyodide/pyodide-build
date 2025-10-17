@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build.build_env import local_versions, get_build_flag
+from pyodide_build.build_env import get_build_flag, local_versions
 from pyodide_build.common import default_xbuildenv_path
 from pyodide_build.views import MetadataView
 from pyodide_build.xbuildenv import CrossBuildEnvManager
