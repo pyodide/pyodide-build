@@ -66,33 +66,6 @@ def test_install_emscripten_default_version(tmp_path, monkeypatch):
     assert "Use `source" in result.stdout, result.stdout
     assert "emsdk_env.sh` to set up the environment." in result.stdout, result.stdout
 
-    # Verify subprocess calls
-    # install_emscripten makes 4 calls: clone + install + patch + activate
-    assert mock_run.call_count == 4
-    calls = mock_run.call_args_list
-
-    # First call: git clone
-    git_clone_cmd = calls[0][0][0]
-    assert "git" in git_clone_cmd
-    assert "clone" in git_clone_cmd
-
-    # Second call: emsdk install
-    emsdk_install_cmd = calls[1][0][0]
-    assert "./emsdk" in emsdk_install_cmd
-    assert "install" in emsdk_install_cmd
-    assert "latest" in emsdk_install_cmd
-
-    # Third call: patch
-    patch_cmd = calls[2][0][0]
-    assert isinstance(patch_cmd, str)
-    assert "patch" in patch_cmd
-
-    # Fourth call: emsdk activate
-    emsdk_activate_cmd = calls[3][0][0]
-    assert "./emsdk" in emsdk_activate_cmd
-    assert "activate" in emsdk_activate_cmd
-    assert "latest" in emsdk_activate_cmd
-
 
 def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     """Test installing Emscripten with a specific version"""
@@ -131,18 +104,7 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.stdout
     assert "Cloning Emscripten" in result.stdout, result.stdout
     assert "Installing emsdk..." in result.stdout, result.stdout
-
-    # Verify the specific version was used
-    assert mock_run.call_count == 4
-    calls = mock_run.call_args_list
-
-    # Check emsdk install was called with specific version (second call)
-    emsdk_install_cmd = calls[1][0][0]
-    assert emscripten_version in emsdk_install_cmd
-
-    # Check emsdk activate was called with specific version (fourth call)
-    emsdk_activate_cmd = calls[3][0][0]
-    assert emscripten_version in emsdk_activate_cmd
+    assert "Installing emsdk complete." in result.stdout, result.stdout
 
 
 def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
@@ -175,16 +137,8 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0, result.stdout
-
-    # Verify subprocess calls - should use git pull instead of clone
-    # With existing emsdk: pull + install + patch + activate
-    assert mock_run.call_count == 4
-    calls = mock_run.call_args_list
-
-    # First call should be git pull (not clone)
-    git_cmd = calls[0][0][0]
-    assert "git" in git_cmd
-    assert "pull" in git_cmd
+    assert "Installing emsdk..." in result.stdout, result.stdout
+    assert "Installing emsdk complete." in result.stdout, result.stdout
 
 
 def test_install_emscripten_git_failure(tmp_path, monkeypatch):

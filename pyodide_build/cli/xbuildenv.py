@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build.build_env import local_versions
+from pyodide_build.build_env import local_versions, get_build_flag
 from pyodide_build.common import default_xbuildenv_path
 from pyodide_build.views import MetadataView
 from pyodide_build.xbuildenv import CrossBuildEnvManager
@@ -210,7 +210,8 @@ def _search(
 @app.command("install-emscripten")
 def _install_emscripten(
     version: str = typer.Option(
-        "latest", help="Emscripten SDK Version (default: latest)"
+        get_build_flag("PYODIDE_EMSCRIPTEN_VERSION"),
+        help=f"Emscripten SDK Version (default: ${get_build_flag('PYODIDE_EMSCRIPTEN_VERSION')})",
     ),
     path: Path = typer.Option(DEFAULT_PATH, help="Pyodide cross-env path"),
 ) -> None:

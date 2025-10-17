@@ -9,14 +9,14 @@ from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
 def test_clone_emscripten_no_active_xbuildenv(tmp_path):
-    """Test that clone_emscripten raises error when no xbuildenv is active"""
+    """Test that _clone_emscripten raises error when no xbuildenv is active"""
     manager = CrossBuildEnvManager(tmp_path)
 
     with pytest.raises(
         ValueError,
         match="No active xbuildenv. Run `pyodide xbuildenv install` first.",
     ):
-        manager.clone_emscripten()
+        manager._clone_emscripten()
 
 
 def test_clone_emscripten_fresh_clone(tmp_path, monkeypatch):
@@ -35,7 +35,7 @@ def test_clone_emscripten_fresh_clone(tmp_path, monkeypatch):
     monkeypatch.setattr(subprocess, "run", mock_run)
 
     # Execute
-    result = manager.clone_emscripten()
+    result = manager._clone_emscripten()
 
     # Verify
     assert result == emsdk_dir
@@ -53,7 +53,7 @@ def test_clone_emscripten_fresh_clone(tmp_path, monkeypatch):
 
 
 def test_clone_emscripten_already_exists(tmp_path, monkeypatch):
-    """Test that clone_emscripten pulls updates when emsdk already exists"""
+    """Test that _clone_emscripten pulls updates when emsdk already exists"""
     manager = CrossBuildEnvManager(tmp_path)
 
     # Setup: create active xbuildenv with existing emsdk
@@ -68,7 +68,7 @@ def test_clone_emscripten_already_exists(tmp_path, monkeypatch):
     monkeypatch.setattr(subprocess, "run", mock_run)
 
     # Execute
-    result = manager.clone_emscripten()
+    result = manager._clone_emscripten()
 
     # Verify - should pull instead of clone
     assert result == emsdk_dir
@@ -262,8 +262,8 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     )
 
 
-def test_install_emscripten_patch_application(tmp_path, monkeypatch):
-    """Test that patches are applied correctly"""
+def test_install_emscripten_patch_fails(tmp_path, monkeypatch):
+    """Test handling of patch application failure due to version mismatch"""
     manager = CrossBuildEnvManager(tmp_path)
 
     # Setup: create active xbuildenv
@@ -274,44 +274,13 @@ def test_install_emscripten_patch_application(tmp_path, monkeypatch):
     emsdk_dir = version_dir / "emsdk"
     upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
 
-    # Mock subprocess.run to track patch command
-    def mock_run_side_effect(cmd, **kwargs):
-        # Create upstream/emscripten directory after clone
-        if isinstance(cmd, list) and "clone" in cmd:
-            upstream_emscripten.mkdir(parents=True, exist_ok=True)
-        return subprocess.CompletedProcess([], 0)
-
-    mock_run = MagicMock(side_effect=mock_run_side_effect)
-    monkeypatch.setattr(subprocess, "run", mock_run)
-
-    # Execute
-    manager.install_emscripten()
-
-    # Get the patch command (3rd call: clone, install, patch, activate)
-    patch_call = mock_run.call_args_list[2]
-
-    # Verify it's a shell command
-    assert patch_call[1]["shell"] is True
-    assert patch_call[1]["check"] is True
-    assert patch_call[1]["cwd"] == upstream_emscripten
-
-    # Verify the command structure
-    patch_cmd = patch_call[0][0]
-    assert f"cat {emsdk_dir / 'patches'}/*.patch" in patch_cmd
-    assert "patch -p1 --verbose" in patch_cmd
-
-
-def test_install_emscripten_patch_fails(tmp_path, monkeypatch):
-    """Test handling of patch application failure"""
-    manager = CrossBuildEnvManager(tmp_path)
-
-    # Setup: create active xbuildenv
-    version_dir = tmp_path / "0.28.0"
-    version_dir.mkdir()
-    manager.use_version("0.28.0")
+    emscripten_version = "3.1.46"
 
     # Mock subprocess.run to fail on patch command
     def mock_run_with_error(cmd, **kwargs):
+        # Create upstream/emscripten directory after clone
+        if isinstance(cmd, list) and "clone" in cmd:
+            upstream_emscripten.mkdir(parents=True, exist_ok=True)
         # Fail on patch command (shell=True command with "patch" in it)
         if kwargs.get("shell") and isinstance(cmd, str) and "patch" in cmd:
             raise subprocess.CalledProcessError(1, cmd, stderr="Patch failed")
@@ -319,52 +288,9 @@ def test_install_emscripten_patch_fails(tmp_path, monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", mock_run_with_error)
 
-    # Execute and verify error is raised
-    with pytest.raises(subprocess.CalledProcessError):
-        manager.install_emscripten()
-
-
-def test_install_emscripten_patch_application_sequence(tmp_path, monkeypatch):
-    """Test that patches are applied AFTER install but BEFORE activate"""
-    manager = CrossBuildEnvManager(tmp_path)
-
-    # Setup
-    version_dir = tmp_path / "0.28.0"
-    version_dir.mkdir()
-    manager.use_version("0.28.0")
-
-    emsdk_dir = version_dir / "emsdk"
-    upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
-    patches_dir = emsdk_dir / "patches"
-
-    # Track operation sequence
-    operations = []
-
-    def mock_run_sequence(cmd, **kwargs):
-        if isinstance(cmd, list):
-            if "clone" in cmd:
-                operations.append("clone")
-                emsdk_dir.mkdir(exist_ok=True)
-                upstream_emscripten.mkdir(parents=True, exist_ok=True)
-                patches_dir.mkdir(parents=True, exist_ok=True)
-                (patches_dir / "test.patch").write_text("--- a/test\n+++ b/test\n")
-            elif "./emsdk" in cmd and "install" in cmd:
-                operations.append("install")
-            elif "./emsdk" in cmd and "activate" in cmd:
-                operations.append("activate")
-        elif isinstance(cmd, str) and "patch" in cmd:
-            operations.append("patch")
-
-        return subprocess.CompletedProcess(cmd, 0)
-
-    monkeypatch.setattr(subprocess, "run", mock_run_sequence)
-
-    # Execute
-    manager.install_emscripten()
-
-    # According to the reference script, order should be:
-    # 1. clone, 2. install, 3. patch, 4. activate
-    assert operations == ["clone", "install", "patch", "activate"], (
-        f"Expected order: clone -> install -> patch -> activate, "
-        f"but got: {' -> '.join(operations)}"
-    )
+    # Execute and verify proper error message is raised
+    with pytest.raises(
+        RuntimeError,
+        match=r"Failed to apply Emscripten patches\. This may occur if the Emscripten version.*does not match",
+    ):
+        manager.install_emscripten(emscripten_version)

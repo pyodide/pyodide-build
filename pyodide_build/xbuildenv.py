@@ -404,7 +404,7 @@ class CrossBuildEnvManager:
 
         return version
 
-    def clone_emscripten(self, emsdk_dir: Path | str | None = None) -> Path:
+    def _clone_emscripten(self, emsdk_dir: Path | str | None = None) -> Path:
         """
         Clone the Emscripten SDK repository into the currently selected xbuildenv.
 
@@ -471,7 +471,7 @@ class CrossBuildEnvManager:
 
         xbuild_root = self.symlink_dir.resolve()
         emsdk_dir = xbuild_root / "emsdk"
-        patches_dir = emsdk_dir / "patches"
+        patches_dir = self.pyodide_root / "emsdk" / "patches"
         emscripten_root = emsdk_dir / "upstream" / "emscripten"
 
         logger.info(
@@ -481,7 +481,7 @@ class CrossBuildEnvManager:
         )
 
         # Clone or update emsdk directory
-        self.clone_emscripten()
+        self._clone_emscripten()
 
         # Install the specified Emscripten version
         subprocess.run(
@@ -491,12 +491,20 @@ class CrossBuildEnvManager:
         )
 
         # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
-        subprocess.run(
-            f"cat {patches_dir}/*.patch | patch -p1 --verbose",
-            check=True,
-            shell=True,
-            cwd=emscripten_root,
-        )
+        try:
+            subprocess.run(
+                f"cat {patches_dir}/*.patch | patch -p1 --verbose",
+                check=True,
+                shell=True,
+                cwd=emscripten_root,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Failed to apply Emscripten patches. This may occur if the Emscripten version "
+                f"({emscripten_version}) does not match the version for which the patches were generated. "
+                f"Please ensure you are using a compatible Emscripten version or update the patches "
+                f"in {patches_dir}"
+            ) from e
 
         # Activate the specified Emscripten version
         subprocess.run(

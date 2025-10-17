@@ -161,10 +161,7 @@ jobs:
           key: ${{ env.EMSDK_CACHE_NUMBER }}-${{ env.EMSCRIPTEN_VERSION }}-${{ runner.os }}
 
       - name: Install Emscripten
-        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
-        with:
-          version: ${{ env.EMSCRIPTEN_VERSION }}
-          actions-cache-folder: ${{env.EMSDK_CACHE_FOLDER}}
+        run: pyodide install-emscripten
 
       - name: Get number of cores on the runner
         id: get-cores
