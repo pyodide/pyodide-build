@@ -161,7 +161,12 @@ jobs:
           key: ${{ env.EMSDK_CACHE_NUMBER }}-${{ env.EMSCRIPTEN_VERSION }}-${{ runner.os }}
 
       - name: Install Emscripten
-        run: pyodide install-emscripten
+        run: pyodide xbuildenv install-emscripten
+
+      - name: Activate emsdk
+        run: |
+          source ${{ env.EMSDK_CACHE_FOLDER }}/emsdk_env.sh
+          emcc --version
 
       - name: Get number of cores on the runner
         id: get-cores

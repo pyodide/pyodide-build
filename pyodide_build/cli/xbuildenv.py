@@ -210,8 +210,8 @@ def _search(
 @app.command("install-emscripten")
 def _install_emscripten(
     version: str = typer.Option(
-        get_build_flag("PYODIDE_EMSCRIPTEN_VERSION"),
-        help=f"Emscripten SDK Version (default: ${get_build_flag('PYODIDE_EMSCRIPTEN_VERSION')})",
+        None,
+        help="Emscripten SDK Version (default: PYODIDE_EMSCRIPTEN_VERSION from xbuildenv)",
     ),
     path: Path = typer.Option(DEFAULT_PATH, help="Pyodide cross-env path"),
 ) -> None:
@@ -223,6 +223,9 @@ def _install_emscripten(
     """
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
+
+    if version is None:
+        version = get_build_flag("PYODIDE_EMSCRIPTEN_VERSION")
 
     print("Installing emsdk...")
 
