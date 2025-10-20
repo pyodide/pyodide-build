@@ -154,18 +154,12 @@ jobs:
           fi
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
-      - name: Cache emsdk
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.EMSDK_CACHE_FOLDER }}
-          key: ${{ env.EMSDK_CACHE_NUMBER }}-${{ env.EMSCRIPTEN_VERSION }}-${{ runner.os }}
-
       - name: Install Emscripten
         run: pyodide xbuildenv install-emscripten
 
       - name: Activate emsdk
         run: |
-          source ${{ env.EMSDK_CACHE_FOLDER }}/emsdk_env.sh
+          source $(pyodide config get pyodide-root)/../emsdk/emsdk_env.sh
           emcc --version
 
       - name: Get number of cores on the runner

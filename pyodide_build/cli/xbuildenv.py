@@ -211,7 +211,7 @@ def _search(
 def _install_emscripten(
     version: str = typer.Option(
         None,
-        help="Emscripten SDK Version (default: PYODIDE_EMSCRIPTEN_VERSION from xbuildenv)",
+        help="Emscripten version corresponding to the target Pyodide version",
     ),
     path: Path = typer.Option(DEFAULT_PATH, help="Pyodide cross-env path"),
 ) -> None:
