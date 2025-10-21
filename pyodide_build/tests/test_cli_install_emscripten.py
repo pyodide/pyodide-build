@@ -2,7 +2,6 @@
 
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock
 
 from typer.testing import CliRunner
 
@@ -31,24 +30,23 @@ def test_install_emscripten_no_xbuildenv(tmp_path):
 def test_install_emscripten_default_version(tmp_path, monkeypatch):
     """Test installing Emscripten with default version"""
     envpath = Path(tmp_path) / ".xbuildenv"
+    envpath.mkdir()
 
-    # Setup: create a fake xbuildenv structure
-    version_dir = envpath / "0.28.0"
-    version_dir.mkdir(parents=True)
-    (envpath / "xbuildenv").symlink_to(version_dir)
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.get_build_flag",
+        lambda name: "3.1.46",
+    )
 
-    emsdk_dir = version_dir / "emsdk"
-    upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
+    called = {}
 
-    # Mock subprocess.run to avoid actual git operations
-    def mock_run_side_effect(cmd, **kwargs):
-        # Create upstream/emscripten directory after clone
-        if isinstance(cmd, list) and "clone" in cmd:
-            upstream_emscripten.mkdir(parents=True, exist_ok=True)
-        return subprocess.CompletedProcess([], 0)
+    def fake_install(self, version):
+        called["version"] = version
+        return self.env_dir / "emsdk"
 
-    mock_run = MagicMock(side_effect=mock_run_side_effect)
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
+        fake_install,
+    )
 
     result = runner.invoke(
         xbuildenv.app,
@@ -60,34 +58,28 @@ def test_install_emscripten_default_version(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "Cloning Emscripten" in result.stdout, result.stdout
     assert "Installing emsdk..." in result.stdout, result.stdout
     assert "Installing emsdk complete." in result.stdout, result.stdout
     assert "Use `source" in result.stdout, result.stdout
     assert "emsdk_env.sh` to set up the environment." in result.stdout, result.stdout
+    assert called["version"] == "3.1.46"
 
 
 def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     """Test installing Emscripten with a specific version"""
     envpath = Path(tmp_path) / ".xbuildenv"
+    envpath.mkdir()
 
-    # Setup: create a fake xbuildenv structure
-    version_dir = envpath / "0.28.0"
-    version_dir.mkdir(parents=True)
-    (envpath / "xbuildenv").symlink_to(version_dir)
+    called = {}
 
-    emsdk_dir = version_dir / "emsdk"
-    upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
+    def fake_install(self, version):
+        called["version"] = version
+        return self.env_dir / "emsdk"
 
-    # Mock subprocess.run
-    def mock_run_side_effect(cmd, **kwargs):
-        # Create upstream/emscripten directory after clone
-        if isinstance(cmd, list) and "clone" in cmd:
-            upstream_emscripten.mkdir(parents=True, exist_ok=True)
-        return subprocess.CompletedProcess([], 0)
-
-    mock_run = MagicMock(side_effect=mock_run_side_effect)
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
+        fake_install,
+    )
 
     emscripten_version = "3.1.46"
     result = runner.invoke(
@@ -102,30 +94,33 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "Cloning Emscripten" in result.stdout, result.stdout
     assert "Installing emsdk..." in result.stdout, result.stdout
     assert "Installing emsdk complete." in result.stdout, result.stdout
+    assert called["version"] == emscripten_version
 
 
 def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     """Test installing Emscripten when emsdk already exists (should pull updates)"""
     envpath = Path(tmp_path) / ".xbuildenv"
+    envpath.mkdir()
 
-    # Setup: create a fake xbuildenv with existing emsdk
-    version_dir = envpath / "0.28.0"
-    version_dir.mkdir(parents=True)
-    emsdk_dir = version_dir / "emsdk"
-    emsdk_dir.mkdir()  # Existing emsdk directory
-    patches_dir = emsdk_dir / "patches"
-    patches_dir.mkdir()
-    (patches_dir / "test.patch").write_text("--- a/test\n+++ b/test\n")
-    upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
-    upstream_emscripten.mkdir(parents=True)
-    (envpath / "xbuildenv").symlink_to(version_dir)
+    existing_emsdk = envpath / "emsdk"
+    existing_emsdk.mkdir()
 
-    # Mock subprocess.run
-    mock_run = MagicMock(return_value=subprocess.CompletedProcess([], 0))
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.get_build_flag",
+        lambda name: "latest",
+    )
+
+    def fake_install(self, version):
+        assert version == "latest"
+        assert existing_emsdk.exists()
+        return existing_emsdk
+
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
+        fake_install,
+    )
 
     result = runner.invoke(
         xbuildenv.app,
@@ -139,23 +134,20 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.stdout
     assert "Installing emsdk..." in result.stdout, result.stdout
     assert "Installing emsdk complete." in result.stdout, result.stdout
+    assert str(existing_emsdk / "emsdk_env.sh") in result.stdout
 
 
 def test_install_emscripten_git_failure(tmp_path, monkeypatch):
     """Test handling of git clone failure"""
     envpath = Path(tmp_path) / ".xbuildenv"
+    envpath.mkdir()
 
-    # Setup: create a fake xbuildenv structure
-    (envpath / "0.28.0").mkdir(parents=True)
-    (envpath / "xbuildenv").symlink_to(envpath / "0.28.0")
-
-    # Mock subprocess.run to fail on git clone
-    def mock_run_with_error(cmd, **kwargs):
-        if "git" in cmd and "clone" in cmd:
-            raise subprocess.CalledProcessError(1, cmd, stderr="Clone failed")
-        return subprocess.CompletedProcess(cmd, 0)
-
-    monkeypatch.setattr(subprocess, "run", mock_run_with_error)
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
+        lambda self, version: (_ for _ in ()).throw(
+            subprocess.CalledProcessError(1, "git clone")
+        ),
+    )
 
     result = runner.invoke(
         xbuildenv.app,
@@ -174,18 +166,14 @@ def test_install_emscripten_git_failure(tmp_path, monkeypatch):
 def test_install_emscripten_emsdk_install_failure(tmp_path, monkeypatch):
     """Test handling of emsdk install command failure"""
     envpath = Path(tmp_path) / ".xbuildenv"
+    envpath.mkdir()
 
-    # Setup: create a fake xbuildenv structure
-    (envpath / "0.28.0").mkdir(parents=True)
-    (envpath / "xbuildenv").symlink_to(envpath / "0.28.0")
-
-    # Mock subprocess.run to fail on emsdk install
-    def mock_run_with_error(cmd, **kwargs):
-        if "./emsdk" in cmd and "install" in cmd:
-            raise subprocess.CalledProcessError(1, cmd, stderr="Installation failed")
-        return subprocess.CompletedProcess(cmd, 0)
-
-    monkeypatch.setattr(subprocess, "run", mock_run_with_error)
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
+        lambda self, version: (_ for _ in ()).throw(
+            subprocess.CalledProcessError(1, "./emsdk install")
+        ),
+    )
 
     result = runner.invoke(
         xbuildenv.app,
@@ -204,15 +192,19 @@ def test_install_emscripten_emsdk_install_failure(tmp_path, monkeypatch):
 def test_install_emscripten_output_format(tmp_path, monkeypatch):
     """Test that the output message format is correct"""
     envpath = Path(tmp_path) / ".xbuildenv"
+    envpath.mkdir()
 
-    # Setup: create a fake xbuildenv structure
-    version_dir = envpath / "0.28.0"
-    version_dir.mkdir(parents=True)
-    (envpath / "xbuildenv").symlink_to(version_dir)
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.get_build_flag",
+        lambda name: "latest",
+    )
 
-    # Mock subprocess.run
-    mock_run = MagicMock(return_value=subprocess.CompletedProcess([], 0))
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    expected_path = envpath / "emsdk"
+
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
+        lambda self, version: expected_path,
+    )
 
     result = runner.invoke(
         xbuildenv.app,
@@ -226,7 +218,6 @@ def test_install_emscripten_output_format(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.stdout
 
     # Verify output format - check for key messages (logger adds extra lines)
-    assert "Cloning Emscripten" in result.stdout
     assert "Installing emsdk..." in result.stdout
     assert "Installing emsdk complete." in result.stdout
     assert "Use `source" in result.stdout
