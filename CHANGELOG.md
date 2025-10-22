@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.30.7] - 2025/10/22
+## [0.30.8] - 2025/10/22
 
 - `pyodide config` now exposes `dist_dir` variable.
 [#236](https://github.com/pyodide/pyodide-build/pull/236)
@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The CMake toolchain file for Pyodide now sets `CMAKE_SHARED_LINKER_FLAGS_INIT` and `CMAKE_MODULE_LINKER_FLAGS_INIT` and
   unset `CMAKE_SHARED_LINKER_FLAGS` to avoid conflicts with the user's settings.
   [#247](https://github.com/pyodide/pyodide-build/pull/237)
+
+## [0.30.7] - 2025/08/18
 
 ## [0.30.6] - 2025/08/16
 
