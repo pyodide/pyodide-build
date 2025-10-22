@@ -91,9 +91,8 @@ def test_xbuildenv_install(tmp_path, mock_xbuildenv_url):
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "Pyodide cross-build environment installed at" in result.stdout, (
-        result.stdout
-    )
+    assert "Downloading Pyodide cross-build environment" in result.stdout, result.stdout
+    assert "Installing Pyodide cross-build environment" in result.stdout, result.stdout
     assert str(envpath.resolve()) in result.stdout, result.stdout
     assert (envpath / "xbuildenv").is_symlink()
     assert (envpath / "xbuildenv").resolve().exists()
@@ -102,7 +101,6 @@ def test_xbuildenv_install(tmp_path, mock_xbuildenv_url):
     assert (concrete_path / ".installed").exists()
 
 
-@pytest.mark.skip(reason="Avoids heavy pip install of SciPy in sandbox")
 def test_xbuildenv_install_version(tmp_path, fake_xbuildenv_releases_compatible):
     envpath = Path(tmp_path) / ".xbuildenv"
 
@@ -136,7 +134,6 @@ def test_xbuildenv_install_version(tmp_path, fake_xbuildenv_releases_compatible)
     assert (concrete_path / ".installed").exists()
 
 
-@pytest.mark.skip(reason="Avoids heavy pip install of SciPy in sandbox")
 def test_xbuildenv_install_force_install(
     tmp_path, fake_xbuildenv_releases_incompatible
 ):
