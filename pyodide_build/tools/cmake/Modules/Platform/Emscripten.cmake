@@ -104,7 +104,8 @@ endif()
 # This is automatically set for Python project, but we often omit these in libraries.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} $ENV{SIDE_MODULE_CFLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} $ENV{SIDE_MODULE_CXXFLAGS}")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} $ENV{SIDE_MODULE_LDFLAGS}")
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "${CMAKE_SHARED_LINKER_FLAGS_INIT} $ENV{SIDE_MODULE_LDFLAGS}")
+set(CMAKE_MODULE_LINKER_FLAGS_INIT "${CMAKE_MODULE_LINKER_FLAGS_INIT} $ENV{SIDE_MODULE_LDFLAGS}")
 
 # By default, we don't want to add version to the shared library.
 # See: https://github.com/pyodide/pyodide/issues/4335
