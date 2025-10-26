@@ -159,7 +159,7 @@ jobs:
 
       - name: Activate emsdk
         run: |
-          source $(pyodide config get pyodide_root)/../emsdk/emsdk_env.sh
+          source $(pyodide config get pyodide_root)/../../emsdk/emsdk_env.sh
           emcc --version
 
       - name: Get number of cores on the runner
