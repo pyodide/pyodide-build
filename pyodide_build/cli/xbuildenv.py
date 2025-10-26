@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build.build_env import local_versions
+from pyodide_build.build_env import get_build_flag, local_versions
 from pyodide_build.common import default_xbuildenv_path
 from pyodide_build.views import MetadataView
 from pyodide_build.xbuildenv import CrossBuildEnvManager
@@ -205,3 +205,31 @@ def _search(
         print(MetadataView.to_json(views))
     else:
         print(MetadataView.to_table(views))
+
+
+@app.command("install-emscripten")
+def _install_emscripten(
+    version: str = typer.Option(
+        None,
+        help="Emscripten version corresponding to the target Pyodide version",
+    ),
+    path: Path = typer.Option(DEFAULT_PATH, help="Pyodide cross-env path"),
+) -> None:
+    """
+    Install Emscripten SDK into the cross-build environment.
+
+    This command clones the emsdk repository, installs and activates the specified
+    Emscripten version, and applies Pyodide-specific patches.
+    """
+    check_xbuildenv_root(path)
+    manager = CrossBuildEnvManager(path)
+
+    if version is None:
+        version = get_build_flag("PYODIDE_EMSCRIPTEN_VERSION")
+
+    print("Installing emsdk...")
+
+    emsdk_dir = manager.install_emscripten(version)
+
+    print("Installing emsdk complete.")
+    print(f"Use `source {emsdk_dir}/emsdk_env.sh` to set up the environment.")

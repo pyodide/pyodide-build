@@ -36,7 +36,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.12"  # TODO: update to 3.13
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
@@ -107,7 +107,8 @@ jobs:
             { name: test-src, installer: uv },
             { name: test-integration-marker, installer: pip }, # installer doesn't matter
           ]
-        os: [ubuntu-latest, macos-latest]
+        # os: [ubuntu-latest, macos-latest]  # FIXME: https://github.com/oracle/graal/issues/11855
+        os: [ubuntu-latest]
         pyodide-version: [stable]
         include:
         # Run no-isolation tests and Pyodide minimum version testing only
@@ -131,7 +132,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
@@ -154,17 +155,8 @@ jobs:
           fi
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
-      - name: Cache emsdk
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.EMSDK_CACHE_FOLDER }}
-          key: ${{ env.EMSDK_CACHE_NUMBER }}-${{ env.EMSCRIPTEN_VERSION }}-${{ runner.os }}
-
       - name: Install Emscripten
-        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
-        with:
-          version: ${{ env.EMSCRIPTEN_VERSION }}
-          actions-cache-folder: ${{env.EMSDK_CACHE_FOLDER}}
+        run: pyodide xbuildenv install-emscripten
 
       - name: Get number of cores on the runner
         id: get-cores
@@ -172,7 +164,9 @@ jobs:
 
       - name: Run tests marked with integration
         if: matrix.task.name == 'test-integration-marker'
-        run: pytest --junitxml=test-results/junit.xml --cov=pyodide-build pyodide_build -m "integration"
+        run: |
+          source $(pyodide config get pyodide_root)/../../emsdk/emsdk_env.sh
+          pytest --junitxml=test-results/junit.xml --cov=pyodide-build pyodide_build -m "integration"
 
       - name: Run the recipe integration tests (${{ matrix.task.name }})
         if: matrix.task.name != 'test-integration-marker'
@@ -180,7 +174,7 @@ jobs:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         working-directory: integration_tests
         run: |
-
+          source $(pyodide config get pyodide_root)/../../emsdk/emsdk_env.sh
           # https://github.com/pyodide/pyodide-build/issues/147
           # disable package with scikit-build-core
           if [[ ${{ matrix.os }} == "macos-latest" ]]; then

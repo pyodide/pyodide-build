@@ -404,6 +404,124 @@ class CrossBuildEnvManager:
 
         return version
 
+    def _clone_emscripten(self, emsdk_dir: Path | str | None = None) -> Path:
+        """
+        Clone the Emscripten SDK repository into the currently selected xbuildenv.
+
+        Parameters
+        ----------
+        emsdk_dir
+            The directory to clone the emsdk into. If not specified, uses the default location
+            inside the currently selected xbuildenv.
+
+        Returns
+        -------
+        Path
+            Path to the emsdk directory inside the xbuildenv.
+        """
+        if not self.symlink_dir.exists():
+            raise ValueError(
+                "No active xbuildenv. Run `pyodide xbuildenv install` first."
+            )
+
+        if emsdk_dir is None:
+            xbuild_root = self.symlink_dir.resolve()
+            emsdk_dir = xbuild_root / "emsdk"
+        else:
+            emsdk_dir = Path(emsdk_dir)
+
+        logger.info("Cloning Emscripten SDK into %s", emsdk_dir)
+
+        if emsdk_dir.exists():
+            logger.info("Emsdk directory already exists, pulling latest changes...")
+            subprocess.run(["git", "-C", str(emsdk_dir), "pull"], check=True)
+        else:
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--depth",
+                    "1",
+                    "https://github.com/emscripten-core/emsdk.git",
+                    str(emsdk_dir),
+                ],
+                check=True,
+            )
+
+        return emsdk_dir
+
+    def install_emscripten(self, emscripten_version: str = "latest") -> Path:
+        """
+        Install and activate Emscripten SDK inside the currently selected xbuildenv.
+
+        Parameters
+        ----------
+        emscripten_version
+            The Emscripten SDK version to install (default: 'latest').
+
+        Returns
+        -------
+        Path
+            Path to the emsdk directory inside the xbuildenv.
+        """
+        if not self.symlink_dir.exists():
+            raise ValueError(
+                "No active xbuildenv. Run `pyodide xbuildenv install` first."
+            )
+
+        xbuild_root = self.symlink_dir.resolve()
+        emsdk_dir = xbuild_root / "emsdk"
+        patches_dir = self.pyodide_root / "emsdk" / "patches"
+        emscripten_root = emsdk_dir / "upstream" / "emscripten"
+
+        logger.info(
+            "Installing Emscripten SDK (version: %s) into %s",
+            emscripten_version,
+            emsdk_dir,
+        )
+
+        # Clone or update emsdk directory
+        self._clone_emscripten()
+
+        # Install the specified Emscripten version
+        subprocess.run(
+            ["./emsdk", "install", "--build=Release", emscripten_version],
+            cwd=emsdk_dir,
+            check=True,
+        )
+
+        # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
+        try:
+            subprocess.run(
+                f"cat {patches_dir}/*.patch | patch -p1 --verbose",
+                check=True,
+                shell=True,
+                cwd=emscripten_root,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Failed to apply Emscripten patches. This may occur if the Emscripten version "
+                f"({emscripten_version}) does not match the version for which the patches were generated. "
+                f"Please ensure you are using a compatible Emscripten version or update the patches "
+                f"in {patches_dir}"
+            ) from e
+
+        # Activate the specified Emscripten version
+        subprocess.run(
+            [
+                "./emsdk",
+                "activate",
+                "--embedded",
+                "--build=Release",
+                emscripten_version,
+            ],
+            cwd=emsdk_dir,
+            check=True,
+        )
+
+        logger.info("Emscripten SDK installed successfully at %s", emsdk_dir)
+        return emsdk_dir
+
     def _add_version_marker(self) -> None:
         """
         Store the Python version in the xbuildenv directory, so we can check compatibility later.
