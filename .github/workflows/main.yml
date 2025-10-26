@@ -107,7 +107,8 @@ jobs:
             { name: test-src, installer: uv },
             { name: test-integration-marker, installer: pip }, # installer doesn't matter
           ]
-        os: [ubuntu-latest, macos-latest]
+        # os: [ubuntu-latest, macos-latest]  # FIXME: https://github.com/oracle/graal/issues/11855
+        os: [ubuntu-latest]
         pyodide-version: [stable]
         include:
         # Run no-isolation tests and Pyodide minimum version testing only
