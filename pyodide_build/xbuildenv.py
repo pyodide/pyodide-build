@@ -520,6 +520,19 @@ class CrossBuildEnvManager:
         )
 
         logger.info("Emscripten SDK installed successfully at %s", emsdk_dir)
+        
+        try:
+            subprocess.run(
+                "source ./emsdk_env.sh",
+                check=True,
+                shell=True,
+                cwd=emsdk_dir,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Failed to activate emsdk environment. Please check the emsdk installation at {emsdk_dir}"
+            ) from e
+        
         return emsdk_dir
 
     def _add_version_marker(self) -> None:
