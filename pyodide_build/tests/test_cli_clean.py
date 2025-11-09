@@ -15,9 +15,7 @@ def _write_meta(recipe_dir: Path, pkg: str) -> Path:
     return pkg_root
 
 
-def _make_pkg_with_artifacts(
-    recipe_dir: Path, pkg: str, install_dir: Path | None = None
-) -> Path:
+def _make_pkg_with_artifacts(recipe_dir: Path, pkg: str) -> Path:
     pkg_root = _write_meta(recipe_dir, pkg)
     build_dir = pkg_root / "build"
     dist_dir = pkg_root / "dist"
@@ -25,16 +23,12 @@ def _make_pkg_with_artifacts(
     build_dir.mkdir(parents=True, exist_ok=True)
     dist_dir.mkdir(parents=True, exist_ok=True)
     (dist_dir / f"{pkg}-1.0.0-any.whl").write_text("wheel", encoding="utf-8")
-    if install_dir is not None:
-        install_dir.mkdir(parents=True, exist_ok=True)
-        (install_dir / "dummy.whl").write_text("wheel", encoding="utf-8")
     return pkg_root
 
 
 def test_clean_recipes_cli_removes_artifacts(tmp_path):
     recipe_dir = tmp_path / "recipes"
-    install_dir = tmp_path / "dist"
-    pkg_root = _make_pkg_with_artifacts(recipe_dir, "pkg_a", install_dir=install_dir)
+    pkg_root = _make_pkg_with_artifacts(recipe_dir, "pkg_a")
 
     result = runner.invoke(
         app,
@@ -42,24 +36,19 @@ def test_clean_recipes_cli_removes_artifacts(tmp_path):
             "recipes",
             "--recipe-dir",
             str(recipe_dir),
-            "--install-dir",
-            str(install_dir),
-            "--include-dist",
         ],
     )
 
     assert result.exit_code == 0, result.output
     assert not (pkg_root / "build").exists()
     assert not (pkg_root / "build.log").exists()
-    assert not (pkg_root / "dist").exists()
-    assert not install_dir.exists()
+    assert (pkg_root / "dist").exists()
 
 
 def test_clean_recipes_cli_targets_subset(tmp_path):
     recipe_dir = tmp_path / "recipes"
-    install_dir = tmp_path / "dist"
-    pkg_a = _make_pkg_with_artifacts(recipe_dir, "pkg_a", install_dir=install_dir)
-    pkg_b = _make_pkg_with_artifacts(recipe_dir, "pkg_b", install_dir=install_dir)
+    pkg_a = _make_pkg_with_artifacts(recipe_dir, "pkg_a")
+    pkg_b = _make_pkg_with_artifacts(recipe_dir, "pkg_b")
 
     result = runner.invoke(
         app,
@@ -67,8 +56,6 @@ def test_clean_recipes_cli_targets_subset(tmp_path):
             "recipes",
             "--recipe-dir",
             str(recipe_dir),
-            "--install-dir",
-            str(install_dir),
             "pkg_a",
         ],
     )
