@@ -4,7 +4,7 @@ import typer
 
 from pyodide_build import build_env
 from pyodide_build.logger import logger
-from pyodide_build.recipe.cleanup import clean_recipes as perform_cleanup
+from pyodide_build.recipe import cleanup
 
 app = typer.Typer(help="Clean build artifacts.")
 
@@ -34,7 +34,7 @@ def _resolve_paths(
 
 
 @app.command("recipes")
-def clean_recipes(  # noqa: D401 - Typer generates help text.
+def clean_recipes(
     targets: list[str] = typer.Argument(
         None,
         help="Packages or tags (tag:<name>) to clean. Defaults to all packages.",
@@ -48,18 +48,6 @@ def clean_recipes(  # noqa: D401 - Typer generates help text.
         envvar="PYODIDE_RECIPE_BUILD_DIR",
         help="Directory where package build artifacts are stored. Defaults to recipe directory.",
     ),
-    install_dir: str | None = typer.Option(
-        None,
-        help="Global install directory used for built wheels. Defaults to <pyodide root>/dist.",
-    ),
-    include_dist: bool = typer.Option(
-        False,
-        help="Remove per-package and global dist directories.",
-    ),
-    include_always_tag: bool = typer.Option(
-        False,
-        help="Include packages tagged with 'always' when no explicit targets are provided.",
-    ),
 ) -> None:
     """
     Remove build artifacts for recipe packages.
@@ -67,16 +55,16 @@ def clean_recipes(  # noqa: D401 - Typer generates help text.
     recipe_path, build_path, install_path = _resolve_paths(
         recipe_dir,
         build_dir,
-        install_dir,
+        None,
     )
 
     logger.info("Cleaning recipes in %s", recipe_path)
 
-    perform_cleanup(
+    cleanup.clean_recipes(
         recipe_path,
         targets or None,
         build_dir=build_path,
-        install_dir=install_path,
-        include_dist=include_dist,
-        include_always_tag=include_always_tag,
+        install_dir=None,
+        include_dist=False,
+        include_always_tag=False,
     )
