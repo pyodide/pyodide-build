@@ -17,8 +17,7 @@ def callback() -> None:
 def _resolve_paths(
     recipe_dir: str | None,
     build_dir: str | None,
-    install_dir: str | None,
-) -> tuple[Path, Path, Path]:
+) -> tuple[Path, Path]:
     cwd = Path.cwd()
     root = build_env.search_pyodide_root(cwd) or cwd
     resolved_recipe = (
@@ -27,10 +26,7 @@ def _resolve_paths(
     resolved_build = (
         Path(build_dir).expanduser().resolve() if build_dir else resolved_recipe
     )
-    resolved_install = (
-        Path(install_dir).expanduser().resolve() if install_dir else (root / "dist")
-    )
-    return resolved_recipe, resolved_build, resolved_install
+    return resolved_recipe, resolved_build
 
 
 @app.command("recipes")
@@ -52,10 +48,9 @@ def clean_recipes(
     """
     Remove build artifacts for recipe packages.
     """
-    recipe_path, build_path, install_path = _resolve_paths(
+    recipe_path, build_path = _resolve_paths(
         recipe_dir,
         build_dir,
-        None,
     )
 
     logger.info("Cleaning recipes in %s", recipe_path)
