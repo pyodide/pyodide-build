@@ -71,22 +71,16 @@ def build_recipes_no_deps(
         help="The directory where build directories for packages are created. "
         "Default: recipe_dir.",
     ),
-    cflags: str = typer.Option(
-        "", help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS"
-    ),
-    cxxflags: str = typer.Option(
-        "", help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS"
-    ),
-    ldflags: str = typer.Option(
-        "", help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS"
-    ),
+    cflags: str = typer.Option("", help="Extra compiling flags."),
+    cxxflags: str = typer.Option("", help="Extra compiling flags."),
+    ldflags: str = typer.Option("", help="Extra linking flags."),
     target_install_dir: str = typer.Option(
         "",
-        help="The path to the target Python installation. Default: TARGETINSTALLDIR",
+        help="The path to the target Python installation.",
     ),
     host_install_dir: str = typer.Option(
         "",
-        help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
+        help="Directory for installing built host packages.",
     ),
     force_rebuild: bool = typer.Option(
         False,
@@ -188,22 +182,16 @@ def build_recipes(
     no_deps: bool = typer.Option(
         False, help="Removed, use `pyodide build-recipes-no-deps` instead."
     ),
-    cflags: str = typer.Option(
-        None, help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS"
-    ),
-    cxxflags: str = typer.Option(
-        None, help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS"
-    ),
-    ldflags: str = typer.Option(
-        None, help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS"
-    ),
+    cflags: str = typer.Option(None, help="Extra compiling flags."),
+    cxxflags: str = typer.Option(None, help="Extra compiling flags."),
+    ldflags: str = typer.Option(None, help="Extra linking flags."),
     target_install_dir: str = typer.Option(
         "",
-        help="The path to the target Python installation. Default: TARGETINSTALLDIR",
+        help="The path to the target Python installation.",
     ),
     host_install_dir: str = typer.Option(
         "",
-        help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
+        help="Directory for installing built host packages.",
     ),
     log_dir: str = typer.Option(None, help="Directory to place log files"),
     force_rebuild: bool = typer.Option(
