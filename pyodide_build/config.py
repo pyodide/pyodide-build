@@ -177,7 +177,6 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "cflags": "SIDE_MODULE_CFLAGS",
     "cxxflags": "SIDE_MODULE_CXXFLAGS",
     "ldflags": "SIDE_MODULE_LDFLAGS",
-    "stdlib_module_cflags": "STDLIB_MODULE_CFLAGS",
     "sysconfigdata_dir": "SYSCONFIGDATA_DIR",
     "sysconfig_name": "SYSCONFIG_NAME",
     "targetinstalldir": "TARGETINSTALLDIR",
@@ -254,8 +253,6 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     "pyo3_cross_lib_dir": "$(CPYTHONINSTALL)/sysconfigdata",  # FIXME: pyodide xbuildenv stores sysconfigdata here
     "pyo3_cross_include_dir": "$(PYTHONINCLUDE)",
     "pyo3_cross_python_version": "$(PYMAJOR).$(PYMINOR)",
-    # Misc
-    "stdlib_module_cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE) -I Include/ -I. -IInclude/internal/",  # TODO: remove this
     # Paths to build dependencies
     "host_install_dir": "$(PYODIDE_ROOT)/packages/.artifacts",
     "host_site_packages": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages",
