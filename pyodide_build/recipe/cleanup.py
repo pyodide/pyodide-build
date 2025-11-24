@@ -2,8 +2,10 @@ import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
+from pyodide_build.build_env import BuildArgs
 from pyodide_build.logger import logger
 from pyodide_build.recipe import loader
+from pyodide_build.recipe.builder import RecipeBuilder
 
 
 def resolve_targets(
@@ -25,27 +27,6 @@ def resolve_targets(
         recipe_dir, names_or_tags, load_always_tag=include_always_tag
     )
     return list(recipes.keys())
-
-
-def _locate_cleanup_paths_for_package(
-    recipe_dir: Path,
-    build_dir_base: Path,
-    package: str,
-    *,
-    include_dist: bool = False,
-) -> list[Path]:
-    """
-    Locate filesystem paths to remove for a single package.
-    """
-    paths: list[Path] = []
-    # Per-package build directory
-    paths.append(build_dir_base / package / "build")
-    # Per-package build log
-    paths.append(recipe_dir / package / "build.log")
-    # Per-package dist directory (optional)
-    if include_dist:
-        paths.append(recipe_dir / package / "dist")
-    return paths
 
 
 def _remove_path(path: Path) -> None:
@@ -85,17 +66,19 @@ def clean_recipes(
     if not recipe_dir.is_dir():
         raise FileNotFoundError(f"Recipe directory {recipe_dir} not found")
 
-    build_base = build_dir or recipe_dir
+    build_dir_base = build_dir or recipe_dir
 
     selected = resolve_targets(
         recipe_dir, targets, include_always_tag=include_always_tag
     )
 
     for pkg in selected:
-        for path in _locate_cleanup_paths_for_package(
-            recipe_dir, build_base, pkg, include_dist=include_dist
-        ):
-            _remove_path(path)
+        builder = RecipeBuilder(
+            recipe_dir / pkg,
+            BuildArgs(),
+            build_dir_base=build_dir_base,
+        )
+        builder.clean(include_dist=include_dist)
 
     if include_dist and install_dir is not None:
         _remove_path(install_dir)

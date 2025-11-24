@@ -104,6 +104,8 @@ class RecipeBuilder:
         build_dir: str | Path | None = None,
         force_rebuild: bool = False,
         continue_: bool = False,
+        *,
+        build_dir_base: str | Path | None = None,
     ):
         """
         Parameters
@@ -120,6 +122,10 @@ class RecipeBuilder:
             If True, the package will be rebuilt even if it is already up-to-date.
         continue_
             If True, continue a build from the middle. For debugging. Implies "force_rebuild".
+        build_dir_base
+            Optional root path under which package build directories live:
+            <build_dir_base>/<package>/build. If provided, overrides the default
+            per-package location, but can still be overridden directly with build_dir.
         """
         recipe = Path(recipe).resolve()
         self.pkg_root, self.recipe = _load_recipe(recipe)
@@ -133,9 +139,13 @@ class RecipeBuilder:
         self.package_type = self.build_metadata.package_type
         self.is_wheel = self.package_type in ["package", "cpython_module"]
 
-        self.build_dir = (
-            Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
-        )
+        # Priority: build_dir > build_dir_base > default
+        if build_dir:
+            self.build_dir = Path(build_dir).resolve()
+        elif build_dir_base:
+            self.build_dir = Path(build_dir_base).resolve() / self.name / "build"
+        else:
+            self.build_dir = self.pkg_root / "build"
         if len(str(self.build_dir).split(maxsplit=1)) > 1:
             raise ValueError(
                 "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
@@ -154,9 +164,52 @@ class RecipeBuilder:
         # where Pyodide will look for the built artifacts when building pyodide-lock.json.
         # after building packages, artifacts in src_dist_dir will be copied to dist_dir
         self.dist_dir = self.pkg_root / "dist"
+        self.build_log_path = self.pkg_root / "build.log"
         self.build_args = build_args
         self.force_rebuild = force_rebuild or continue_
         self.continue_ = continue_
+
+    def cleanup_paths(self, *, include_dist: bool = False) -> list[Path]:
+        """
+        Return filesystem paths that should be removed to clean the build artifacts.
+
+        Parameters
+        ----------
+        include_dist : bool
+            If True, include the dist directory in the cleanup paths.
+
+        Returns
+        -------
+        list[Path]
+            List of paths to be removed during cleanup.
+        """
+        paths: list[Path] = [self.build_dir, self.build_log_path]
+        if include_dist:
+            paths.append(self.dist_dir)
+        return paths
+
+    def clean(self, *, include_dist: bool = False) -> None:
+        """
+        Clean build artifacts for this package.
+
+        Parameters
+        ----------
+        include_dist : bool
+            If True, also remove the dist directory.
+        """
+        for path in self.cleanup_paths(include_dist=include_dist):
+            try:
+                if path.is_dir():
+                    if path.exists():
+                        logger.info("Removing %s", str(path))
+                        shutil.rmtree(path, ignore_errors=True)
+                elif path.is_file():
+                    logger.info("Removing %s", str(path))
+                    path.unlink(missing_ok=True)
+                else:
+                    logger.debug("Path does not exist: %s", str(path))
+            except Exception as exc:
+                logger.debug("Failed to remove %s: %s", str(path), exc, exc_info=True)
 
     @classmethod
     def get_builder(
