@@ -97,6 +97,27 @@ class RecipeBuilder:
     A class to build a Pyodide meta.yaml recipe.
     """
 
+    @staticmethod
+    def get_default_recipe_dir(root: Path | None = None) -> Path:
+        """
+        Get the default recipe directory for Pyodide packages.
+
+        Parameters
+        ----------
+        root : Path | None
+            The Pyodide root directory. If None, searches for it starting from cwd.
+
+        Returns
+        -------
+        Path
+            The default recipe directory (<root>/packages)
+        """
+        if root is None:
+            from pyodide_build.build_env import search_pyodide_root
+
+            root = search_pyodide_root(Path.cwd()) or Path.cwd()
+        return root / "packages"
+
     def __init__(
         self,
         recipe: str | Path,

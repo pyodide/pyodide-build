@@ -2,9 +2,9 @@ from pathlib import Path
 
 import typer
 
-from pyodide_build import build_env
 from pyodide_build.logger import logger
 from pyodide_build.recipe import cleanup
+from pyodide_build.recipe.builder import RecipeBuilder
 
 app = typer.Typer(help="Clean build artifacts.")
 
@@ -18,10 +18,10 @@ def _resolve_paths(
     recipe_dir: str | None,
     build_dir: str | None,
 ) -> tuple[Path, Path]:
-    cwd = Path.cwd()
-    root = build_env.search_pyodide_root(cwd) or cwd
     resolved_recipe = (
-        Path(recipe_dir).expanduser().resolve() if recipe_dir else (root / "packages")
+        Path(recipe_dir).expanduser().resolve()
+        if recipe_dir
+        else RecipeBuilder.get_default_recipe_dir()
     )
     resolved_build = (
         Path(build_dir).expanduser().resolve() if build_dir else resolved_recipe
