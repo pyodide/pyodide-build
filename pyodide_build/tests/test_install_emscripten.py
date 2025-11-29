@@ -113,9 +113,9 @@ def test_install_emscripten_fresh_install(tmp_path, monkeypatch):
 
     # Verify
     assert result == emsdk_dir
-    assert mock_run.call_count == 4  # clone + install + patch + activate
+    assert mock_run.call_count == 5  # clone + install + patch + activate + source env
 
-    # Check the four subprocess calls
+    # Check the subprocess calls in the expected order
     calls = mock_run.call_args_list
 
     # 1. Clone emsdk
@@ -153,6 +153,14 @@ def test_install_emscripten_fresh_install(tmp_path, monkeypatch):
         check=True,
     )
 
+    # 5. Source the environment script to validate activation
+    assert calls[4] == call(
+        "source ./emsdk_env.sh",
+        check=True,
+        shell=True,
+        cwd=emsdk_dir,
+    )
+
 
 def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     """Test installing a specific Emscripten SDK version"""
@@ -182,7 +190,7 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
 
     # Verify
     assert result == emsdk_dir
-    assert mock_run.call_count == 4  # clone + install + patch + activate
+    assert mock_run.call_count == 5  # clone + install + patch + activate + source env
 
     calls = mock_run.call_args_list
 
@@ -206,6 +214,14 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
         ],
         cwd=emsdk_dir,
         check=True,
+    )
+
+    # Verify sourcing of the environment script (call 4)
+    assert calls[4] == call(
+        "source ./emsdk_env.sh",
+        check=True,
+        shell=True,
+        cwd=emsdk_dir,
     )
 
 
@@ -234,7 +250,7 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
 
     # Verify - should pull, then install, patch, and activate
     assert result == emsdk_dir
-    assert mock_run.call_count == 4
+    assert mock_run.call_count == 5
 
     calls = mock_run.call_args_list
 
@@ -259,6 +275,14 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
         ["./emsdk", "activate", "--embedded", "--build=Release", "latest"],
         cwd=emsdk_dir,
         check=True,
+    )
+
+    # 5. Source the environment script
+    assert calls[4] == call(
+        "source ./emsdk_env.sh",
+        check=True,
+        shell=True,
+        cwd=emsdk_dir,
     )
 
 

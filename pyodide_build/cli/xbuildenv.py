@@ -232,4 +232,3 @@ def _install_emscripten(
     emsdk_dir = manager.install_emscripten(version)
 
     print("Installing emsdk complete.")
-    print(f"Use `source {emsdk_dir}/emsdk_env.sh` to set up the environment.")

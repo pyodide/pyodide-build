@@ -60,8 +60,6 @@ def test_install_emscripten_default_version(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.stdout
     assert "Installing emsdk..." in result.stdout, result.stdout
     assert "Installing emsdk complete." in result.stdout, result.stdout
-    assert "Use `source" in result.stdout, result.stdout
-    assert "emsdk_env.sh` to set up the environment." in result.stdout, result.stdout
     assert called["version"] == "3.1.46"
 
 
@@ -134,7 +132,6 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.stdout
     assert "Installing emsdk..." in result.stdout, result.stdout
     assert "Installing emsdk complete." in result.stdout, result.stdout
-    assert str(existing_emsdk / "emsdk_env.sh") in result.stdout
 
 
 def test_install_emscripten_git_failure(tmp_path, monkeypatch):
@@ -220,5 +217,3 @@ def test_install_emscripten_output_format(tmp_path, monkeypatch):
     # Verify output format - check for key messages (logger adds extra lines)
     assert "Installing emsdk..." in result.stdout
     assert "Installing emsdk complete." in result.stdout
-    assert "Use `source" in result.stdout
-    assert "emsdk_env.sh` to set up the environment." in result.stdout
