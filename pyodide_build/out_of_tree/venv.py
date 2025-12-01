@@ -29,6 +29,9 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
 ]
 
 
+IS_WIN = sys.platform == "win32"
+
+
 def dedent(s: str) -> str:
     return textwrap.dedent(s).strip() + "\n"
 
@@ -324,7 +327,11 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
     logger.info("Creating Pyodide virtualenv at %s", dest)
     from virtualenv import session_via_cli
 
-    interp_path = pyodide_dist_dir() / "python"
+    python_exe_name = "python.bat" if IS_WIN else "python"
+    interp_path = pyodide_dist_dir() / python_exe_name
+
+    if not interp_path.exists():
+        raise RuntimeError(f"Pyodide python interpreter not found at {interp_path}")
 
     cli_args = ["--python", str(interp_path)]
 

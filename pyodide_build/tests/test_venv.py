@@ -104,6 +104,7 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
 
     # necessary directories for valid venv
     (temp_venv_path / "dist").mkdir(exist_ok=True)
+    (temp_venv_path / "dist" / "python").touch()
     (temp_venv_path / "bin").mkdir(exist_ok=True)
 
     venv.create_pyodide_venv(temp_venv_path, options)
