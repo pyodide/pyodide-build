@@ -331,9 +331,8 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
     interp_path = pyodide_dist_dir() / python_exe_name
 
     if not interp_path.exists():
-        logger.error(
-            "ERROR: Pyodide python interpreter not found at %s\n",
-            interp_path,
+        raise RuntimeError(
+            f"Pyodide python interpreter not found at {interp_path}"
         )
 
     cli_args = ["--python", str(interp_path)]
