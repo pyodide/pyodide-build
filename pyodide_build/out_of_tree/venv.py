@@ -57,6 +57,25 @@ def pyodide_dist_dir() -> Path:
     return get_pyodide_root() / "dist"
 
 
+def create_python_symlink(venv_bin: Path, interp_path: Path) -> None:
+    if not IS_WIN:
+        # Nothing to do on non-Windows platforms, as virtualenv already creates
+        # a symlink to the interpreter.
+        return
+
+    # IS_WIN
+    # the virtualenv does not understand the batch file, so we need to
+    # symlink it ourselves
+    python_in_venv = venv_bin / "python.bat"
+    python_in_venv.unlink(missing_ok=True)
+
+    python_in_venv.symlink_to(interp_path)
+
+    # Also remove the virtualenv-generated exe files as exe file takes precedence over .bat file
+    python_exe_in_venv = venv_bin / "python.exe"
+    python_exe_in_venv.unlink(missing_ok=True)
+
+
 def create_pip_conf(venv_root: Path) -> None:
     """Create pip.conf file in venv root
 
@@ -92,10 +111,10 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
     The code returned is injected at the beginning of the pip script.
     """
 
-    python_exe_name = "python.bat" if IS_WIN else "python"
+    interp_path = venv_bin / "python.bat" if IS_WIN else venv_bin / "python"
     result = run_command(
         [
-            venv_bin / python_exe_name,
+            interp_path,
             "-c",
             dedent(
                 """
@@ -253,8 +272,6 @@ def create_pip_script(venv_bin):
     host_python_path.chmod(0o777)
     host_python_path_no_version.symlink_to(host_python_path)
 
-    # breakpoint()
-
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
@@ -330,6 +347,8 @@ def install_stdlib(venv_bin: Path) -> None:
 def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
     """Create a Pyodide virtualenv and store it into dest"""
     logger.info("Creating Pyodide virtualenv at %s", dest)
+    from contextlib import nullcontext
+
     from virtualenv import session_via_cli
 
     python_exe_name = "python.bat" if IS_WIN else "python"
@@ -354,10 +373,16 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
     if IS_WIN:
         from .app_data import create_app_data_dir
 
-        with create_app_data_dir(str(interp_path)) as app_data_dir:
+        ctx = create_app_data_dir(str(interp_path))
+    else:
+        ctx = nullcontext()
+
+    with ctx as app_data_dir:
+        if IS_WIN:
             cli_args += ["--app-data", app_data_dir]
 
-            session = session_via_cli(cli_args + [str(dest)])
+        session = session_via_cli(cli_args + [str(dest)])
+
     check_host_python_version(session)
 
     try:
@@ -366,16 +391,7 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
         venv_bin = venv_root / "Scripts" if IS_WIN else venv_root / "bin"
 
         logger.info("... Configuring virtualenv")
-        if IS_WIN:
-            # symlink the batchfile in Windows as the virtualenv does not understand the batch file and make a link for us
-            python_in_venv = venv_bin / "python.bat"
-            if python_in_venv.exists():
-                python_in_venv.unlink()
-            python_in_venv.symlink_to(interp_path)
-            # Also remove the virtualenv-generated exe files as exe file takes precedence over .bat file
-            python_exe_in_venv = venv_bin / "python.exe"
-            python_exe_in_venv.unlink(missing_ok=True)
-
+        create_python_symlink(venv_bin, interp_path)
         create_pip_conf(venv_root)
         create_pip_script(venv_bin)
         create_pyodide_script(venv_bin)

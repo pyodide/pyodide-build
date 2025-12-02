@@ -20,6 +20,8 @@ VIRTUALENV_OVERRIDE_APP_DATA=<temp_dir> virtualenv venv
 ```
 
 This will create a directory `<temp_dir>` containing the app data JSON file, which you can inspect to understand the format.
+
+FIXME: This module relies on internal details of virtualenv and may break with future versions of virtualenv. Find a more robust way to achieve this if possible.
 """
 
 import json
@@ -46,6 +48,7 @@ def build_host_app_data(app_data_dir: str | Path) -> dict[str, Any]:
         env = {"VIRTUALENV_OVERRIDE_APP_DATA": str(app_data_dir)}
         session_via_cli([temp_dir], env=env)
 
+        # https://github.com/pypa/virtualenv/blob/23032cbb3cc2cc78f1f9de4ad56689318c04f702/src/virtualenv/app_data/via_disk_folder.py#L81-L82
         py_info_dir = Path(app_data_dir) / "py_info" / "2"
         py_info_file = next(
             py_info_dir.glob("*.json")
@@ -70,6 +73,10 @@ def overwrite_host_app_data(
     target_python_executable : str
         The path to the target Python executable.
     """
+
+    # executable paths are overridden to target interpreter path
+    # st_mtime need to be updated to avoid cache invalidation
+    # https://github.com/pypa/virtualenv/blob/23032cbb3cc2cc78f1f9de4ad56689318c04f702/src/virtualenv/discovery/cached_py_info.py#L56
     patched_app_data = app_data.copy()
     patched_app_data["path"] = target_python_executable
     patched_app_data["st_mtime"] = Path(target_python_executable).stat().st_mtime
@@ -96,12 +103,7 @@ def create_app_data_dir(
             host_app_data,
             target_python_executable,
         )
-        print("Saving patched app data to", app_data_dir)  # --- IGNORE ---
         AppDataDiskFolder(app_data_dir).py_info(target_python_executable).write(
             patched_app_data
-        )
-        print(
-            "key is: ",
-            AppDataDiskFolder(app_data_dir).py_info(target_python_executable).key,
         )
         yield app_data_dir
