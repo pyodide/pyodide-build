@@ -105,6 +105,8 @@ jobs:
             { name: test-src, installer: pip },
             { name: test-recipe, installer: uv },
             { name: test-src, installer: uv },
+            { name: test-scripts, installer: pip },
+            { name: test-scripts, installer: uv },
             { name: test-integration-marker, installer: pip }, # installer doesn't matter
           ]
         # os: [ubuntu-latest, macos-latest]  # FIXME: https://github.com/oracle/graal/issues/11855
@@ -137,7 +139,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install the package
         run: |

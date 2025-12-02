@@ -42,6 +42,15 @@ test-src-no-isolation: check
 	@rm -rf ./test_venv
 
 	@echo "... Passed"
+
+.PHONY: test-scripts
+test-scripts: check
+	@echo "... Running integration tests for scripts"
+
+	./scripts/pyodide_venv_test.sh
+
+	@echo "... Passed"
+
 .PHONY: check
 check:
 	@echo "... Checking dependencies"
