@@ -21,12 +21,12 @@ VIRTUALENV_OVERRIDE_APP_DATA=<temp_dir> virtualenv venv
 
 This will create a directory `<temp_dir>` containing the app data JSON file, which you can inspect to understand the format.
 """
-from typing import Any
-from contextlib import contextmanager
+
 import json
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import sys
+from typing import Any
 
 from virtualenv import session_via_cli
 from virtualenv.app_data import AppDataDiskFolder
@@ -47,7 +47,9 @@ def build_host_app_data(app_data_dir: str | Path) -> dict[str, Any]:
         session_via_cli([temp_dir], env=env)
 
         py_info_dir = Path(app_data_dir) / "py_info" / "2"
-        py_info_file = next(py_info_dir.glob("*.json")) # there should be only one JSON file that just created
+        py_info_file = next(
+            py_info_dir.glob("*.json")
+        )  # there should be only one JSON file that just created
 
         data = py_info_file.read_text(encoding="utf-8")
 
@@ -71,10 +73,12 @@ def overwrite_host_app_data(
     patched_app_data = app_data.copy()
     patched_app_data["path"] = target_python_executable
     patched_app_data["st_mtime"] = Path(target_python_executable).stat().st_mtime
-    patched_app_data["content"].update({
-        "executable": target_python_executable,
-        "original_executable": target_python_executable,
-    })
+    patched_app_data["content"].update(
+        {
+            "executable": target_python_executable,
+            "original_executable": target_python_executable,
+        }
+    )
     return patched_app_data
 
 
@@ -93,6 +97,11 @@ def create_app_data_dir(
             target_python_executable,
         )
         print("Saving patched app data to", app_data_dir)  # --- IGNORE ---
-        AppDataDiskFolder(app_data_dir).py_info(target_python_executable).write(patched_app_data)
-        print("key is: ", AppDataDiskFolder(app_data_dir).py_info(target_python_executable).key)
+        AppDataDiskFolder(app_data_dir).py_info(target_python_executable).write(
+            patched_app_data
+        )
+        print(
+            "key is: ",
+            AppDataDiskFolder(app_data_dir).py_info(target_python_executable).key,
+        )
         yield app_data_dir

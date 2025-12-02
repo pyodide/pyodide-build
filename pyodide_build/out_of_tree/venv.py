@@ -353,6 +353,7 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
 
     if IS_WIN:
         from .app_data import create_app_data_dir
+
         with create_app_data_dir(str(interp_path)) as app_data_dir:
             cli_args += ["--app-data", app_data_dir]
 
@@ -374,7 +375,6 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
             # Also remove the virtualenv-generated exe files as exe file takes precedence over .bat file
             python_exe_in_venv = venv_bin / "python.exe"
             python_exe_in_venv.unlink(missing_ok=True)
-
 
         create_pip_conf(venv_root)
         create_pip_script(venv_bin)
