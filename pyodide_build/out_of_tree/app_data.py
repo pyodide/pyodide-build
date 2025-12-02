@@ -52,7 +52,7 @@ def build_host_app_data(app_data_dir: str | Path) -> dict[str, Any]:
         py_info_dir = Path(app_data_dir) / "py_info" / "2"
         py_info_file = next(
             py_info_dir.glob("*.json")
-        )  # there should be only one JSON file that just created
+        )  # there can be multiple files if the caller is in venv already (I guess), but pick any
 
         data = py_info_file.read_text(encoding="utf-8")
 
