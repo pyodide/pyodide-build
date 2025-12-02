@@ -91,9 +91,11 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
 
     The code returned is injected at the beginning of the pip script.
     """
+
+    python_exe_name = "python.bat" if IS_WIN else "python"
     result = run_command(
         [
-            venv_bin / "python",
+            venv_bin / python_exe_name,
             "-c",
             dedent(
                 """
@@ -251,6 +253,8 @@ def create_pip_script(venv_bin):
     host_python_path.chmod(0o777)
     host_python_path_no_version.symlink_to(host_python_path)
 
+    # breakpoint()
+
     pip_path.write_text(
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
@@ -302,9 +306,10 @@ def install_stdlib(venv_bin: Path) -> None:
 
     # Other stuff we need to load with loadPackage
     to_load = ["micropip"]
+    interp_path = venv_bin / "python.bat" if IS_WIN else venv_bin / "python"
     run_command(
         [
-            venv_bin / "python",
+            interp_path,
             "-c",
             dedent(
                 f"""
@@ -346,15 +351,31 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
 
         cli_args.extend(virtualenv_args)
 
-    session = session_via_cli(cli_args + [str(dest)])
+    if IS_WIN:
+        from .app_data import create_app_data_dir
+        with create_app_data_dir(str(interp_path)) as app_data_dir:
+            cli_args += ["--app-data", app_data_dir]
+
+            session = session_via_cli(cli_args + [str(dest)])
     check_host_python_version(session)
 
     try:
         session.run()
         venv_root = Path(session.creator.dest).absolute()
-        venv_bin = venv_root / "bin"
+        venv_bin = venv_root / "Scripts" if IS_WIN else venv_root / "bin"
 
         logger.info("... Configuring virtualenv")
+        if IS_WIN:
+            # symlink the batchfile in Windows as the virtualenv does not understand the batch file and make a link for us
+            python_in_venv = venv_bin / "python.bat"
+            if python_in_venv.exists():
+                python_in_venv.unlink()
+            python_in_venv.symlink_to(interp_path)
+            # Also remove the virtualenv-generated exe files as exe file takes precedence over .bat file
+            python_exe_in_venv = venv_bin / "python.exe"
+            python_exe_in_venv.unlink(missing_ok=True)
+
+
         create_pip_conf(venv_root)
         create_pip_script(venv_bin)
         create_pyodide_script(venv_bin)

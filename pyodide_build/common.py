@@ -305,6 +305,7 @@ def run_command(
     Run command. If it returns a nonzero status code, log an error message and
     exit.
     """
+    print("Running command:", " ".join(str(c) for c in cmd))
     result = subprocess.run(
         cmd, text=text, capture_output=capture_output, check=False, **kwargs
     )
