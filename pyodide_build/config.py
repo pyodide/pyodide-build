@@ -122,25 +122,81 @@ class CrossBuildEnvConfigManager(ConfigManager):
         Load environment variables from Makefile.envs
         """
         environment = {}
-        result = run_command(
-            ["make", "-f", str(self.pyodide_root / "Makefile.envs"), ".output_vars"],
-            env={"PYODIDE_ROOT": str(self.pyodide_root)},
-            err_msg="ERROR: Failed to load environment variables from Makefile.envs",
-        )
+        env = os.environ | {"PYODIDE_ROOT": str(self.pyodide_root)}
+        makefile_path = self.pyodide_root / "Makefile.envs"
 
-        for line in result.stdout.splitlines():
-            equalPos = line.find("=")
-            if equalPos != -1:
-                varname = line[0:equalPos]
+        # Try using make first if available
+        try:
+            result = run_command(
+                ["make", "-f", str(makefile_path), ".output_vars"],
+                env=env,
+                err_msg="ERROR: Failed to load environment variables from Makefile.envs",
+            )
 
-                if varname not in BUILD_VAR_TO_KEY:
-                    continue
+            for line in result.stdout.splitlines():
+                equalPos = line.find("=")
+                if equalPos != -1:
+                    varname = line[0:equalPos]
 
-                value = line[equalPos + 1 :]
-                value = value.strip("'").strip()
-                environment[varname] = value
+                    if varname not in BUILD_VAR_TO_KEY:
+                        continue
 
-        return environment
+                    value = line[equalPos + 1 :]
+                    value = value.strip("'").strip()
+                    environment[varname] = value
+
+            return environment
+        except Exception:
+            logger.debug(
+                "make command not available, using fallback Makefile.envs parser"
+            )
+            return _parse_makefile_envs(env=env, makefile_path=makefile_path)
+
+
+def _parse_makefile_envs(
+    env: Mapping[str, str],
+    makefile_path: Path,
+) -> dict[str, str]:
+    """
+    Simple parser for Makefile.envs that doesn't require make.
+    This is a fallback for systems where make is not available (e.g., Windows).
+
+    This function is not a full-featured Makefile parser, but it can handle simple variable assignments.
+    For instance, it does not parse multi-line values or complex Makefile syntax correctly.
+    But it is sufficient to extract the build configuration required for `pyodide venv`.
+    Ideally, we should get rid of Makefile.envs and find a better way to pass build configuration
+    from Pyodide to pyodide-build. Still, to support backward compatibility, we keep this parser for now.
+    """
+    environment = dict(env)
+
+    with open(makefile_path) as f:
+        for line in f:
+            line = line.strip()
+
+            # Skip comments and empty lines
+            if not line or line.startswith("#"):
+                continue
+
+            # Only process export statements
+            if line.startswith("export "):
+                line = line[7:].strip()  # Remove "export "
+
+                # Handle variable assignments
+                if "=" in line:
+                    # Split on first '=' only
+                    parts = line.split("=", 1)
+                    if len(parts) == 2:
+                        varname = parts[0].rstrip("?").strip()  # Remove ?= operator
+                        value = parts[1].strip()
+
+                        # Skip if not a variable we care about
+                        if varname not in BUILD_VAR_TO_KEY:
+                            continue
+
+                        value = _environment_substitute_str(value, environment)
+                        environment[varname] = value
+
+    return environment
 
 
 # Configuration variables and corresponding environment variables.
