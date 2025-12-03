@@ -34,6 +34,7 @@ repos:
     rev: "v0.10.0.1"
     hooks:
       - id: shellcheck
+        exclude: ^(integration_tests/scripts/pyodide_venv_test.sh)$
 
   - repo: https://github.com/codespell-project/codespell
     rev: "v2.4.1"
