@@ -124,8 +124,7 @@ class CrossBuildEnvConfigManager(ConfigManager):
         environment = {}
         # TODO: Do not use make to parse Makefile.envs so that we don't have to depend on make being installed
         # Windows does not have make installed by default
-        env = os.environ.copy()
-        env["PYODIDE_ROOT"] = str(self.pyodide_root)
+        env = os.environ | {"PYODIDE_ROOT": str(self.pyodide_root)}
         result = run_command(
             ["make", "-f", str(self.pyodide_root / "Makefile.envs"), ".output_vars"],
             env=env,

@@ -307,6 +307,7 @@ def clear_app_data_cache():
 
 def test_build_host_app_data(tmp_path, clear_app_data_cache):
     app_data_dir = tmp_path / "app_data"
+    clear_app_data_cache(app_data_dir)
 
     try:
         app_data_json = app_data.build_host_app_data(app_data_dir)
@@ -320,6 +321,7 @@ def test_build_host_app_data(tmp_path, clear_app_data_cache):
 
 def test_overwrite_host_app_data(tmp_path, clear_app_data_cache):
     app_data_dir = tmp_path / "app_data"
+    clear_app_data_cache(app_data_dir)
 
     try:
         host_app_data = app_data.build_host_app_data(app_data_dir)
