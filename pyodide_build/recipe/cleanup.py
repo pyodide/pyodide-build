@@ -40,7 +40,7 @@ def _remove_path(path: Path) -> None:
                 shutil.rmtree(path, ignore_errors=True)
         elif path.is_file():
             logger.info("Removing %s", str(path))
-            path.unlink(missing_ok=True)  # type: ignore[call-arg]
+            path.unlink(missing_ok=True)
         else:
             # Path does not exist; nothing to do
             logger.debug("Path does not exist: %s", str(path))
@@ -56,7 +56,6 @@ def clean_recipes(
     targets: Iterable[str] | None,
     *,
     build_dir: Path | None = None,
-    install_dir: Path | None = None,
     include_dist: bool = False,
     include_always_tag: bool = False,
 ) -> None:
@@ -66,8 +65,6 @@ def clean_recipes(
     if not recipe_dir.is_dir():
         raise FileNotFoundError(f"Recipe directory {recipe_dir} not found")
 
-    build_dir_base = build_dir or recipe_dir
-
     selected = resolve_targets(
         recipe_dir, targets, include_always_tag=include_always_tag
     )
@@ -76,9 +73,6 @@ def clean_recipes(
         builder = RecipeBuilder(
             recipe_dir / pkg,
             BuildArgs(),
-            build_dir_base=build_dir_base,
+            build_dir=build_dir,
         )
         builder.clean(include_dist=include_dist)
-
-    if include_dist and install_dir is not None:
-        _remove_path(install_dir)
