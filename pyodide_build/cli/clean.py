@@ -2,9 +2,9 @@ from pathlib import Path
 
 import typer
 
+from pyodide_build import build_env
 from pyodide_build.logger import logger
 from pyodide_build.recipe import cleanup
-from pyodide_build import build_env
 
 app = typer.Typer(help="Clean build artifacts.")
 

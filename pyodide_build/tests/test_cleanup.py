@@ -55,9 +55,7 @@ def test_clean_preserves_dist_by_default(tmp_path: Path):
 def test_clean_include_dist_removes_dist(tmp_path: Path):
     recipe_dir = tmp_path / "recipes"
     pkg = "pkg_a"
-    pkg_root, build_dir, dist_dir = _make_pkg_with_artifacts(
-        recipe_dir, pkg
-    )
+    pkg_root, build_dir, dist_dir = _make_pkg_with_artifacts(recipe_dir, pkg)
 
     clean_recipes(
         recipe_dir,
