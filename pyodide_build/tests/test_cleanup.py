@@ -42,7 +42,6 @@ def test_clean_preserves_dist_by_default(tmp_path: Path):
         recipe_dir,
         ["pkg_a", "pkg_b"],
         build_dir=None,
-        install_dir=None,
         include_dist=False,
     )
 
@@ -55,24 +54,19 @@ def test_clean_preserves_dist_by_default(tmp_path: Path):
 
 def test_clean_include_dist_removes_dist(tmp_path: Path):
     recipe_dir = tmp_path / "recipes"
-    install_dir = tmp_path / "dist"
     pkg = "pkg_a"
-    pkg_root, build_dir, dist_dir = _make_pkg_with_artifacts(
-        recipe_dir, pkg, install_dir=install_dir
-    )
+    pkg_root, build_dir, dist_dir = _make_pkg_with_artifacts(recipe_dir, pkg)
 
     clean_recipes(
         recipe_dir,
         [pkg],
         build_dir=None,
-        install_dir=install_dir,
         include_dist=True,
     )
 
     assert not build_dir.exists()
     assert not dist_dir.exists()
     assert not (pkg_root / "build.log").exists()
-    assert not install_dir.exists()
 
 
 def test_resolve_targets_star_selects_all(tmp_path: Path):

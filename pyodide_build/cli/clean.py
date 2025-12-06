@@ -17,15 +17,13 @@ def callback() -> None:
 def _resolve_paths(
     recipe_dir: str | None,
     build_dir: str | None,
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path | None]:
     cwd = Path.cwd()
     root = build_env.search_pyodide_root(cwd) or cwd
     resolved_recipe = (
         Path(recipe_dir).expanduser().resolve() if recipe_dir else (root / "packages")
     )
-    resolved_build = (
-        Path(build_dir).expanduser().resolve() if build_dir else resolved_recipe
-    )
+    resolved_build = Path(build_dir).expanduser().resolve() if build_dir else None
     return resolved_recipe, resolved_build
 
 
@@ -59,7 +57,6 @@ def clean_recipes(
         recipe_path,
         targets or None,
         build_dir=build_path,
-        install_dir=None,
         include_dist=False,
         include_always_tag=False,
     )
