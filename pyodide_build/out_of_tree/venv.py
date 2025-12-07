@@ -347,7 +347,6 @@ def install_stdlib(venv_bin: Path) -> None:
 def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
     """Create a Pyodide virtualenv and store it into dest"""
     logger.info("Creating Pyodide virtualenv at %s", dest)
-    from contextlib import nullcontext
 
     from virtualenv import session_via_cli
 
