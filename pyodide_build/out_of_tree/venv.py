@@ -373,14 +373,10 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
     if IS_WIN:
         from .app_data import create_app_data_dir
 
-        ctx = create_app_data_dir(str(interp_path))
-    else:
-        ctx = nullcontext()
-
-    with ctx as app_data_dir:
-        if IS_WIN:
+        with create_app_data_dir(str(interp_path)) as app_data_dir:
             cli_args += ["--app-data", app_data_dir]
-
+            session = session_via_cli(cli_args + [str(dest)])
+    else:
         session = session_via_cli(cli_args + [str(dest)])
 
     check_host_python_version(session)
