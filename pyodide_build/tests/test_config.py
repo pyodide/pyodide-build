@@ -231,6 +231,9 @@ export PYODIDE_VERSION ?= 0.30.0.dev0
 
 # Another comment
 export PLATFORM_TRIPLET=wasm32-emscripten
+
+export PYODIDE_JOBS = 8 # Trailing comment
+PIP_CONSTRAINT = some_value_not_exported
 """)
         env = {"PYODIDE_ROOT": str(tmp_path)}
         result = _parse_makefile_envs(env, makefile)
@@ -239,6 +242,8 @@ export PLATFORM_TRIPLET=wasm32-emscripten
         assert result["PYODIDE_EMSCRIPTEN_VERSION"] == "4.0.9"
         assert result["PYODIDE_VERSION"] == "0.30.0.dev0"
         assert result["PLATFORM_TRIPLET"] == "wasm32-emscripten"
+        assert result["PYODIDE_JOBS"] == "8"
+        assert "PIP_CONSTRAINT" not in result  # Not exported, should be skipped
 
     def test_parse_makefile_envs_variable_substitution(
         self, tmp_path, reset_env_vars, reset_cache

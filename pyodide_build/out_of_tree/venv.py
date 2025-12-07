@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
-from pyodide_build.common import run_command
+from pyodide_build.common import IS_WIN, run_command
 from pyodide_build.logger import logger
 
 # A subset of supported virtualenv options that make sense in Pyodide's context.
@@ -27,9 +27,6 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--no-setuptools",
     "--no-periodic-update",
 ]
-
-
-IS_WIN = sys.platform == "win32"
 
 
 def dedent(s: str) -> str:

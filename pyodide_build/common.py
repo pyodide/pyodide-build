@@ -30,6 +30,8 @@ from packaging.utils import parse_wheel_filename
 
 from pyodide_build.logger import logger
 
+IS_WIN = sys.platform == "win32"
+
 
 def xbuildenv_dirname() -> str:
     try:

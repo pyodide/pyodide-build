@@ -5,6 +5,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from pyodide_build.common import (
+    IS_WIN,
     _environment_substitute_str,
     run_command,
     search_pyproject_toml,
@@ -125,8 +126,10 @@ class CrossBuildEnvConfigManager(ConfigManager):
         env = os.environ | {"PYODIDE_ROOT": str(self.pyodide_root)}
         makefile_path = self.pyodide_root / "Makefile.envs"
 
-        # Try using make first if available
-        try:
+        if IS_WIN:
+            logger.debug("Using internal Makefile.envs parser on Windows system")
+            return _parse_makefile_envs(env=env, makefile_path=makefile_path)
+        else:
             result = run_command(
                 ["make", "-f", str(makefile_path), ".output_vars"],
                 env=env,
@@ -135,22 +138,19 @@ class CrossBuildEnvConfigManager(ConfigManager):
 
             for line in result.stdout.splitlines():
                 equalPos = line.find("=")
-                if equalPos != -1:
-                    varname = line[0:equalPos]
+                if equalPos == -1:
+                    continue
 
-                    if varname not in BUILD_VAR_TO_KEY:
-                        continue
+                varname = line[0:equalPos]
 
-                    value = line[equalPos + 1 :]
-                    value = value.strip("'").strip()
-                    environment[varname] = value
+                if varname not in BUILD_VAR_TO_KEY:
+                    continue
+
+                value = line[equalPos + 1 :]
+                value = value.strip("'").strip()
+                environment[varname] = value
 
             return environment
-        except Exception:
-            logger.debug(
-                "make command not available, using fallback Makefile.envs parser"
-            )
-            return _parse_makefile_envs(env=env, makefile_path=makefile_path)
 
 
 def _parse_makefile_envs(
@@ -178,23 +178,26 @@ def _parse_makefile_envs(
                 continue
 
             # Only process export statements
-            if line.startswith("export "):
-                line = line[7:].strip()  # Remove "export "
+            if not line.startswith("export "):
+                continue
 
-                # Handle variable assignments
-                if "=" in line:
-                    # Split on first '=' only
-                    parts = line.split("=", 1)
-                    if len(parts) == 2:
-                        varname = parts[0].rstrip("?").strip()  # Remove ?= operator
-                        value = parts[1].strip()
+            line = line.removeprefix("export ").strip()
 
-                        # Skip if not a variable we care about
-                        if varname not in BUILD_VAR_TO_KEY:
-                            continue
+            # Handle variable assignments
+            if "=" not in line:
+                continue
 
-                        value = _environment_substitute_str(value, environment)
-                        environment[varname] = value
+            # Split on first '=' only
+            parts = line.split("=", 1)
+            varname = parts[0].removesuffix("?").rstrip()  # Remove ?= operator
+            value = parts[1].split("#")[0].strip()  # Remove trailing comments
+
+            # Skip if not a variable we care about
+            if varname not in BUILD_VAR_TO_KEY:
+                continue
+
+            value = _environment_substitute_str(value, environment)
+            environment[varname] = value
 
     return environment
 
