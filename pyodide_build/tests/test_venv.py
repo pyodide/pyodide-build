@@ -79,23 +79,25 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
 
     temp_venv_path.mkdir(exist_ok=True)
 
-    # Mock most of the functions called by create_pyodide_venv
+    # Mock most of the functions/methods called by create_pyodide_venv
     # as we just need to check the arguments passed to it
     monkeypatch.setattr("virtualenv.session_via_cli", mock_session_via_cli)
     monkeypatch.setattr(
         "pyodide_build.out_of_tree.venv.check_host_python_version", lambda session: None
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.create_pip_conf", lambda venv_root: None
+        "pyodide_build.out_of_tree.venv.PyodideVenv._create_pip_conf", lambda self: None
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.create_pip_script", lambda venv_bin: None
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pip_script",
+        lambda self: None,
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.create_pyodide_script", lambda venv_bin: None
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pyodide_script",
+        lambda self: None,
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.install_stdlib", lambda venv_bin: None
+        "pyodide_build.out_of_tree.venv.PyodideVenv._install_stdlib", lambda self: None
     )
     monkeypatch.setattr(
         "pyodide_build.out_of_tree.venv.pyodide_dist_dir",
