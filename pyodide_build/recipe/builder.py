@@ -154,9 +154,51 @@ class RecipeBuilder:
         # where Pyodide will look for the built artifacts when building pyodide-lock.json.
         # after building packages, artifacts in src_dist_dir will be copied to dist_dir
         self.dist_dir = self.pkg_root / "dist"
+        self.build_log_path = self.pkg_root / "build.log"
         self.build_args = build_args
         self.force_rebuild = force_rebuild or continue_
         self.continue_ = continue_
+
+    def _cleanup_paths(self, *, include_dist: bool = False) -> list[Path]:
+        """
+        Return filesystem paths that should be removed to clean the build artifacts.
+
+        Parameters
+        ----------
+        include_dist : bool
+            If True, include the dist directory in the cleanup paths.
+
+        Returns
+        -------
+        list[Path]
+            List of paths to be removed during cleanup.
+        """
+        paths: list[Path] = [self.build_dir, self.build_log_path]
+        if include_dist:
+            paths.append(self.dist_dir)
+        return paths
+
+    def clean(self, *, include_dist: bool = False) -> None:
+        """
+        Clean build artifacts for this package.
+
+        Parameters
+        ----------
+        include_dist : bool
+            If True, also remove the dist directory.
+        """
+        for path in self._cleanup_paths(include_dist=include_dist):
+            try:
+                if path.is_dir():
+                    logger.info("Removing %s", str(path))
+                    shutil.rmtree(path, ignore_errors=True)
+                elif path.is_file():
+                    logger.info("Removing %s", str(path))
+                    path.unlink(missing_ok=True)
+                else:
+                    logger.debug("Path does not exist: %s", str(path))
+            except Exception as exc:
+                logger.debug("Failed to remove %s: %s", str(path), exc, exc_info=True)
 
     @classmethod
     def get_builder(
