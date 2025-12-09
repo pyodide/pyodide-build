@@ -136,11 +136,17 @@ class RecipeBuilder:
         self.build_dir = (
             Path(build_dir).resolve() if build_dir else self.pkg_root / "build"
         )
-        if len(str(self.build_dir).split(maxsplit=1)) > 1:
-            raise ValueError(
-                "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to the package build directory has no spaces.\n"
-                "See https://github.com/pypa/pip/issues/13283"
+        # If a path to a file specified PIP_CONSTRAINT contains spaces, pip will misinterpret
+        # it as multiple files; see https://github.com/pypa/pip/issues/13283
+        # We work around this by converting the path to a URI when needed.
+        if " " in str(self.build_dir):
+            logger.info(
+                "The value of PIP_CONSTRAINT contains spaces, and pip will interpret it as "
+                "multiple files. If you are using a single constraints file and it has spaces "
+                "in its file path, please convert it to a URI instead. Please ignore this "
+                "message if you are using multiple constraints files."
             )
+
         self.library_install_prefix = self.build_dir.parent.parent / ".libs"
         self.src_extract_dir = (
             self.build_dir / self.fullname
@@ -409,7 +415,7 @@ class RecipeBuilder:
         shutil.move(self.build_dir / extract_dir_name, self.src_extract_dir)
         self.src_dist_dir.mkdir(parents=True, exist_ok=True)
 
-    def _create_constraints_file(self) -> str:
+    def _create_combined_constraints_file(self) -> str:
         """
         Creates a pip constraints file by concatenating global constraints (PIP_CONSTRAINT)
         with constraints specific to this package.
@@ -476,7 +482,7 @@ class RecipeBuilder:
                     )
                     build_env = runner.env
 
-            build_env["PIP_CONSTRAINT"] = str(self._create_constraints_file())
+            build_env["PIP_CONSTRAINT"] = str(self._create_combined_constraints_file())
 
             wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings
