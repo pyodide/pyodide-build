@@ -78,23 +78,26 @@ class PyodideVenv(ABC):
         """Return the bin directory name for the platform."""
         return "bin"
 
-    def get_interp_path(self) -> Path:
-        """Get the path to the Pyodide Python interpreter."""
+    @property
+    def interpreter_path(self) -> Path:
+        """Get the path to the original Pyodide Python interpreter."""
         return pyodide_dist_dir() / self.python_exe_name
-    
-    def get_interp_path_symlink(self) -> Path:
+
+    @property
+    def interpreter_symlink_path(self) -> Path:
         """Get the path to the Pyodide Python interpreter symlink."""
         return self.venv_bin / self.python_exe_name
 
     def validate_interpreter(self) -> None:
         """Validate that the Pyodide interpreter exists."""
-        interp_path = self.get_interp_path()
-        if not interp_path.exists():
-            raise RuntimeError(f"Pyodide python interpreter not found at {interp_path}")
+        if not self.interpreter_path.exists():
+            raise RuntimeError(
+                f"Pyodide python interpreter not found at {self.interpreter_path}"
+            )
 
     def get_cli_args(self) -> list[str]:
         """Build the CLI arguments for virtualenv."""
-        cli_args = ["--python", str(self.get_interp_path())]
+        cli_args = ["--python", str(self.interpreter_path)]
 
         if self.virtualenv_args:
             for arg in self.virtualenv_args:
@@ -153,7 +156,7 @@ class PyodideVenv(ABC):
         to_load = ["micropip"]
         run_command(
             [
-                self.get_interp_path_symlink(),
+                self.interpreter_symlink_path,
                 "-c",
                 dedent(
                     f"""
@@ -180,7 +183,7 @@ class PyodideVenv(ABC):
 
         result = run_command(
             [
-                self.get_interp_path_symlink(),
+                self.interpreter_symlink_path,
                 "-c",
                 dedent(
                     """
@@ -313,27 +316,25 @@ class PyodideVenv(ABC):
         pass
 
     # TODO: move to Windows subclass
-    def create_python_symlink(venv_bin: Path, interp_path: Path) -> None:
+    def _create_python_symlink(self) -> None:
         if not IS_WIN:
             # Nothing to do on non-Windows platforms, as virtualenv already creates
             # a symlink to the interpreter.
             return
 
-        # IS_WIN
         # the virtualenv does not understand the batch file, so we need to
         # symlink it ourselves
-        python_in_venv = venv_bin / "python.bat"
-        python_in_venv.unlink(missing_ok=True)
-
-        python_in_venv.symlink_to(interp_path)
+        self.interpreter_symlink_path.unlink(missing_ok=True)
+        self.interpreter_symlink_path.symlink_to(self.interpreter_path)
 
         # Also remove the virtualenv-generated exe files as exe file takes precedence over .bat file
-        python_exe_in_venv = venv_bin / "python.exe"
+        python_exe_in_venv = self.venv_bin / "python.exe"
         python_exe_in_venv.unlink(missing_ok=True)
 
     def configure_virtualenv(self) -> None:
         """Configure the virtualenv after creation."""
         logger.info("... Configuring virtualenv")
+        self._create_python_symlink()
         self._create_pip_conf()
         self.create_pip_script()
         self.create_pyodide_script()
@@ -349,7 +350,7 @@ class PyodideVenv(ABC):
         if IS_WIN:
             from .app_data import create_app_data_dir
 
-            with create_app_data_dir(str(self.get_interp_path())) as app_data_dir:
+            with create_app_data_dir(str(self.interpreter_path)) as app_data_dir:
                 cli_args += ["--app-data", app_data_dir]
                 session = session_via_cli(cli_args + [str(self.dest)])
         else:
