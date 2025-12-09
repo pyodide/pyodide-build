@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
-from pyodide_build.common import run_command
+from pyodide_build.common import IS_WIN, run_command
 from pyodide_build.logger import logger
 
 # A subset of supported virtualenv options that make sense in Pyodide's context.
@@ -28,9 +28,6 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--no-setuptools",
     "--no-periodic-update",
 ]
-
-
-IS_WIN = sys.platform == "win32"
 
 
 def dedent(s: str) -> str:
@@ -84,6 +81,10 @@ class PyodideVenv(ABC):
     def get_interp_path(self) -> Path:
         """Get the path to the Pyodide Python interpreter."""
         return pyodide_dist_dir() / self.python_exe_name
+    
+    def get_interp_path_symlink(self) -> Path:
+        """Get the path to the Pyodide Python interpreter symlink."""
+        return self.venv_bin / self.python_exe_name
 
     def validate_interpreter(self) -> None:
         """Validate that the Pyodide interpreter exists."""
@@ -152,7 +153,7 @@ class PyodideVenv(ABC):
         to_load = ["micropip"]
         run_command(
             [
-                self.venv_bin / "python",
+                self.get_interp_path_symlink(),
                 "-c",
                 dedent(
                     f"""
@@ -179,7 +180,7 @@ class PyodideVenv(ABC):
 
         result = run_command(
             [
-                self.venv_bin / "python",
+                self.get_interp_path_symlink(),
                 "-c",
                 dedent(
                     """
@@ -311,6 +312,25 @@ class PyodideVenv(ABC):
         """
         pass
 
+    # TODO: move to Windows subclass
+    def create_python_symlink(venv_bin: Path, interp_path: Path) -> None:
+        if not IS_WIN:
+            # Nothing to do on non-Windows platforms, as virtualenv already creates
+            # a symlink to the interpreter.
+            return
+
+        # IS_WIN
+        # the virtualenv does not understand the batch file, so we need to
+        # symlink it ourselves
+        python_in_venv = venv_bin / "python.bat"
+        python_in_venv.unlink(missing_ok=True)
+
+        python_in_venv.symlink_to(interp_path)
+
+        # Also remove the virtualenv-generated exe files as exe file takes precedence over .bat file
+        python_exe_in_venv = venv_bin / "python.exe"
+        python_exe_in_venv.unlink(missing_ok=True)
+
     def configure_virtualenv(self) -> None:
         """Configure the virtualenv after creation."""
         logger.info("... Configuring virtualenv")
@@ -326,7 +346,15 @@ class PyodideVenv(ABC):
         self.validate_interpreter()
         cli_args = self.get_cli_args()
 
-        session = session_via_cli(cli_args + [str(self.dest)])
+        if IS_WIN:
+            from .app_data import create_app_data_dir
+
+            with create_app_data_dir(str(self.get_interp_path())) as app_data_dir:
+                cli_args += ["--app-data", app_data_dir]
+                session = session_via_cli(cli_args + [str(self.dest)])
+        else:
+            session = session_via_cli(cli_args + [str(self.dest)])
+
         check_host_python_version(session)
 
         try:
