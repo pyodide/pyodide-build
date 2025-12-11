@@ -547,9 +547,6 @@ class UnixPyodideVenv(PyodideVenv):
         """Write pyodide cli script into the virtualenv bin folder."""
         import os
 
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
-
         # Temporarily restore us to the environment that 'pyodide venv' was
         # invoked in
         PATH = os.environ["PATH"]
@@ -559,8 +556,7 @@ class UnixPyodideVenv(PyodideVenv):
         if original_pyodide_cli is None:
             raise RuntimeError("ERROR: pyodide cli not found")
 
-        pyodide_path = self.venv_bin / "pyodide"
-        pyodide_path.write_text(
+        self.pyodide_cli_path.write_text(
             dedent(
                 f"""
                 #!/usr/bin/env bash
@@ -568,7 +564,7 @@ class UnixPyodideVenv(PyodideVenv):
                 """
             )
         )
-        pyodide_path.chmod(0o777)
+        self.pyodide_cli_path.chmod(0o777)
 
 
 def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
