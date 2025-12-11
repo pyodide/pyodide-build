@@ -64,19 +64,46 @@ class PyodideVenv(ABC):
 
     def __init__(self, dest: Path, virtualenv_args: list[str] | None = None) -> None:
         self.dest = dest
-        self.virtualenv_args = virtualenv_args
+        self.virtualenv_args = virtualenv_args or []
         self.venv_root: Path | None = None
         self.venv_bin: Path | None = None
 
     @property
-    def python_exe_name(self) -> str:
-        """Return the Python executable name for the platform."""
-        return "python"
+    def exe_suffix(self) -> str:
+        """Return the executable suffix for the platform."""
+        return ""
 
     @property
+    def python_exe_name(self) -> str:
+        """Return the Python executable name for the platform."""
+        return "python" + self.exe_suffix
+
+    @property
+    @abstractmethod
     def bin_dir_name(self) -> str:
         """Return the bin directory name for the platform."""
-        return "bin"
+        pass
+
+    @property
+    def pyodide_exe_name(self) -> str:
+        """Return the Pyodide executable name for the platform."""
+        return "pyodide" + self.exe_suffix
+
+    @property
+    def host_python_name(self) -> str:
+        """Get the host python executable name."""
+        return f"python{get_pyversion()}-host" + self.exe_suffix
+
+    @property
+    def host_python_name_noversion(self) -> str:
+        """Get the host python executable name without version."""
+        return "python-host" + self.exe_suffix
+
+    @property
+    @abstractmethod
+    def host_python_symlink_suffix(self) -> str:
+        """Get the host python symlink suffix."""
+        pass
 
     @property
     def interpreter_path(self) -> Path:
@@ -86,7 +113,72 @@ class PyodideVenv(ABC):
     @property
     def interpreter_symlink_path(self) -> Path:
         """Get the path to the Pyodide Python interpreter symlink."""
+        if self.venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
+
         return self.venv_bin / self.python_exe_name
+
+    @property
+    def pyodide_cli_path(self) -> Path:
+        """Get the path to the pyodide CLI script in the virtualenv."""
+        if self.venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
+
+        return self.venv_bin / self.pyodide_exe_name
+
+    @property
+    def host_python_path(self) -> Path:
+        """Get the path to the host python executable in the virtualenv."""
+        if self.venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
+
+        return self.venv_bin / self.host_python_name
+
+    @property
+    def host_python_path_noversion(self) -> Path:
+        """Get the path to the host python executable without version in the virtualenv."""
+        if self.venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
+
+        return self.venv_bin / self.host_python_name_noversion
+
+    @property
+    def host_python_symlink_path(self) -> Path:
+        """Get the path to the host python symlink in the virtualenv."""
+        if self.venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
+
+        return self.venv_bin / f"python{self.host_python_symlink_suffix}"
+
+    @property
+    def pip_conf_path(self) -> Path:
+        """Get the path to the pip.conf file in the virtualenv."""
+        if self.venv_root is None:
+            raise RuntimeError("venv_root is not set")
+
+        return self.venv_root / "pip.conf"
+
+    @property
+    def pip_patched_path(self) -> Path:
+        """Get the path to the pip_patched script in the virtualenv."""
+        if self.venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
+
+        return self.venv_bin / "pip_patched"
+
+    @property
+    @abstractmethod
+    def host_python_wrapper(self) -> str:
+        """Get the content of the host python wrapper script.
+        This script allows invoking the host python with the correct PYTHONHOME.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def host_pip_wrapper(self) -> str:
+        """Get the content of the host pip wrapper script."""
+        pass
 
     def validate_interpreter(self) -> None:
         """Validate that the Pyodide interpreter exists."""
@@ -299,13 +391,47 @@ class PyodideVenv(ABC):
             """
         )
 
-    @abstractmethod
     def create_pip_script(self) -> None:
-        """Create pip script in the virtualenv bin folder.
+        """Create pip and write it into the virtualenv bin folder."""
+        if self.venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
 
-        This is platform-specific and must be implemented by subclasses.
-        """
-        pass
+        # pip needs to run in the host Python not in Pyodide, so we'll use the host
+        # Python in the shebang. Use whichever Python was used to invoke
+        # pyodide venv.
+
+        # To support the "--clear" and "--no-clear" args, we need to remove
+        # the existing symlinks before creating new ones.
+        self.host_python_path.unlink(missing_ok=True)
+        self.host_python_path_noversion.unlink(missing_ok=True)
+        self.host_python_symlink_path.unlink(missing_ok=True)
+
+        # Replace all pip* scripts in the venv bin folder with symlinks to
+        # our patched pip script.
+        for pip in self.venv_bin.glob("pip*"):
+            if pip == self.pip_patched_path:
+                continue
+            pip.unlink(missing_ok=True)
+
+            patched_pip_exe = pip.with_suffix(self.exe_suffix)
+            if patched_pip_exe != self.pip_patched_path:
+                patched_pip_exe.unlink(missing_ok=True)
+                patched_pip_exe.symlink_to(self.pip_patched_path)
+
+        # Weird hack to work around:
+        # https://github.com/astral-sh/python-build-standalone/issues/380
+        # If we resolve the symlink all the way, the python-host interpreter works
+        # but won't install into our pyodide venv. If we don't resolve the symlink,
+        # sys.prefix is calculated incorrectly. To ensure that we get the right
+        # sys.prefix, we explicitly set it with the PYTHONHOME environment variable
+        # and then call the symlink.
+        self.host_python_symlink_path.symlink_to(sys.executable)
+        self.host_python_path.write_text(self.host_python_wrapper)
+        self.host_python_path.chmod(0o777)
+        self.host_python_path_noversion.symlink_to(self.host_python_path)
+
+        self.pip_patched_path.write_text(self.host_pip_wrapper)
+        self.pip_patched_path.chmod(0o777)
 
     @abstractmethod
     def create_pyodide_script(self) -> None:
@@ -375,54 +501,35 @@ class PyodideVenv(ABC):
 class UnixPyodideVenv(PyodideVenv):
     """Unix-specific implementation of Pyodide virtual environment creation."""
 
-    def create_pip_script(self) -> None:
-        """Create pip and write it into the virtualenv bin folder."""
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
+    @property
+    def bin_dir_name(self) -> str:
+        """Return the bin directory name for the platform."""
+        return "bin"
 
-        # pip needs to run in the host Python not in Pyodide, so we'll use the host
-        # Python in the shebang. Use whichever Python was used to invoke
-        # pyodide venv.
-        host_python_path = self.venv_bin / f"python{get_pyversion()}-host"
-        host_python_path_no_version = self.venv_bin / "python-host"
-        pip_path = self.venv_bin / "pip_patched"
-        python_host_link = self.venv_bin / "python-host-link"
+    @property
+    def host_python_symlink_suffix(self) -> str:
+        """Get the host python symlink name."""
+        return "-host-link"
 
-        # To support the "--clear" and "--no-clear" args, we need to remove
-        # the existing symlinks before creating new ones.
-        host_python_path.unlink(missing_ok=True)
-        host_python_path_no_version.unlink(missing_ok=True)
-        python_host_link.unlink(missing_ok=True)
-        for pip in self.venv_bin.glob("pip*"):
-            if pip == pip_path:
-                continue
-            pip.unlink(missing_ok=True)
-            pip.symlink_to(pip_path)
-
-        # Weird hack to work around:
-        # https://github.com/astral-sh/python-build-standalone/issues/380
-        # If we resolve the symlink all the way, the python-host interpreter works
-        # but won't install into our pyodide venv. If we don't resolve the symlink,
-        # sys.prefix is calculated incorrectly. To ensure that we get the right
-        # sys.prefix, we explicitly set it with the PYTHONHOME environment variable
-        # and then call the symlink.
-        python_host_link.symlink_to(sys.executable)
+    @property
+    def host_python_wrapper(self) -> str:
+        """Get the content of the host python wrapper script.
+        This script allows invoking the host python with the correct PYTHONHOME.
+        """
         pythonhome = Path(sys._base_executable).parents[1]
-        host_python_path.write_text(
-            dedent(
-                f"""\
-                #!/bin/sh
-                exec env PYTHONHOME={pythonhome} {python_host_link} "$@"
-                """
-            )
+        return dedent(
+            f"""\
+            #!/bin/sh
+            exec env PYTHONHOME={pythonhome} {self.host_python_symlink_path} "$@"
+            """
         )
-        host_python_path.chmod(0o777)
-        host_python_path_no_version.symlink_to(host_python_path)
 
-        pip_path.write_text(
-            # Other than the shebang and the monkey patch, this is exactly what
-            # normal pip looks like.
-            f"#!/usr/bin/env -S {host_python_path} -s\n"
+    @property
+    def host_pip_wrapper(self) -> str:
+        # Other than the shebang and the monkey patch, this is exactly what
+        # normal pip looks like.
+        return (
+            f"#!/usr/bin/env -S {self.host_python_path} -s\n"
             + self._get_pip_monkeypatch()
             + dedent(
                 """
@@ -435,7 +542,6 @@ class UnixPyodideVenv(PyodideVenv):
                 """
             )
         )
-        pip_path.chmod(0o777)
 
     def create_pyodide_script(self) -> None:
         """Write pyodide cli script into the virtualenv bin folder."""
