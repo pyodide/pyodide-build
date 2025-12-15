@@ -448,9 +448,9 @@ class RecipeBuilder:
 
         """
 
-        cflags = self.build_metadata.cflags + " " + self.build_args.cflags
-        cxxflags = self.build_metadata.cxxflags + " " + self.build_args.cxxflags
-        ldflags = self.build_metadata.ldflags + " " + self.build_args.ldflags
+        cflags = self.build_args.cflags + " " + self.build_metadata.cflags
+        cxxflags = self.build_args.cxxflags + " " + self.build_metadata.cxxflags
+        ldflags = self.build_args.ldflags + " " + self.build_metadata.ldflags
 
         build_env_ctx = pypabuild.get_build_env(
             env=bash_runner.env,
