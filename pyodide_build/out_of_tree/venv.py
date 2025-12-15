@@ -65,8 +65,24 @@ class PyodideVenv(ABC):
     def __init__(self, dest: Path, virtualenv_args: list[str] | None = None) -> None:
         self.dest = dest
         self.virtualenv_args = virtualenv_args or []
-        self.venv_root: Path | None = None
-        self.venv_bin: Path | None = None
+        self._venv_root: Path | None = None
+        self._venv_bin: Path | None = None
+
+    @property
+    def venv_root(self) -> Path | None:
+        """Get the path to the virtualenv's root directory."""
+        if self._venv_root is None:
+            raise RuntimeError("venv_root is not set")
+
+        return self._venv_root
+
+    @property
+    def venv_bin(self) -> Path | None:
+        """Get the path to the virtualenv's bin directory."""
+        if self._venv_bin is None:
+            raise RuntimeError("venv_bin is not set")
+
+        return self._venv_bin
 
     @property
     def exe_suffix(self) -> str:
@@ -113,57 +129,36 @@ class PyodideVenv(ABC):
     @property
     def interpreter_symlink_path(self) -> Path:
         """Get the path to the Pyodide Python interpreter symlink."""
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
-
         return self.venv_bin / self.python_exe_name
 
     @property
     def pyodide_cli_path(self) -> Path:
         """Get the path to the pyodide CLI script in the virtualenv."""
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
-
         return self.venv_bin / self.pyodide_exe_name
 
     @property
     def host_python_path(self) -> Path:
         """Get the path to the host python executable in the virtualenv."""
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
-
         return self.venv_bin / self.host_python_name
 
     @property
     def host_python_path_noversion(self) -> Path:
         """Get the path to the host python executable without version in the virtualenv."""
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
-
         return self.venv_bin / self.host_python_name_noversion
 
     @property
     def host_python_symlink_path(self) -> Path:
         """Get the path to the host python symlink in the virtualenv."""
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
-
         return self.venv_bin / f"python{self.host_python_symlink_suffix}"
 
     @property
     def pip_conf_path(self) -> Path:
         """Get the path to the pip.conf file in the virtualenv."""
-        if self.venv_root is None:
-            raise RuntimeError("venv_root is not set")
-
         return self.venv_root / "pip.conf"
 
     @property
     def pip_patched_path(self) -> Path:
         """Get the path to the pip_patched script in the virtualenv."""
-        if self.venv_bin is None:
-            raise RuntimeError("venv_bin is not set")
-
         return self.venv_bin / "pip_patched"
 
     @property
@@ -208,9 +203,6 @@ class PyodideVenv(ABC):
 
         This file adds a few options that will always be used by pip install.
         """
-        if self.venv_root is None:
-            raise RuntimeError("venv_root is not set")
-
         if in_xbuildenv():
             # In the xbuildenv, we don't have the packages locally. We will include
             # in the xbuildenv a PEP 503 index for the vendored Pyodide packages
@@ -486,8 +478,8 @@ class PyodideVenv(ABC):
 
         try:
             session.run()
-            self.venv_root = Path(session.creator.dest).absolute()
-            self.venv_bin = self.venv_root / self.bin_dir_name
+            self._venv_root = Path(session.creator.dest).absolute()
+            self._venv_bin = self._venv_root / self.bin_dir_name
 
             self.configure_virtualenv()
             self._install_stdlib()
