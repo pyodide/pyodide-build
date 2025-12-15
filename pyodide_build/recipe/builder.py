@@ -36,12 +36,12 @@ from pyodide_build.common import (
     _environment_substitute_str,
     _get_sha256_checksum,
     chdir,
-    exit_with_stdio,
     find_matching_wheel,
     make_zip_archive,
     modify_wheel,
     retag_wheel,
     retrying_rmtree,
+    run_command,
 )
 from pyodide_build.logger import logger
 from pyodide_build.recipe.bash_runner import (
@@ -154,9 +154,51 @@ class RecipeBuilder:
         # where Pyodide will look for the built artifacts when building pyodide-lock.json.
         # after building packages, artifacts in src_dist_dir will be copied to dist_dir
         self.dist_dir = self.pkg_root / "dist"
+        self.build_log_path = self.pkg_root / "build.log"
         self.build_args = build_args
         self.force_rebuild = force_rebuild or continue_
         self.continue_ = continue_
+
+    def _cleanup_paths(self, *, include_dist: bool = False) -> list[Path]:
+        """
+        Return filesystem paths that should be removed to clean the build artifacts.
+
+        Parameters
+        ----------
+        include_dist : bool
+            If True, include the dist directory in the cleanup paths.
+
+        Returns
+        -------
+        list[Path]
+            List of paths to be removed during cleanup.
+        """
+        paths: list[Path] = [self.build_dir, self.build_log_path]
+        if include_dist:
+            paths.append(self.dist_dir)
+        return paths
+
+    def clean(self, *, include_dist: bool = False) -> None:
+        """
+        Clean build artifacts for this package.
+
+        Parameters
+        ----------
+        include_dist : bool
+            If True, also remove the dist directory.
+        """
+        for path in self._cleanup_paths(include_dist=include_dist):
+            try:
+                if path.is_dir():
+                    logger.info("Removing %s", str(path))
+                    shutil.rmtree(path, ignore_errors=True)
+                elif path.is_file():
+                    logger.info("Removing %s", str(path))
+                    path.unlink(missing_ok=True)
+                else:
+                    logger.debug("Path does not exist: %s", str(path))
+            except Exception as exc:
+                logger.debug("Failed to remove %s: %s", str(path), exc, exc_info=True)
 
     @classmethod
     def get_builder(
@@ -406,9 +448,9 @@ class RecipeBuilder:
 
         """
 
-        cflags = self.build_metadata.cflags + " " + self.build_args.cflags
-        cxxflags = self.build_metadata.cxxflags + " " + self.build_args.cxxflags
-        ldflags = self.build_metadata.ldflags + " " + self.build_args.ldflags
+        cflags = self.build_args.cflags + " " + self.build_metadata.cflags
+        cxxflags = self.build_args.cxxflags + " " + self.build_metadata.cxxflags
+        ldflags = self.build_args.ldflags + " " + self.build_metadata.ldflags
 
         build_env_ctx = pypabuild.get_build_env(
             env=bash_runner.env,
@@ -459,15 +501,11 @@ class RecipeBuilder:
         # Apply all the patches
         for patch in patches:
             patch_abspath = self.pkg_root / patch
-            result = subprocess.run(
+            run_command(
                 ["patch", "-p1", "--binary", "--verbose", "-i", patch_abspath],
-                check=False,
-                encoding="utf-8",
                 cwd=self.src_extract_dir,
+                err_msg=("ERROR: Patch %s failed", patch_abspath),
             )
-            if result.returncode != 0:
-                logger.error("ERROR: Patch %s failed", patch_abspath)
-                exit_with_stdio(result)
 
         # Add any extra files
         for src, dst in extras:

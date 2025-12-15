@@ -15,9 +15,9 @@ license = {text = "MPL-2.0"}
 requires-python = ">=3.12"
 dependencies = [
     "build~=1.2.0",
-    "pyodide-cli!=0.2.1,>=0.3.0",
-    "pyodide-lock==0.1.0a7",
-    "auditwheel-emscripten==0.1.0",
+    "pyodide-cli>=0.3.0",
+    "pyodide-lock~=0.1.0",
+    "auditwheel-emscripten~=0.2.0",
     "pydantic>=2,<3",
     "wheel",
     "ruamel.yaml",
@@ -47,6 +47,7 @@ pyodide = "pyodide_cli.__main__:main"
 
 [project.entry-points."pyodide.cli"]
 build = "pyodide_build.cli.build:main"
+clean = "pyodide_build.cli.clean:app"
 build-recipes = "pyodide_build.cli.build_recipes:build_recipes"
 build-recipes-no-deps = "pyodide_build.cli.build_recipes:build_recipes_no_deps"
 venv = "pyodide_build.cli.venv:main"
@@ -142,7 +143,7 @@ lint.select = [
 
 lint.logger-objects = ["pyodide_build.logger.logger"]
 
-lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038", "PLR0912"]
+lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038", "PLR0912", "PLC0415"]
 # line-length = 219  # E501: Recommended goal is 88 to match black
 target-version = "py312"
 

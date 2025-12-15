@@ -1,0 +1,17 @@
+#!/bin/bash
+set -x
+
+rm -rf test-cmdline-runner
+mkdir test-cmdline-runner
+cd test-cmdline-runner || exit
+
+python -m venv .venv-host
+source .venv-host/bin/activate
+
+pyodide venv .venv-pyodide
+source .venv-pyodide/bin/activate
+
+git clone https://github.com/python-attrs/attrs --depth 1 --branch 25.3.0
+cd attrs || exit
+pip install ".[tests]"
+python -m pytest -k 'not mypy'

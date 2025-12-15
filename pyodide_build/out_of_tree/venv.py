@@ -1,12 +1,11 @@
 import shutil
-import subprocess
 import sys
 import textwrap
 from pathlib import Path
 from typing import Any
 
 from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
-from pyodide_build.common import exit_with_stdio
+from pyodide_build.common import IS_WIN, run_command
 from pyodide_build.logger import logger
 
 # A subset of supported virtualenv options that make sense in Pyodide's context.
@@ -28,13 +27,6 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--no-setuptools",
     "--no-periodic-update",
 ]
-
-
-def check_result(result: subprocess.CompletedProcess[str], msg: str) -> None:
-    """Abort if the process returns a nonzero error code"""
-    if result.returncode != 0:
-        logger.error(msg)
-        exit_with_stdio(result)
 
 
 def dedent(s: str) -> str:
@@ -62,6 +54,25 @@ def pyodide_dist_dir() -> Path:
     return get_pyodide_root() / "dist"
 
 
+def create_python_symlink(venv_bin: Path, interp_path: Path) -> None:
+    if not IS_WIN:
+        # Nothing to do on non-Windows platforms, as virtualenv already creates
+        # a symlink to the interpreter.
+        return
+
+    # IS_WIN
+    # the virtualenv does not understand the batch file, so we need to
+    # symlink it ourselves
+    python_in_venv = venv_bin / "python.bat"
+    python_in_venv.unlink(missing_ok=True)
+
+    python_in_venv.symlink_to(interp_path)
+
+    # Also remove the virtualenv-generated exe files as exe file takes precedence over .bat file
+    python_exe_in_venv = venv_bin / "python.exe"
+    python_exe_in_venv.unlink(missing_ok=True)
+
+
 def create_pip_conf(venv_root: Path) -> None:
     """Create pip.conf file in venv root
 
@@ -83,7 +94,7 @@ def create_pip_conf(venv_root: Path) -> None:
     (venv_root / "pip.conf").write_text(
         dedent(
             f"""
-            [install]
+            [global]
             only-binary=:all:
             {repo}
             """
@@ -96,9 +107,11 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
 
     The code returned is injected at the beginning of the pip script.
     """
-    result = subprocess.run(
+
+    interp_path = venv_bin / "python.bat" if IS_WIN else venv_bin / "python"
+    result = run_command(
         [
-            venv_bin / "python",
+            interp_path,
             "-c",
             dedent(
                 """
@@ -113,11 +126,8 @@ def get_pip_monkeypatch(venv_bin: Path) -> str:
                 """
             ),
         ],
-        capture_output=True,
-        encoding="utf8",
-        check=False,
+        err_msg="ERROR: failed to invoke Pyodide",
     )
-    check_result(result, "ERROR: failed to invoke Pyodide")
     platform_data = result.stdout
     sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
     return dedent(
@@ -310,9 +320,10 @@ def install_stdlib(venv_bin: Path) -> None:
 
     # Other stuff we need to load with loadPackage
     to_load = ["micropip"]
-    result = subprocess.run(
+    interp_path = venv_bin / "python.bat" if IS_WIN else venv_bin / "python"
+    run_command(
         [
-            venv_bin / "python",
+            interp_path,
             "-c",
             dedent(
                 f"""
@@ -326,19 +337,21 @@ def install_stdlib(venv_bin: Path) -> None:
                 """
             ),
         ],
-        capture_output=True,
-        encoding="utf8",
-        check=False,
+        err_msg="ERROR: failed to install unvendored stdlib modules",
     )
-    check_result(result, "ERROR: failed to install unvendored stdlib modules")
 
 
 def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
     """Create a Pyodide virtualenv and store it into dest"""
     logger.info("Creating Pyodide virtualenv at %s", dest)
+
     from virtualenv import session_via_cli
 
-    interp_path = pyodide_dist_dir() / "python"
+    python_exe_name = "python.bat" if IS_WIN else "python"
+    interp_path = pyodide_dist_dir() / python_exe_name
+
+    if not interp_path.exists():
+        raise RuntimeError(f"Pyodide python interpreter not found at {interp_path}")
 
     cli_args = ["--python", str(interp_path)]
 
@@ -353,15 +366,24 @@ def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) ->
 
         cli_args.extend(virtualenv_args)
 
-    session = session_via_cli(cli_args + [str(dest)])
+    if IS_WIN:
+        from .app_data import create_app_data_dir
+
+        with create_app_data_dir(str(interp_path)) as app_data_dir:
+            cli_args += ["--app-data", app_data_dir]
+            session = session_via_cli(cli_args + [str(dest)])
+    else:
+        session = session_via_cli(cli_args + [str(dest)])
+
     check_host_python_version(session)
 
     try:
         session.run()
         venv_root = Path(session.creator.dest).absolute()
-        venv_bin = venv_root / "bin"
+        venv_bin = venv_root / "Scripts" if IS_WIN else venv_root / "bin"
 
         logger.info("... Configuring virtualenv")
+        create_python_symlink(venv_bin, interp_path)
         create_pip_conf(venv_root)
         create_pip_script(venv_bin)
         create_pyodide_script(venv_bin)

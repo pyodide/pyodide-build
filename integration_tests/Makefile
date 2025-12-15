@@ -42,12 +42,20 @@ test-src-no-isolation: check
 	@rm -rf ./test_venv
 
 	@echo "... Passed"
+
+.PHONY: test-scripts
+test-scripts: check
+	@echo "... Running integration tests for scripts"
+
+	./scripts/pyodide_venv_test.sh
+
+	@echo "... Passed"
+
 .PHONY: check
 check:
 	@echo "... Checking dependencies"
 
 	@which pyodide > /dev/null || (echo "pyodide-build is not installed"; exit 1)
-	@which emsdk > /dev/null || (echo "emscripten is not installed"; exit 1)
 
 	@echo "... Passed"
 

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed an issue where the compiler flags such as `cflas`, `cxxflags`, and `ldflags` from
+  the meta.yaml were being overridden by those from the default build arguments.
+  [#270](https://github.com/pyodide/pyodide-build/pull/270)
+
+## [0.30.9] - 2025/11/11
+
+### Added
+
+- Added `pyodide clean recipes`, a CLI command that deletes build files for chosen packages or tags.
+[#254](https://github.com/pyodide/pyodide-build/pull/254)
+
+## [0.30.8] - 2025/10/22
+
+- `pyodide config` now exposes `dist_dir` variable.
+[#236](https://github.com/pyodide/pyodide-build/pull/236)
+
+- The CMake toolchain file for Pyodide now sets `CMAKE_SHARED_LINKER_FLAGS_INIT` and `CMAKE_MODULE_LINKER_FLAGS_INIT` and
+  unset `CMAKE_SHARED_LINKER_FLAGS` to avoid conflicts with the user's settings.
+  [#247](https://github.com/pyodide/pyodide-build/pull/237)
+
+## [0.30.7] - 2025/08/18
+
 ## [0.30.6] - 2025/08/16
 
 - `pyodide config` now exposes `rust_emscripten_target_url`.
