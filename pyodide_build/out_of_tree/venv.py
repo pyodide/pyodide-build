@@ -94,7 +94,7 @@ def create_pip_conf(venv_root: Path) -> None:
     (venv_root / "pip.conf").write_text(
         dedent(
             f"""
-            [install]
+            [global]
             only-binary=:all:
             {repo}
             """
