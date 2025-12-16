@@ -1,10 +1,10 @@
+import os
 import shutil
 import sys
 import textwrap
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
-import os
 
 from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
 from pyodide_build.common import IS_WIN, run_command
@@ -230,7 +230,7 @@ class PyodideVenv(ABC):
             # should contain the needed wheels. find-links
             repo = f"find-links={pyodide_dist_dir()}"
 
-        platform = f"pyodide_{get_build_flag("PYODIDE_ABI_VERSION")}_wasm32"
+        platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
         # Prevent attempts to install binary wheels from source.
         # Maybe some day we can convince pip to invoke `pyodide build` as the build
         # front end for wheels...
@@ -293,7 +293,9 @@ class PyodideVenv(ABC):
                         sys.implementation._multiarch,
                         sysconfig.get_platform()
                     ])
-                    """.replace("\n", "")  # Windows doesn't seems to like newlines here...
+                    """.replace(
+                        "\n", ""
+                    )  # Windows doesn't seems to like newlines here...
                 ),
             ],
             err_msg="ERROR: failed to invoke Pyodide",
@@ -445,7 +447,7 @@ class PyodideVenv(ABC):
             (
                 self._get_pip_monkeypatch()
                 + dedent(
-                   f"""
+                    f"""
                     import re
                     import sys
                     from pip._internal.cli.main import main
@@ -454,7 +456,7 @@ class PyodideVenv(ABC):
                         sys.exit(main())
                     """
                 )
-            ).replace('\\', '\\\\')  # Escape backslashes for Windows batch files
+            ).replace("\\", "\\\\")  # Escape backslashes for Windows batch files
         )
 
     @abstractmethod
@@ -534,10 +536,7 @@ class UnixPyodideVenv(PyodideVenv):
     def host_pip_wrapper(self) -> str:
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
-        return (
-            f"#!{self.host_python_path} -s\n"
-            f"{self.pip_wrapper_path} $@\n"
-        )
+        return f"#!{self.host_python_path} -s\n{self.pip_wrapper_path} $@\n"
 
     def _create_python_symlink(self) -> None:
         """Create a symlink to the Pyodide Python interpreter.
@@ -577,6 +576,7 @@ class UnixPyodideVenv(PyodideVenv):
 
 class WindowsPyodideVenv(PyodideVenv):
     """Windows-specific implementation of Pyodide virtual environment creation."""
+
     @property
     def exe_suffix(self) -> str:
         """Return the executable suffix for the platform."""
