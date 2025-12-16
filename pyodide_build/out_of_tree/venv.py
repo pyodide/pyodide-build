@@ -538,7 +538,12 @@ class UnixPyodideVenv(PyodideVenv):
     def host_pip_wrapper(self) -> str:
         # Other than the shebang and the monkey patch, this is exactly what
         # normal pip looks like.
-        return f"#!{self.host_python_path} -s\n{self.pip_wrapper_path} $@\n"
+        return dedent(
+            f"""
+            #!/usr/bin/env bash
+            {self.host_python_path} -s {self.pip_wrapper_path} $@\n"
+            """
+        )
 
     def _create_python_symlink(self) -> None:
         """Create a symlink to the Pyodide Python interpreter.
