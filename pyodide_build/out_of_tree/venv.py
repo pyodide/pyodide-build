@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+import virtualenv
+
 from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
 from pyodide_build.common import IS_WIN, run_command
 from pyodide_build.logger import logger
@@ -473,7 +475,7 @@ class PyodideVenv(ABC):
         pass
 
     @abstractmethod
-    def _create_session(self) -> "virtualenv.session.Session":
+    def _create_session(self) -> virtualenv.session.Session:
         """Create and return a virtualenv session object."""
         pass
 
@@ -545,11 +547,9 @@ class UnixPyodideVenv(PyodideVenv):
         """
         return
 
-    def _create_session(self) -> "virtualenv.session.Session":
+    def _create_session(self) -> virtualenv.session.Session:
         """Create and return a virtualenv session object."""
-        from virtualenv import session_via_cli
-
-        return session_via_cli(self.get_cli_args() + [str(self.dest)])
+        return virtualenv.session_via_cli(self.get_cli_args() + [str(self.dest)])
 
     def _create_pyodide_script(self) -> None:
         """Write pyodide cli script into the virtualenv bin folder."""
@@ -617,14 +617,12 @@ class WindowsPyodideVenv(PyodideVenv):
         )
 
     def _create_session(self):
-        from virtualenv import session_via_cli
-
         from .app_data import create_app_data_dir
 
         cli_args = self.get_cli_args()
         with create_app_data_dir(str(self.interpreter_path)) as app_data_dir:
             cli_args += ["--app-data", app_data_dir]
-            session = session_via_cli(cli_args + [str(self.dest)])
+            session = virtualenv.session_via_cli(cli_args + [str(self.dest)])
 
         return session
 
