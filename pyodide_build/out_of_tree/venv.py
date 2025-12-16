@@ -475,7 +475,7 @@ class PyodideVenv(ABC):
         pass
 
     @abstractmethod
-    def _create_session(self) -> virtualenv.session.Session:
+    def _create_session(self):
         """Create and return a virtualenv session object."""
         pass
 
@@ -547,7 +547,7 @@ class UnixPyodideVenv(PyodideVenv):
         """
         return
 
-    def _create_session(self) -> virtualenv.session.Session:
+    def _create_session(self):
         """Create and return a virtualenv session object."""
         return virtualenv.session_via_cli(self.get_cli_args() + [str(self.dest)])
 
