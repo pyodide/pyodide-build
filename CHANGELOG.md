@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed an issue where the compiler flags such as `cflas`, `cxxflags`, and `ldflags` from
+- Fixed an issue where the compiler flags such as `cflags`, `cxxflags`, and `ldflags` from
   the meta.yaml were being overridden by those from the default build arguments.
   [#270](https://github.com/pyodide/pyodide-build/pull/270)
+
+- Default `cxxflags` are not equal to the `cflags`
+  [#255](https://github.com/pyodide/pyodide-build/pull/255)
 
 ## [0.30.9] - 2025/11/11
 

@@ -219,7 +219,7 @@ class PyodideVenv(ABC):
         (self.venv_root / "pip.conf").write_text(
             dedent(
                 f"""
-                [install]
+                [global]
                 only-binary=:all:
                 {repo}
                 """
