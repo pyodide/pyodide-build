@@ -551,7 +551,7 @@ class UnixPyodideVenv(PyodideVenv):
 
         return session_via_cli(self.get_cli_args() + [str(self.dest)])
 
-    def create_pyodide_script(self) -> None:
+    def _create_pyodide_script(self) -> None:
         """Write pyodide cli script into the virtualenv bin folder."""
 
         # Temporarily restore us to the environment that 'pyodide venv' was
