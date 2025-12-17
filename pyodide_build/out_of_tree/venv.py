@@ -348,6 +348,10 @@ class PyodideVenv(ABC):
             """
             f"""
             os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
+            # Only modify os.name on posix systems to avoid issues on Windows path calculation
+            if os.name == "posix":
+                os.name = os_name
+                sys.platform = sys_platform
             sys.platlibdir = "lib"
             sys.implementation._multiarch = multiarch
             sys.abiflags = getattr(sys, "abiflags", "")  # ensure abiflags exists even in Windows
@@ -362,21 +366,23 @@ class PyodideVenv(ABC):
             """
             # Pass the platform and target to pip install so that it installs the
             # correct wheels for Pyodide.
-            # Originally, we used following approaches to make this correctly work, but each had some issues
-            # so we ended up patching sys.argv directly. For reference, the approaches were:
-            # 1) changing os.name and sys.platform directly here in the pip monkeypatch
-            #    - however, some parts of pip read these values to apply os-specific logic which caused issues.
-            #      for instance, on Windows, if we set os.name to 'posix', pip would try to use posix-specific path handling which fails.
-            # 2) using pip.conf to set platform and target
-            #    this mostly worked, but when we are building and testing a local package (e.g., pip install ./some_package),
-            #    pip tried to install build dependencies with the platform tag in the pip.conf, while passing target="" which is invalid configuration.
+            # This is a hack to make pip install emscripten wheels in Windows host.
+            # Unfortunately, using `--target` parameter changes the pip behavior in a way that
+            # it does not overwrite the installed packages even the version specifies a newer one.
+            # so user should explicitly pass --upgrade to upgrade an already installed package.
+            #
+            # Note:
+            #    Originally, these parameters are set in pip.conf.
+            #    However, setting the pip.conf messes up when we are building and testing a local package (e.g., pip install ./some_package),
+            #    pip tries to install build dependencies with the platform tag in the pip.conf, while passing target="" which is invalid configuration.
             #    (Partially related: https://github.com/pypa/pip/issues/11275)
             f"""
-            if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
-                if "--platform" not in sys.argv:
-                    sys.argv.extend(["--platform", "{pyodide_platform}"])
-                if "--target" not in sys.argv:
-                    sys.argv.extend(["--target", "{self.venv_sitepackages_path}"])
+            if os.name == "nt":
+                if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
+                    if "--platform" not in sys.argv:
+                        sys.argv.extend(["--platform", "{pyodide_platform}"])
+                    if "--target" not in sys.argv:
+                        sys.argv.extend(["--target", "{self.venv_sitepackages_path}"])
             """
             # Handle pip updates.
             #
