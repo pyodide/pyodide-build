@@ -2,10 +2,10 @@ import os
 import shutil
 import sys
 import textwrap
+import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
-import warnings
 
 import virtualenv
 
@@ -576,7 +576,8 @@ class UnixPyodideVenv(PyodideVenv):
         # This is not fatal, so just warn and return for each unit test purposes
         if not activate_path.exists():
             warnings.warn(
-                f"Virtualenv activate script not found at {activate_path}, skipping patching.", stacklevel=2
+                f"Virtualenv activate script not found at {activate_path}, skipping patching.",
+                stacklevel=2,
             )
             return
 
@@ -723,7 +724,9 @@ class WindowsPyodideVenv(PyodideVenv):
         )
 
 
-def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> PyodideVenv:
+def create_pyodide_venv(
+    dest: Path, virtualenv_args: list[str] | None = None
+) -> PyodideVenv:
     """Create a Pyodide virtualenv and store it into dest"""
     builder = WindowsPyodideVenv if IS_WIN else UnixPyodideVenv
     venv = builder(dest, virtualenv_args)
