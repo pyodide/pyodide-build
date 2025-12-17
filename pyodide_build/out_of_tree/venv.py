@@ -495,10 +495,16 @@ class PyodideVenv(ABC):
         """Create and return a virtualenv session object."""
         pass
 
+    @abstractmethod
+    def _patch_activate_scripts(self) -> None:
+        """Patch the activate scripts in the virtualenv to set necessary environment variables."""
+        pass
+
     def configure_virtualenv(self) -> None:
         """Configure the virtualenv after creation."""
         logger.info("... Configuring virtualenv")
         self._create_python_symlink()
+        self._patch_activate_scripts()
         self._create_pip_conf()
         self._create_pip_script()
         self._create_pyodide_script()
@@ -561,6 +567,18 @@ class UnixPyodideVenv(PyodideVenv):
             """
         )
 
+    def _patch_activate_scripts(self) -> None:
+        # modify PATH inside the activate script
+        # Since we are using `--target` parameter with pip, the entrypoints of installed
+        # packages may not be found unless we add the site-packages Scripts folder to PATH.
+        activate_path = self.venv_bin / "activate"
+        activate_path.write_text(
+            activate_path.read_text().replace(
+                'PATH="$VIRTUAL_ENV/"bin"',
+                f'PATH="{self.venv_sitepackages_path / "bin"}:$VIRTUAL_ENV/bin"',
+            )
+        )
+
     def _create_python_symlink(self) -> None:
         """Create a symlink to the Pyodide Python interpreter.
 
@@ -617,7 +635,7 @@ class WindowsPyodideVenv(PyodideVenv):
     def host_python_wrapper(self) -> str:
         """Get the content of the host python wrapper script.
 
-        TODO: In windows, it doesn't seem setting PYTHONHOME is required to make it correctly work.
+        TODO(check): In windows, it doesn't seem setting PYTHONHOME is required to make it correctly work.
         """
         return dedent(f"""\
             @echo off
@@ -635,6 +653,18 @@ class WindowsPyodideVenv(PyodideVenv):
             "@echo off\n"
             + f'"{self.host_python_path}" -s '
             + f'"{self.pip_wrapper_path}" %*\n'
+        )
+
+    def _patch_activate_scripts(self) -> None:
+        # modify PATH inside the activate script
+        # Since we are using `--target` parameter with pip, the entrypoints of installed
+        # packages may not be found unless we add the site-packages Scripts folder to PATH.
+        activate_path = self.venv_bin / "activate.bat"
+        activate_path.write_text(
+            activate_path.read_text().replace(
+                '@set "PATH=%VIRTUAL_ENV%\\Scripts',
+                f'@set "PATH={self.venv_sitepackages_path / "bin"};%VIRTUAL_ENV%\\Scripts',
+            )
         )
 
     def _create_session(self):
