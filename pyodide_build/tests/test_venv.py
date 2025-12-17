@@ -276,7 +276,7 @@ def test_pytest_invoke(base_test_dir):
         ],
         check=True,
     )
-    venv_pytest = builder.venv_sitepackages_path / "bin" / "pytest"
+    venv_pytest = builder.venv_bin / "pytest"
 
     (base_test_dir / "test_a.py").write_text(
         dedent(
