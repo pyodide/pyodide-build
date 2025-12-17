@@ -232,7 +232,6 @@ class PyodideVenv(ABC):
             # should contain the needed wheels. find-links
             repo = f"find-links={pyodide_dist_dir()}"
 
-        platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
         # Prevent attempts to install binary wheels from source.
         # Maybe some day we can convince pip to invoke `pyodide build` as the build
         # front end for wheels...
@@ -241,8 +240,6 @@ class PyodideVenv(ABC):
                 f"""
                 [global]
                 only-binary=:all:
-                platform={platform}
-                target={self.venv_sitepackages_path}
                 {repo}
                 """
             )
@@ -306,6 +303,7 @@ class PyodideVenv(ABC):
         sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
         pip_patched_name = self.pip_patched_path.name
         exe_suffix = self.exe_suffix
+        pyodide_platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
         return dedent(
             """\
             import os
@@ -360,6 +358,23 @@ class PyodideVenv(ABC):
             import sysconfig
             sysconfig._init_config_vars()
             del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
+            """
+            # Pass the platform and target to pip install so that it installs the
+            # correct wheels for Pyodide.
+            # Originally, we used following approaches to make this correctly work, but each had some issues
+            # so we ended up patching sys.argv directly. For reference, the approaches were:
+            # 1) changing os.name and sys.platform directly here in the pip monkeypatch
+            #    - however, some parts of pip read these values to apply os-specific logic which caused issues.
+            #      for instance, on Windows, if we set os.name to 'posix', pip would try to use posix-specific path handling which fails.
+            # 2) using pip.conf to set platform and target
+            #    this mostly worked, but when we are building and testing a local package (e.g., pip install ./some_package),
+            #    pip tried to install build dependencies with the platform tag in the pip.conf, while passing target="" which is invalid configuration.
+            #    (Partially related: https://github.com/pypa/pip/issues/11275)
+            f"""
+            if "--platform" not in sys.argv:
+                sys.argv.extend(["--platform", "{pyodide_platform}"])
+            if "--target" not in sys.argv:
+                sys.argv.extend(["--target", "{self.venv_sitepackages_path}"])
             """
             # Handle pip updates.
             #
