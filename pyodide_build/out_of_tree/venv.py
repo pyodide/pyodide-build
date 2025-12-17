@@ -575,7 +575,7 @@ class UnixPyodideVenv(PyodideVenv):
         activate_path.write_text(
             activate_path.read_text().replace(
                 'PATH="$VIRTUAL_ENV/"bin"',
-                f'PATH="{self.venv_sitepackages_path / "bin"}:$VIRTUAL_ENV/bin"',
+                f'PATH="{self.venv_sitepackages_path / "bin"}:$VIRTUAL_ENV/"bin"',
             )
         )
 
