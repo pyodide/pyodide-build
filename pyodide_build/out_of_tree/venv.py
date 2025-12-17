@@ -355,7 +355,7 @@ class PyodideVenv(ABC):
             platform.system = lambda: platform_system
             platform.machine = lambda: "wasm32"
             os.environ["_PYTHON_HOST_PLATFORM"] = host_platform
-            os.environ["_PYTHON_SYSCONFIGDATA_NAME"] = f'_sysconfigdata_{{sys.abiflags}}_{{sys.platform}}_{{sys.implementation._multiarch}}'
+            os.environ["_PYTHON_SYSCONFIGDATA_NAME"] = f'_sysconfigdata_{{sys.abiflags}}_{{sys_platform}}_{{sys.implementation._multiarch}}'
             sys.path.append("{sysconfigdata_dir}")
             import sysconfig
             sysconfig._init_config_vars()

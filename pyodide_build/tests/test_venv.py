@@ -91,11 +91,11 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
         "pyodide_build.out_of_tree.venv.PyodideVenv._create_pip_conf", lambda self: None
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pip_script",
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_pip_script",
         lambda self: None,
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pyodide_script",
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_pyodide_script",
         lambda self: None,
     )
     monkeypatch.setattr(
