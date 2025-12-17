@@ -266,7 +266,7 @@ def test_pytest_invoke(base_test_dir):
     if platform.system() == "Darwin":
         pytest.skip("TODO: Why doesn't this work on Mac OS?")
     venv_path = base_test_dir / "test_venv"
-    venv.create_pyodide_venv(venv_path, [])
+    builder = venv.create_pyodide_venv(venv_path, [])
     pip = venv_path / "bin" / "pip"
     subprocess.run(
         [
@@ -276,7 +276,7 @@ def test_pytest_invoke(base_test_dir):
         ],
         check=True,
     )
-    venv_pytest = venv_path / "bin" / "pytest"
+    venv_pytest = builder.venv_sitepackages_path / "bin" / "pytest"
 
     (base_test_dir / "test_a.py").write_text(
         dedent(

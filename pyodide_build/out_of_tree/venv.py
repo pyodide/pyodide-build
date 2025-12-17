@@ -5,6 +5,7 @@ import textwrap
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
+import warnings
 
 import virtualenv
 
@@ -572,6 +573,13 @@ class UnixPyodideVenv(PyodideVenv):
         # Since we are using `--target` parameter with pip, the entrypoints of installed
         # packages may not be found unless we add the site-packages Scripts folder to PATH.
         activate_path = self.venv_bin / "activate"
+        # This is not fatal, so just warn and return for each unit test purposes
+        if not activate_path.exists():
+            warnings.warn(
+                f"Virtualenv activate script not found at {activate_path}, skipping patching.", stacklevel=2
+            )
+            return
+
         activate_path.write_text(
             activate_path.read_text().replace(
                 'PATH="$VIRTUAL_ENV/"bin"',
@@ -715,8 +723,10 @@ class WindowsPyodideVenv(PyodideVenv):
         )
 
 
-def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> None:
+def create_pyodide_venv(dest: Path, virtualenv_args: list[str] | None = None) -> PyodideVenv:
     """Create a Pyodide virtualenv and store it into dest"""
     builder = WindowsPyodideVenv if IS_WIN else UnixPyodideVenv
     venv = builder(dest, virtualenv_args)
     venv.create()
+
+    return venv
