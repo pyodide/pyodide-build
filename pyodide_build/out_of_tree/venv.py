@@ -371,10 +371,11 @@ class PyodideVenv(ABC):
             #    pip tried to install build dependencies with the platform tag in the pip.conf, while passing target="" which is invalid configuration.
             #    (Partially related: https://github.com/pypa/pip/issues/11275)
             f"""
-            if "--platform" not in sys.argv:
-                sys.argv.extend(["--platform", "{pyodide_platform}"])
-            if "--target" not in sys.argv:
-                sys.argv.extend(["--target", "{self.venv_sitepackages_path}"])
+            if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
+                if "--platform" not in sys.argv:
+                    sys.argv.extend(["--platform", "{pyodide_platform}"])
+                if "--target" not in sys.argv:
+                    sys.argv.extend(["--target", "{self.venv_sitepackages_path}"])
             """
             # Handle pip updates.
             #
