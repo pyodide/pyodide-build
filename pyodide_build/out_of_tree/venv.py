@@ -476,6 +476,10 @@ class PyodideVenv(ABC):
 
         # On windows, link the venv site-packages to the host site-packages so that the packages
         # installed in the windows location are visible to pyodide environment.
+        # Note that if we simply symlink the host site-packages to the venv site-packages,
+        # python doesn't seem to recognize the symlink as a real path, ending up not adding it to sys.path.
+        # To work around this, we first move the host site-packages to the venv location,
+        # then create a symlink from the host location to the venv location.
         if not self.venv_sitepackages_path.exists():
             self.venv_sitepackages_path.parent.mkdir(parents=True, exist_ok=True)
             self.host_sitepackages_path.replace(self.venv_sitepackages_path)
