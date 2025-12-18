@@ -2,7 +2,6 @@ import os
 import shutil
 import sys
 import textwrap
-import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -480,8 +479,9 @@ class PyodideVenv(ABC):
         if not self.venv_sitepackages_path.exists():
             self.venv_sitepackages_path.parent.mkdir(parents=True, exist_ok=True)
             self.host_sitepackages_path.replace(self.venv_sitepackages_path)
-            self.host_sitepackages_path.symlink_to(self.venv_sitepackages_path, target_is_directory=True)
-
+            self.host_sitepackages_path.symlink_to(
+                self.venv_sitepackages_path, target_is_directory=True
+            )
 
     @abstractmethod
     def _create_pyodide_script(self) -> None:
