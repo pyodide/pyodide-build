@@ -126,9 +126,17 @@ class PyodideVenv(ABC):
         pass
 
     @property
+    @abstractmethod
+    def host_sitepackages_path(self) -> Path:
+        """
+        Path to the host-specific site-packages directory in the virtualenv
+        """
+        pass
+
+    @property
     def venv_sitepackages_path(self) -> Path:
         """
-        Path to the site-packages directory in the virtualenv, where packages are installed.
+        Path to the site-packages directory in the virtualenv, where packages should be installed.
 
         Note that in host environment, Windows uses 'Lib\\site-packages' while Unix uses 'lib/pythonX.Y/site-packages'.
         However, Pyodide environment is Unix-like, so we always use the Unix-style path here so that packages are located correctly
@@ -304,12 +312,12 @@ class PyodideVenv(ABC):
         sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
         pip_patched_name = self.pip_patched_path.name
         exe_suffix = self.exe_suffix
-        pyodide_platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
         return dedent(
             """\
             import os
             import platform
             import sys
+            import pathlib
             """
             # when pip installs an executable it uses sys.executable to create the
             # shebang for the installed executable. The shebang for pip points to
@@ -348,10 +356,13 @@ class PyodideVenv(ABC):
             """
             f"""
             os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
-            # Only modify os.name on posix systems to avoid issues on Windows path calculation
-            if os.name == "posix":
-                os.name = os_name
-                sys.platform = sys_platform
+            if os.name == "nt":
+                # Replace pathlib.Path with pathlib.WindowsPath to avoid issues on Windows in path calculation
+                pathlib.Path = pathlib.WindowsPath
+
+            os.name = os_name
+            os.getuid = os.getuid if hasattr(os, "getuid") else lambda: 0
+            sys.platform = sys_platform
             sys.platlibdir = "lib"
             sys.implementation._multiarch = multiarch
             sys.abiflags = getattr(sys, "abiflags", "")  # ensure abiflags exists even in Windows
@@ -363,26 +374,6 @@ class PyodideVenv(ABC):
             import sysconfig
             sysconfig._init_config_vars()
             del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
-            """
-            # Pass the platform and target to pip install so that it installs the
-            # correct wheels for Pyodide.
-            # This is a hack to make pip install emscripten wheels in Windows host.
-            # Unfortunately, using `--target` parameter changes the pip behavior in a way that
-            # it does not overwrite the installed packages even the version specifies a newer one.
-            # so user should explicitly pass --upgrade to upgrade an already installed package.
-            #
-            # Note:
-            #    Originally, these parameters are set in pip.conf.
-            #    However, setting the pip.conf messes up when we are building and testing a local package (e.g., pip install ./some_package),
-            #    pip tries to install build dependencies with the platform tag in the pip.conf, while passing target="" which is invalid configuration.
-            #    (Partially related: https://github.com/pypa/pip/issues/11275)
-            f"""
-            if os.name == "nt":
-                if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
-                    if "--platform" not in sys.argv:
-                        sys.argv.extend(["--platform", "{pyodide_platform}"])
-                    if "--target" not in sys.argv:
-                        sys.argv.extend(["--target", "{self.venv_sitepackages_path}"])
             """
             # Handle pip updates.
             #
@@ -484,6 +475,14 @@ class PyodideVenv(ABC):
             ).replace("\\", "\\\\")  # Escape backslashes for Windows batch files
         )
 
+        # On windows, link the venv site-packages to the host site-packages so that the packages
+        # installed in the windows location are visible to pyodide environment.
+        if not self.venv_sitepackages_path.exists():
+            self.venv_sitepackages_path.parent.mkdir(parents=True, exist_ok=True)
+            self.host_sitepackages_path.replace(self.venv_sitepackages_path)
+            self.host_sitepackages_path.symlink_to(self.venv_sitepackages_path, target_is_directory=True)
+
+
     @abstractmethod
     def _create_pyodide_script(self) -> None:
         """Create pyodide CLI script in the virtualenv bin folder.
@@ -502,16 +501,10 @@ class PyodideVenv(ABC):
         """Create and return a virtualenv session object."""
         pass
 
-    @abstractmethod
-    def _patch_activate_scripts(self) -> None:
-        """Patch the activate scripts in the virtualenv to set necessary environment variables."""
-        pass
-
     def configure_virtualenv(self) -> None:
         """Configure the virtualenv after creation."""
         logger.info("... Configuring virtualenv")
         self._create_python_symlink()
-        self._patch_activate_scripts()
         self._create_pip_conf()
         self._create_pip_script()
         self._create_pyodide_script()
@@ -574,25 +567,12 @@ class UnixPyodideVenv(PyodideVenv):
             """
         )
 
-    def _patch_activate_scripts(self) -> None:
-        # modify PATH inside the activate script
-        # Since we are using `--target` parameter with pip, the entrypoints of installed
-        # packages may not be found unless we add the site-packages Scripts folder to PATH.
-        activate_path = self.venv_bin / "activate"
-        # This is not fatal, so just warn and return for each unit test purposes
-        if not activate_path.exists():
-            warnings.warn(
-                f"Virtualenv activate script not found at {activate_path}, skipping patching.",
-                stacklevel=2,
-            )
-            return
-
-        activate_path.write_text(
-            activate_path.read_text().replace(
-                'PATH="$VIRTUAL_ENV/"bin"',
-                f'PATH="{self.venv_sitepackages_path / "bin"}:$VIRTUAL_ENV/"bin"',
-            )
-        )
+    @property
+    def host_sitepackages_path(self) -> Path:
+        """
+        Path to the host-specific site-packages directory in the virtualenv
+        """
+        return self.venv_sitepackages_path
 
     def _create_python_symlink(self) -> None:
         """Create a symlink to the Pyodide Python interpreter.
@@ -660,7 +640,9 @@ class WindowsPyodideVenv(PyodideVenv):
     @property
     def pip_conf_path(self) -> Path:
         """Get the path to the pip.conf file in the virtualenv."""
-        return self.venv_root / "pip.ini"
+        # On windows, pip would look for pip.conf normally, but since we patch pip to mirror unix behavior,
+        # we place pip.conf in the venv root directory.
+        return self.venv_root / "pip.conf"
 
     @property
     def host_pip_wrapper(self) -> str:
@@ -670,17 +652,12 @@ class WindowsPyodideVenv(PyodideVenv):
             + f'"{self.pip_wrapper_path}" %*\n'
         )
 
-    def _patch_activate_scripts(self) -> None:
-        # modify PATH inside the activate script
-        # Since we are using `--target` parameter with pip, the entrypoints of installed
-        # packages may not be found unless we add the site-packages Scripts folder to PATH.
-        activate_path = self.venv_bin / "activate.bat"
-        activate_path.write_text(
-            activate_path.read_text().replace(
-                '@set "PATH=%VIRTUAL_ENV%\\Scripts',
-                f'@set "PATH={self.venv_sitepackages_path / "bin"};%VIRTUAL_ENV%\\Scripts',
-            )
-        )
+    @property
+    def host_sitepackages_path(self) -> Path:
+        """
+        Path to the host-specific site-packages directory in the virtualenv
+        """
+        return self.venv_root / "Lib" / "site-packages"
 
     def _create_session(self):
         from .app_data import create_app_data_dir
