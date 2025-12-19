@@ -19,6 +19,7 @@ from pyodide_build.common import default_xbuildenv_path
 from pyodide_build.logger import logger
 from pyodide_build.out_of_tree import build
 from pyodide_build.out_of_tree.pypi import (
+    MissingOptionalDependencyError,
     build_dependencies_for_wheel,
     build_wheels_from_pypi_requirements,
     fetch_pypi_package,
@@ -55,7 +56,11 @@ def pypi(
         srcdir = Path(tmpdir)
 
         # get package from pypi
-        package_path = fetch_pypi_package(package, srcdir)
+        try:
+            package_path = fetch_pypi_package(package, srcdir)
+        except MissingOptionalDependencyError as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
         if not package_path.is_dir():
             # a pure-python wheel has been downloaded - just copy to dist folder
             dest_file = output_directory / package_path.name
@@ -278,6 +283,9 @@ def main(
                 skip_dependency_check=skip_dependency_check,
                 output_lockfile=output_lockfile,
             )
+        except MissingOptionalDependencyError as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
         except BaseException as e:
             import traceback
 
@@ -346,6 +354,10 @@ def main(
                 output_lockfile=output_lockfile,
                 compression_level=compression_level,
             )
+        except MissingOptionalDependencyError as e:
+            print(str(e), file=sys.stderr)
+            wheel.unlink()
+            sys.exit(1)
         except BaseException as e:
             import traceback
 
