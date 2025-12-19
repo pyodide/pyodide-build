@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Removed `pyodide create-zipfile` subcommand. This command is was used only for building pyodide runtime and not for building packages.
+  [#276](https://github.com/pyodide/pyodide-build/pull/276)
+
 ### Fixed
 
 - Fixed an issue where the compiler flags such as `cflags`, `cxxflags`, and `ldflags` from

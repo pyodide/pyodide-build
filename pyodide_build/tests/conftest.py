@@ -9,38 +9,6 @@ from pyodide_build.common import default_xbuildenv_path, xbuildenv_dirname
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
-@pytest.fixture(scope="module")
-def temp_python_lib(tmp_path_factory):
-    libdir = tmp_path_factory.mktemp("python")
-
-    path = Path(libdir)
-
-    (path / "test").mkdir()
-    (path / "test" / "test_blah.py").touch()
-    (path / "turtle.py").touch()
-
-    (path / "module1.py").touch()
-    (path / "module2.py").touch()
-
-    (path / "hello_pyodide.py").write_text("def hello(): return 'hello'")
-
-    yield libdir
-
-
-@pytest.fixture(scope="module")
-def temp_python_lib2(tmp_path_factory):
-    libdir = tmp_path_factory.mktemp("python")
-
-    path = Path(libdir)
-
-    (path / "module3.py").touch()
-    (path / "module4.py").touch()
-
-    (path / "bye_pyodide.py").write_text("def bye(): return 'bye'")
-
-    yield libdir
-
-
 @pytest.fixture(scope="function")
 def reset_env_vars():
     # Will reset the environment variables to their original values after each test.

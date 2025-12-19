@@ -54,7 +54,6 @@ venv = "pyodide_build.cli.venv:main"
 skeleton = "pyodide_build.cli.skeleton:app"
 py-compile = "pyodide_build.cli.py_compile:main"
 config = "pyodide_build.cli.config:app"
-create-zipfile = "pyodide_build.cli.create_zipfile:main"
 xbuildenv = "pyodide_build.cli.xbuildenv:app"
 
 [project.optional-dependencies]
