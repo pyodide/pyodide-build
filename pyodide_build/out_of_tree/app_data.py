@@ -32,6 +32,7 @@ from typing import Any
 
 from virtualenv import session_via_cli
 from virtualenv.app_data import AppDataDiskFolder
+from virtualenv.discovery.cached_py_info import clear
 
 
 def build_host_app_data(app_data_dir: str | Path) -> dict[str, Any]:
@@ -46,6 +47,8 @@ def build_host_app_data(app_data_dir: str | Path) -> dict[str, Any]:
     """
     with TemporaryDirectory() as temp_dir:
         env = {"VIRTUALENV_OVERRIDE_APP_DATA": str(app_data_dir)}
+        # Clear any existing cached py_info to avoid interference
+        clear(AppDataDiskFolder(app_data_dir))
         session_via_cli([temp_dir], env=env)
 
         # https://github.com/pypa/virtualenv/blob/23032cbb3cc2cc78f1f9de4ad56689318c04f702/src/virtualenv/app_data/via_disk_folder.py#L81-L82
