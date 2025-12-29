@@ -182,3 +182,6 @@ max-statements = 58  # Default is 50
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[tool.pyodide.build]
+default_cross_build_env_url = "https://github.com/pyodide/pyodide-build-environment-nightly/releases/download/20251216/xbuildenv.tar.bz2"
