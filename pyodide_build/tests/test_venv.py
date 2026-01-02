@@ -2,11 +2,13 @@ import os
 import platform
 import shutil
 import subprocess
+from hashlib import sha256
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
 
-from pyodide_build.out_of_tree import venv
+from pyodide_build.out_of_tree import app_data, venv
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
@@ -79,23 +81,25 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
 
     temp_venv_path.mkdir(exist_ok=True)
 
-    # Mock most of the functions called by create_pyodide_venv
+    # Mock most of the functions/methods called by create_pyodide_venv
     # as we just need to check the arguments passed to it
     monkeypatch.setattr("virtualenv.session_via_cli", mock_session_via_cli)
     monkeypatch.setattr(
         "pyodide_build.out_of_tree.venv.check_host_python_version", lambda session: None
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.create_pip_conf", lambda venv_root: None
+        "pyodide_build.out_of_tree.venv.PyodideVenv._create_pip_conf", lambda self: None
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.create_pip_script", lambda venv_bin: None
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pip_script",
+        lambda self: None,
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.create_pyodide_script", lambda venv_bin: None
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pyodide_script",
+        lambda self: None,
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.install_stdlib", lambda venv_bin: None
+        "pyodide_build.out_of_tree.venv.PyodideVenv._install_stdlib", lambda self: None
     )
     monkeypatch.setattr(
         "pyodide_build.out_of_tree.venv.pyodide_dist_dir",
@@ -104,6 +108,7 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
 
     # necessary directories for valid venv
     (temp_venv_path / "dist").mkdir(exist_ok=True)
+    (temp_venv_path / "dist" / "python").touch()
     (temp_venv_path / "bin").mkdir(exist_ok=True)
 
     venv.create_pyodide_venv(temp_venv_path, options)
@@ -288,3 +293,71 @@ def test_pytest_invoke(base_test_dir):
         check=True,
         env=os.environ | {"_PYODIDE_EXTRA_MOUNTS": str(base_test_dir)},
     )
+
+
+@pytest.fixture
+def clear_app_data_cache():
+    """
+    virtualenv stores the cache of the app data in memory for the duration of the process,
+    so we need to clear it between tests to avoid interference.
+    """
+    from virtualenv.app_data.via_disk_folder import AppDataDiskFolder
+    from virtualenv.discovery.cached_py_info import clear
+
+    yield lambda app_data_dir: clear(AppDataDiskFolder(app_data_dir))
+
+
+def test_build_host_app_data(tmp_path, clear_app_data_cache):
+    app_data_dir = tmp_path / "app_data"
+    clear_app_data_cache(app_data_dir)
+
+    try:
+        app_data_json = app_data.build_host_app_data(app_data_dir)
+        assert isinstance(app_data_json, dict)
+        assert "content" in app_data_json
+        assert "executable" in app_data_json["content"]
+        assert "st_mtime" in app_data_json
+    finally:
+        clear_app_data_cache(app_data_dir)
+
+
+def test_overwrite_host_app_data(tmp_path, clear_app_data_cache):
+    app_data_dir = tmp_path / "app_data"
+    clear_app_data_cache(app_data_dir)
+
+    try:
+        host_app_data = app_data.build_host_app_data(app_data_dir)
+
+        target_python_executable = tmp_path / "fake_python"
+        target_python_executable.touch()
+
+        patched_app_data = app_data.overwrite_host_app_data(
+            host_app_data,
+            target_python_executable,
+        )
+
+        assert patched_app_data["path"] == target_python_executable
+        assert patched_app_data["content"]["executable"] == target_python_executable
+        assert (
+            patched_app_data["content"]["original_executable"]
+            == target_python_executable
+        )
+    finally:
+        clear_app_data_cache(app_data_dir)
+
+
+def test_create_app_data_dir(tmp_path, clear_app_data_cache):
+    target_python_executable = tmp_path / "fake_python"
+    target_python_executable.touch()
+
+    with app_data.create_app_data_dir(
+        str(target_python_executable),
+    ) as app_data_dir:
+        # virtualenv creates the app data file named by the sha256 hash of the target python executable path
+        # not the best way to test, but can't think of a better one right now
+        py_info_dir = Path(app_data_dir) / "py_info" / "2"
+        filename = (
+            sha256(str(target_python_executable).encode("utf-8")).hexdigest() + ".json"
+        )
+        assert (py_info_dir / filename).exists()
+        clear_app_data_cache(app_data_dir)
