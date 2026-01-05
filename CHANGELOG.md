@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026/01/05
+
+### Added
+
+- `pyodide venv` now works in Windows. It only works with Pyodide 0.29.1 and later.
+  [#274](https://github.com/pyodide/pyodide-build/pull/274)
+
 ### Removed
 
 - Removed `pyodide create-zipfile` subcommand. This command is was used only for building pyodide runtime and not for building packages.
