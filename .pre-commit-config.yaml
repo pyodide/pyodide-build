@@ -2,7 +2,7 @@ default_language_version:
   python: "3.12"
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: "v5.0.0"
+    rev: "v6.0.0"
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -16,7 +16,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.12.2"
+    rev: "v0.14.10"
     hooks:
       - id: ruff
         args: [--fix]
@@ -31,7 +31,7 @@ repos:
       - id: rst-inline-touching-normal
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: "v0.10.0.1"
+    rev: "v0.11.0.1"
     hooks:
       - id: shellcheck
         exclude: ^(integration_tests/scripts/pyodide_venv_test.sh)$
@@ -47,7 +47,7 @@ repos:
           ]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.16.1"
+    rev: "v1.19.1"
     hooks:
       - id: mypy
         files: ^(pyodide-build/pyodide_build)
