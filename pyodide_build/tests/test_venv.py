@@ -91,11 +91,11 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
         "pyodide_build.out_of_tree.venv.PyodideVenv._create_pip_conf", lambda self: None
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pip_script",
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_pip_script",
         lambda self: None,
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pyodide_script",
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_pyodide_script",
         lambda self: None,
     )
     monkeypatch.setattr(
@@ -266,7 +266,7 @@ def test_pytest_invoke(base_test_dir):
     if platform.system() == "Darwin":
         pytest.skip("TODO: Why doesn't this work on Mac OS?")
     venv_path = base_test_dir / "test_venv"
-    venv.create_pyodide_venv(venv_path, [])
+    builder = venv.create_pyodide_venv(venv_path, [])
     pip = venv_path / "bin" / "pip"
     subprocess.run(
         [
@@ -276,7 +276,7 @@ def test_pytest_invoke(base_test_dir):
         ],
         check=True,
     )
-    venv_pytest = venv_path / "bin" / "pytest"
+    venv_pytest = builder.venv_bin / "pytest"
 
     (base_test_dir / "test_a.py").write_text(
         dedent(
