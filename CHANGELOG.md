@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.1] - 2026/01/05
+
+### Fixed
+
+- Fixed an issue where pip inside the Pyodide venv would not correctly handle the arguments with spaces.
+  [#281](https://github.com/pyodide/pyodide-build/pull/281)
+
 ## [0.31.0] - 2026/01/05
 
 ### Added

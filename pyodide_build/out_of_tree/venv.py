@@ -567,7 +567,7 @@ class UnixPyodideVenv(PyodideVenv):
         return dedent(
             f"""
             #!/usr/bin/env bash
-            {self.host_python_path} -s {self.pip_wrapper_path} $@
+            {self.host_python_path} -s {self.pip_wrapper_path} "$@"
             """
         )
 
