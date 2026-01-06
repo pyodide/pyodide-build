@@ -12,6 +12,9 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
+pytest.importorskip("resolvelib")
+pytest.importorskip("unearth")
+
 from pyodide_build.cli import build
 
 runner = CliRunner()
