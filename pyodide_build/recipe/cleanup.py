@@ -11,8 +11,6 @@ from pyodide_build.recipe.builder import RecipeBuilder
 def resolve_targets(
     recipe_dir: Path,
     names_or_tags: Iterable[str] | None,
-    *,
-    include_always_tag: bool = False,
 ) -> list[str]:
     """
     Resolve package names from names/tags using the recipe loader.
@@ -24,7 +22,8 @@ def resolve_targets(
         names_or_tags = ["*"]
 
     recipes = loader.load_recipes(
-        recipe_dir, names_or_tags, load_always_tag=include_always_tag
+        recipe_dir,
+        names_or_tags,
     )
     return list(recipes.keys())
 
@@ -57,7 +56,6 @@ def clean_recipes(
     *,
     build_dir: Path | None = None,
     include_dist: bool = False,
-    include_always_tag: bool = False,
 ) -> None:
     """
     Clean recipe build artifacts and optionally dist directories.
@@ -66,7 +64,8 @@ def clean_recipes(
         raise FileNotFoundError(f"Recipe directory {recipe_dir} not found")
 
     selected = resolve_targets(
-        recipe_dir, targets, include_always_tag=include_always_tag
+        recipe_dir,
+        targets,
     )
 
     for pkg in selected:

@@ -160,7 +160,9 @@ class BasePackage:
         )
         return res
 
-    def build(self, build_args: BuildArgs, build_dir: Path) -> None:
+    def build(
+        self, build_args: BuildArgs, build_dir: Path, clean: bool = False
+    ) -> None:
         run_prefix = (
             [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
         )
@@ -185,7 +187,8 @@ class BasePackage:
                 "--force-rebuild",
                 # We already did the rust setup in buildall
                 "--skip-rust-setup",
-            ],
+            ]
+            + (["--clean"] if clean else []),
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -666,26 +669,11 @@ class _GraphBuilder:
     def _build_one(self, n: int, pkg: BasePackage) -> BaseException | None:
         try:
             with self._pkg_status_display(n, pkg):
-                pkg.build(self.build_args, self.build_dir)
+                pkg.build(self.build_args, self.build_dir, clean=self.clean)
         except BaseException as e:
             return e
         else:
-            if self.clean:
-                self._clean_package_build_dir(pkg)
             return None
-
-    def _clean_package_build_dir(self, pkg: BasePackage) -> None:
-        from pyodide_build.recipe.builder import RecipeBuilder
-
-        try:
-            builder = RecipeBuilder(
-                pkg.pkgdir,
-                self.build_args,
-                build_dir=pkg.build_path(self.build_dir),
-            )
-            builder.clean(include_dist=False)
-        except Exception as e:
-            logger.warning("Failed to clean %s: %s", pkg.name, e)
 
     def _builder(self, n: int) -> None:
         """This is the logic that controls a thread in the thread pool."""
