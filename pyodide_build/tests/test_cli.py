@@ -114,6 +114,44 @@ def test_build_recipe_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     assert len(built_wheels) == len(pkgs_to_build)
 
 
+def test_build_recipe_clean(tmp_path, dummy_xbuildenv, mock_emscripten):
+    output_dir = tmp_path / "dist"
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    app = typer.Typer()
+    app.command()(build_recipes.build_recipes)
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+
+    result = runner.invoke(
+        app,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--install",
+            "--install-dir",
+            str(output_dir),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"built {pkg} in" in result.stdout
+
+    built_wheels = set(output_dir.glob("*.whl"))
+    assert len(built_wheels) >= len(pkgs_to_build)
+
+    for pkg in pkgs_to_build:
+        build_dir = RECIPE_DIR / pkg / "build"
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
+
+
 def test_build_recipe_no_deps_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
@@ -140,6 +178,37 @@ def test_build_recipe_no_deps_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     for pkg in pkgs_to_build:
         dist_dir = RECIPE_DIR / pkg / "dist"
         assert len(list(dist_dir.glob("*.whl"))) == 1
+
+
+def test_build_recipe_no_deps_clean(tmp_path, dummy_xbuildenv, mock_emscripten):
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    app = typer.Typer()
+    app.command()(build_recipes.build_recipes_no_deps)
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+    result = runner.invoke(
+        app,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"Succeeded building package {pkg}" in result.stdout
+
+    for pkg in pkgs_to_build:
+        dist_dir = RECIPE_DIR / pkg / "dist"
+        build_dir = RECIPE_DIR / pkg / "build"
+        assert len(list(dist_dir.glob("*.whl"))) == 1
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
 
 
 def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emscripten):

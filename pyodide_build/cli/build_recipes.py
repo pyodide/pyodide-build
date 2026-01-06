@@ -23,6 +23,7 @@ class Args:
     skip_rust_setup: bool
     force_rebuild: bool
     n_jobs: int
+    clean: bool
 
     def __init__(
         self,
@@ -34,6 +35,7 @@ class Args:
         force_rebuild: bool,
         skip_rust_setup: bool = False,
         n_jobs: int | None = None,
+        clean: bool = False,
     ):
         cwd = Path.cwd()
         root = build_env.search_pyodide_root(cwd) or cwd
@@ -48,6 +50,7 @@ class Args:
         self.force_rebuild = force_rebuild
         self.skip_rust_setup = skip_rust_setup
         self.n_jobs = n_jobs or get_num_cores()
+        self.clean = clean
         if not self.recipe_dir.is_dir():
             raise FileNotFoundError(f"Recipe directory {self.recipe_dir} not found")
 
@@ -98,6 +101,10 @@ def build_recipes_no_deps(
         "--skip-rust-setup",
         help="Don't setup rust environment when building a rust package",
     ),
+    clean: bool = typer.Option(
+        False,
+        help="Remove the build directory after a successful build of each package.",
+    ),
 ) -> None:
     """Build packages using yaml recipes but don't try to resolve dependencies"""
     init_environment()
@@ -119,6 +126,7 @@ def build_recipes_no_deps(
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
         skip_rust_setup=skip_rust_setup,
+        clean=clean,
     )
 
     return build_recipes_no_deps_impl(packages, args, continue_)
@@ -148,6 +156,8 @@ def build_recipes_no_deps_impl(
             continue_,
         )
         builder.build()
+        if args.clean:
+            builder.clean(include_dist=False)
 
 
 def build_recipes(
@@ -209,6 +219,10 @@ def build_recipes(
         envvar="PYODIDE_ZIP_COMPRESSION_LEVEL",
         help="Level of zip compression to apply when installing. 0 means no compression.",
     ),
+    clean: bool = typer.Option(
+        False,
+        help="Remove the build directory after a successful build of each package.",
+    ),
 ) -> None:
     if no_deps:
         logger.error(
@@ -246,6 +260,7 @@ def build_recipes(
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
         n_jobs=n_jobs,
+        clean=clean,
     )
     log_dir_ = Path(log_dir).resolve() if log_dir else None
     build_recipes_impl(packages, args, log_dir_, install_options)
@@ -271,6 +286,7 @@ def build_recipes_impl(
         build_dir=args.build_dir,
         n_jobs=args.n_jobs,
         force_rebuild=args.force_rebuild,
+        clean=args.clean,
     )
     if log_dir:
         graph_builder.copy_logs(pkg_map, log_dir)
