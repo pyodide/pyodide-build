@@ -160,7 +160,9 @@ class BasePackage:
         )
         return res
 
-    def build(self, build_args: BuildArgs, build_dir: Path) -> None:
+    def build(
+        self, build_args: BuildArgs, build_dir: Path, clean: bool = False
+    ) -> None:
         run_prefix = (
             [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
         )
@@ -185,7 +187,8 @@ class BasePackage:
                 "--force-rebuild",
                 # We already did the rust setup in buildall
                 "--skip-rust-setup",
-            ],
+            ]
+            + (["--clean"] if clean else []),
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -591,11 +594,13 @@ class _GraphBuilder:
         build_args: BuildArgs,
         build_dir: Path,
         needs_build: set[str],
+        clean: bool = False,
     ):
         self.pkg_map: dict[str, BasePackage] = pkg_map
         self.build_args: BuildArgs = build_args
         self.build_dir: Path = build_dir
         self.needs_build: set[str] = needs_build
+        self.clean: bool = clean
         self.build_queue: PriorityQueue[_PackagePriorityWrapper] = PriorityQueue()
         self.built_queue: Queue[tuple[BasePackage, BaseException | None]] = Queue()
         self.lock: Lock = Lock()
@@ -664,7 +669,7 @@ class _GraphBuilder:
     def _build_one(self, n: int, pkg: BasePackage) -> BaseException | None:
         try:
             with self._pkg_status_display(n, pkg):
-                pkg.build(self.build_args, self.build_dir)
+                pkg.build(self.build_args, self.build_dir, clean=self.clean)
         except BaseException as e:
             return e
         else:
@@ -772,6 +777,7 @@ def build_from_graph(
     build_dir: Path,
     n_jobs: int = 1,
     force_rebuild: bool = False,
+    clean: bool = False,
 ) -> None:
     """
     This builds packages in pkg_map in parallel, building at most n_jobs
@@ -827,7 +833,7 @@ def build_from_graph(
         "Building the following packages: [bold]%s[/bold]",
         format_name_list(sorted_needs_build),
     )
-    build_state = _GraphBuilder(pkg_map, build_args, build_dir, set(needs_build))
+    build_state = _GraphBuilder(pkg_map, build_args, build_dir, set(needs_build), clean)
     try:
         build_state.run(n_jobs, already_built)
     except BuildError as err:
@@ -936,6 +942,7 @@ def build_packages(
     build_dir: Path,
     n_jobs: int = 1,
     force_rebuild: bool = False,
+    clean: bool = False,
 ) -> dict[str, BasePackage]:
     requested, disabled = _parse_package_query(targets)
     requested_packages = loader.load_recipes(packages_dir, requested)
@@ -943,7 +950,7 @@ def build_packages(
         packages_dir, set(requested_packages.keys()), disabled
     )
 
-    build_from_graph(pkg_map, build_args, build_dir, n_jobs, force_rebuild)
+    build_from_graph(pkg_map, build_args, build_dir, n_jobs, force_rebuild, clean)
     for pkg in pkg_map.values():
         dist_path = pkg.dist_artifact_path()
 
