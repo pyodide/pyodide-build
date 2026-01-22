@@ -207,6 +207,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "cflags",
     "cxxflags",
     "ldflags",
+    "rustflags",
     "rust_toolchain",
     "rust_emscripten_target_url",
     "meson_cross_file",
