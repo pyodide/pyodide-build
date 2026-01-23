@@ -1,7 +1,7 @@
+import ast
 import os
 from collections.abc import Mapping
 from copy import deepcopy
-from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from types import MappingProxyType
 
@@ -158,22 +158,52 @@ class CrossBuildEnvConfigManager(ConfigManager):
         }
 
     def _load_sysconfigdata(self, sysconfigdata_path: Path) -> dict[str, str]:
-        old_pyodide_root = os.environ.get("PYODIDE_ROOT")
         try:
-            os.environ["PYODIDE_ROOT"] = str(self.pyodide_root)
-            spec = spec_from_file_location("_sysconfigdata", sysconfigdata_path)
-            if spec is None or spec.loader is None:
-                return {}
-            module = module_from_spec(spec)
-            spec.loader.exec_module(module)
-            return getattr(module, "build_time_vars", {})
-        except Exception:
+            source = sysconfigdata_path.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+        except (OSError, SyntaxError) as e:
+            logger.debug(
+                "failed to parse sysconfigdata at %s: %s", sysconfigdata_path, e
+            )
             return {}
-        finally:
-            if old_pyodide_root is None:
-                os.environ.pop("PYODIDE_ROOT", None)
-            else:
-                os.environ["PYODIDE_ROOT"] = old_pyodide_root
+
+        # find build_time_vars assignment
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "build_time_vars":
+                        try:
+                            expr = ast.Expression(body=node.value)
+                            code = compile(expr, sysconfigdata_path, "eval")
+                            namespace = {"PYODIDE_ROOT": str(self.pyodide_root)}
+                            raw_vars = eval(code, namespace)
+                        except Exception as e:
+                            logger.debug(
+                                "failed to evaluate build_time_vars from %s: %s",
+                                sysconfigdata_path,
+                                e,
+                            )
+                            return {}
+
+                        # validate and normalise the result
+                        if not isinstance(raw_vars, Mapping):
+                            logger.debug(
+                                "build_time_vars in %s is not a Mapping",
+                                sysconfigdata_path,
+                            )
+                            return {}
+
+                        result: dict[str, str] = {}
+                        for key, value in raw_vars.items():
+                            if not isinstance(key, str):
+                                continue
+                            result[key] = (
+                                value if isinstance(value, str) else str(value)
+                            )
+                        return result
+
+        logger.debug("no build_time_vars found in %s", sysconfigdata_path)
+        return {}
 
     def _load_cross_build_envs(self) -> Mapping[str, str]:
         makefile_vars = self._get_make_environment_vars()
