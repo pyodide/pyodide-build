@@ -220,17 +220,6 @@ def test_cli_config_subset():
 
 
 class TestComputeSysconfigPaths:
-    SYSCONFIG_PATH_KEYS = [
-        "sysconfig_stdlib",
-        "sysconfig_platstdlib",
-        "sysconfig_purelib",
-        "sysconfig_platlib",
-        "sysconfig_include",
-        "sysconfig_platinclude",
-        "sysconfig_scripts",
-        "sysconfig_data",
-    ]
-
     def test_compute_sysconfig_paths(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
     ):
@@ -244,17 +233,11 @@ class TestComputeSysconfigPaths:
         makefile_vars = config_manager._get_make_environment_vars()
         sysconfig_paths = config_manager._compute_sysconfig_paths(makefile_vars)
 
-        for key in self.SYSCONFIG_PATH_KEYS:
-            assert key in sysconfig_paths
-            assert sysconfig_paths[key]
+        assert "sysconfig_include" in sysconfig_paths
+        assert sysconfig_paths["sysconfig_include"]
 
         pyodide_root = str(xbuildenv_manager.pyodide_root)
-        assert pyodide_root in sysconfig_paths["sysconfig_stdlib"]
         assert pyodide_root in sysconfig_paths["sysconfig_include"]
-        assert pyodide_root in sysconfig_paths["sysconfig_scripts"]
-        assert pyodide_root in sysconfig_paths["sysconfig_data"]
-        assert sysconfig_paths["sysconfig_purelib"].endswith("/site-packages")
-        assert sysconfig_paths["sysconfig_platlib"].endswith("/site-packages")
 
     def test_compute_sysconfig_paths_in_cross_build_envs(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
@@ -268,12 +251,10 @@ class TestComputeSysconfigPaths:
 
         cross_build_envs = config_manager._load_cross_build_envs()
 
-        for key in self.SYSCONFIG_PATH_KEYS:
-            assert key in cross_build_envs
+        assert "sysconfig_include" in cross_build_envs
 
     def test_sysconfig_paths_in_cli_configs(self):
-        for key in self.SYSCONFIG_PATH_KEYS:
-            assert key in PYODIDE_CLI_CONFIGS
+        assert "sysconfig_include" in PYODIDE_CLI_CONFIGS
 
 
 class TestParseMakefileEnvs:

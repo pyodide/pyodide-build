@@ -110,14 +110,7 @@ class CrossBuildEnvConfigManager(ConfigManager):
         self, makefile_vars: Mapping[str, str]
     ) -> dict[str, str]:
         empty_res = {
-            "sysconfig_stdlib": "",
-            "sysconfig_platstdlib": "",
-            "sysconfig_purelib": "",
-            "sysconfig_platlib": "",
             "sysconfig_include": "",
-            "sysconfig_platinclude": "",
-            "sysconfig_scripts": "",
-            "sysconfig_data": "",
         }
 
         target_install_dir = makefile_vars.get("TARGETINSTALLDIR", "")
@@ -136,25 +129,10 @@ class CrossBuildEnvConfigManager(ConfigManager):
         if not build_time_vars:
             return empty_res
 
-        # Map sysconfigdata variables to sysconfig path names
-        # - LIBDEST points to stdlib, BINLIBDEST points to platstdlib
-        # - INCLUDEPY points to include, CONFINCLUDEPY points to platinclude (or we fall back to INCLUDEPY)
-        # - BINDIR points to scripts, prefix points to data
-        # and for purelib/platlib, we append site-packages to LIBDEST/BINLIBDEST respectively
-        libdest = build_time_vars.get("LIBDEST", "")
-        binlibdest = build_time_vars.get("BINLIBDEST", "")
         includepy = build_time_vars.get("INCLUDEPY", "")
-        confincludepy = build_time_vars.get("CONFINCLUDEPY", "") or includepy
 
         return {
-            "sysconfig_stdlib": libdest,
-            "sysconfig_platstdlib": binlibdest,
-            "sysconfig_purelib": f"{libdest}/site-packages" if libdest else "",
-            "sysconfig_platlib": f"{binlibdest}/site-packages" if binlibdest else "",
             "sysconfig_include": includepy,
-            "sysconfig_platinclude": confincludepy,
-            "sysconfig_scripts": build_time_vars.get("BINDIR", ""),
-            "sysconfig_data": build_time_vars.get("prefix", ""),
         }
 
     def _load_sysconfigdata(self, sysconfigdata_path: Path) -> dict[str, str]:
@@ -361,14 +339,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
-    "sysconfig_stdlib": "SYSCONFIG_STDLIB",
-    "sysconfig_platstdlib": "SYSCONFIG_PLATSTDLIB",
-    "sysconfig_purelib": "SYSCONFIG_PURELIB",
-    "sysconfig_platlib": "SYSCONFIG_PLATLIB",
     "sysconfig_include": "SYSCONFIG_INCLUDE",
-    "sysconfig_platinclude": "SYSCONFIG_PLATINCLUDE",
-    "sysconfig_scripts": "SYSCONFIG_SCRIPTS",
-    "sysconfig_data": "SYSCONFIG_DATA",
 }
 
 BUILD_VAR_TO_KEY = {v: k for k, v in BUILD_KEY_TO_VAR.items()}
@@ -457,12 +428,5 @@ PYODIDE_CLI_CONFIGS = {
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     "interpreter": "PYODIDE_INTERPRETER",
     "package_index": "PYODIDE_PACKAGE_INDEX",
-    "sysconfig_stdlib": "SYSCONFIG_STDLIB",
-    "sysconfig_platstdlib": "SYSCONFIG_PLATSTDLIB",
-    "sysconfig_purelib": "SYSCONFIG_PURELIB",
-    "sysconfig_platlib": "SYSCONFIG_PLATLIB",
     "sysconfig_include": "SYSCONFIG_INCLUDE",
-    "sysconfig_platinclude": "SYSCONFIG_PLATINCLUDE",
-    "sysconfig_scripts": "SYSCONFIG_SCRIPTS",
-    "sysconfig_data": "SYSCONFIG_DATA",
 }

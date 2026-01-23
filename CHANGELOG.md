@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `pyodide config list` now exposes `sysconfig` path variables computed
-  from the cross-build environment.
+- `pyodide config list` now exposes the `sysconfig_include` path variable computed
+  from the cross-build environment. This variable can also be accessed through
+  `pyodide config get sysconfig_include` for use in out-of-tree builds.
   [#286](https://github.com/pyodide/pyodide-build/pull/286)
 
 ## [0.31.1] - 2026/01/05
