@@ -6,7 +6,6 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-import pyodide_build
 from pyodide_build import build_env, common
 from pyodide_build.cli import (
     build,

@@ -240,7 +240,7 @@ DEFAULT_PATH = default_xbuildenv_path()
     help="Path to the cross-build environment directory.",
 )
 @click.pass_context
-def main(
+def main(  # noqa: PLR0915
     ctx: click.Context,
     source_location: str,
     output_directory: str,
