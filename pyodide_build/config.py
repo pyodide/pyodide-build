@@ -255,6 +255,14 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
+    "sysconfig_stdlib": "PYODIDE_SYSCONFIG_STDLIB",
+    "sysconfig_platstdlib": "PYODIDE_SYSCONFIG_PLATSTDLIB",
+    "sysconfig_purelib": "PYODIDE_SYSCONFIG_PURELIB",
+    "sysconfig_platlib": "PYODIDE_SYSCONFIG_PLATLIB",
+    "sysconfig_include": "PYODIDE_SYSCONFIG_INCLUDE",
+    "sysconfig_platinclude": "PYODIDE_SYSCONFIG_PLATINCLUDE",
+    "sysconfig_scripts": "PYODIDE_SYSCONFIG_SCRIPTS",
+    "sysconfig_data": "PYODIDE_SYSCONFIG_DATA",
 }
 
 BUILD_VAR_TO_KEY = {v: k for k, v in BUILD_KEY_TO_VAR.items()}
@@ -343,4 +351,12 @@ PYODIDE_CLI_CONFIGS = {
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     "interpreter": "PYODIDE_INTERPRETER",
     "package_index": "PYODIDE_PACKAGE_INDEX",
+    "sysconfig_stdlib": "PYODIDE_SYSCONFIG_STDLIB",
+    "sysconfig_platstdlib": "PYODIDE_SYSCONFIG_PLATSTDLIB",
+    "sysconfig_purelib": "PYODIDE_SYSCONFIG_PURELIB",
+    "sysconfig_platlib": "PYODIDE_SYSCONFIG_PLATLIB",
+    "sysconfig_include": "PYODIDE_SYSCONFIG_INCLUDE",
+    "sysconfig_platinclude": "PYODIDE_SYSCONFIG_PLATINCLUDE",
+    "sysconfig_scripts": "PYODIDE_SYSCONFIG_SCRIPTS",
+    "sysconfig_data": "PYODIDE_SYSCONFIG_DATA",
 }
