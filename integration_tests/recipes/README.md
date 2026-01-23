@@ -2,16 +2,17 @@ This directory contains a few curated recipes to test the build process of pyodi
 
 ### List of recipes and their purpose
 
-- numpy: The most popular and widely used library in the scientific computing community.
-- pywavelets: a library with C and Cython extensions that uses the NumPy-C API.
-- orjson: Tests rust extension modules.
-- zlib: Tests static libraries.
-- geos: Tests shared libraries.
-- shapely: Tests a python package that depends on a shared library.
-- pydoc_data: Unvendored cpython module
-- boost-histogram: Tests scikit-build-core and cmake build system.
+- `numpy`: The most popular and widely used library in the scientific computing community.
+- `pywavelets`: a library with C and Cython extensions that uses the NumPy-C API.
+- `orjson`: Tests rust extension modules.
+- `zlib`: Tests static libraries.
+- `geos`: Tests shared libraries.
+- `shapely`: Tests a python package that depends on a shared library.
+- `pydoc_data`: Unvendored cpython module
+- `boost-histogram``: Tests scikit-build-core and cmake build system.
+- `colorama`: Uses prebuilt wheel as source to check test file unvendoring capabilities.
 
 ### For maintainers
 
 - Do not put too many recipes in this directory. It is meant to be a small collection of recipes that are representative of the build process.
-- The recipes in this directory is originally copied from `pyodide/pyodide`. It does not need to be updated frequently unless there is a change in the build process.
+- The recipes in this directory are originally copied from `pyodide/pyodide`. They do not need to be updated frequently unless there is a change in the build process.
