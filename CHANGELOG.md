@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `pyodide config list` now exposes `sysconfig` path variables computed
+  from the cross-build environment.
+  [#286](https://github.com/pyodide/pyodide-build/pull/286)
+
 ## [0.31.1] - 2026/01/05
 
 ### Fixed
