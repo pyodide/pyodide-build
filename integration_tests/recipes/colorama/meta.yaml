@@ -7,7 +7,6 @@ source:
   url: https://files.pythonhosted.org/packages/py2.py3/c/colorama/colorama-0.4.6-py2.py3-none-any.whl
   sha256: 4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
 build:
-  unvendor-tests: true
   # Should retain only winterm_test.py file in the colorama/tests/ directory
   _retain-test-patterns:
     - "*winterm_test*.py"
