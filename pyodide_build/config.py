@@ -1,6 +1,7 @@
 import os
 from collections.abc import Mapping
 from copy import deepcopy
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from types import MappingProxyType
 
@@ -105,6 +106,75 @@ class CrossBuildEnvConfigManager(ConfigManager):
         self.pyodide_root = pyodide_root
         super().__init__()
 
+    def _compute_sysconfig_paths(
+        self, makefile_vars: Mapping[str, str]
+    ) -> dict[str, str]:
+        empty_res = {
+            "sysconfig_stdlib": "",
+            "sysconfig_platstdlib": "",
+            "sysconfig_purelib": "",
+            "sysconfig_platlib": "",
+            "sysconfig_include": "",
+            "sysconfig_platinclude": "",
+            "sysconfig_scripts": "",
+            "sysconfig_data": "",
+        }
+
+        target_install_dir = makefile_vars.get("TARGETINSTALLDIR", "")
+        sysconfig_name = makefile_vars.get("SYSCONFIG_NAME", "")
+
+        if not target_install_dir or not sysconfig_name:
+            return empty_res
+
+        path_to_sysconfigdata = (
+            Path(target_install_dir) / "sysconfigdata" / f"{sysconfig_name}.py"
+        )
+        if not path_to_sysconfigdata.exists():
+            return empty_res
+
+        build_time_vars = self._load_sysconfigdata(path_to_sysconfigdata)
+        if not build_time_vars:
+            return empty_res
+
+        # Map sysconfigdata variables to sysconfig path names
+        # - LIBDEST points to stdlib, BINLIBDEST points to platstdlib
+        # - INCLUDEPY points to include, CONFINCLUDEPY points to platinclude
+        # - BINDIR points to scripts, prefix points to data
+        # and for purelib/platlib, we append site-packages to LIBDEST/BINLIBDEST respectively
+        libdest = build_time_vars.get("LIBDEST", "")
+        binlibdest = build_time_vars.get("BINLIBDEST", "")
+        includepy = build_time_vars.get("INCLUDEPY", "")
+        confincludepy = build_time_vars.get("CONFINCLUDEPY", "") or includepy
+
+        return {
+            "sysconfig_stdlib": libdest,
+            "sysconfig_platstdlib": binlibdest,
+            "sysconfig_purelib": f"{libdest}/site-packages" if libdest else "",
+            "sysconfig_platlib": f"{binlibdest}/site-packages" if binlibdest else "",
+            "sysconfig_include": includepy,
+            "sysconfig_platinclude": confincludepy,
+            "sysconfig_scripts": build_time_vars.get("BINDIR", ""),
+            "sysconfig_data": build_time_vars.get("prefix", ""),
+        }
+
+    def _load_sysconfigdata(self, sysconfigdata_path: Path) -> dict[str, str]:
+        old_pyodide_root = os.environ.get("PYODIDE_ROOT")
+        try:
+            os.environ["PYODIDE_ROOT"] = str(self.pyodide_root)
+            spec = spec_from_file_location("_sysconfigdata", sysconfigdata_path)
+            if spec is None or spec.loader is None:
+                return {}
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return getattr(module, "build_time_vars", {})
+        except Exception:
+            return {}
+        finally:
+            if old_pyodide_root is None:
+                os.environ.pop("PYODIDE_ROOT", None)
+            else:
+                os.environ["PYODIDE_ROOT"] = old_pyodide_root
+
     def _load_cross_build_envs(self) -> Mapping[str, str]:
         makefile_vars = self._get_make_environment_vars()
         computed_vars = {
@@ -112,11 +182,17 @@ class CrossBuildEnvConfigManager(ConfigManager):
             for k, v in DEFAULT_CONFIG_COMPUTED.items()
         }
 
-        return {
-            BUILD_VAR_TO_KEY[k]: v
-            for k, v in makefile_vars.items()
-            if k in BUILD_VAR_TO_KEY
-        } | computed_vars
+        sysconfig_paths = self._compute_sysconfig_paths(makefile_vars)
+
+        return (
+            {
+                BUILD_VAR_TO_KEY[k]: v
+                for k, v in makefile_vars.items()
+                if k in BUILD_VAR_TO_KEY
+            }
+            | computed_vars
+            | sysconfig_paths
+        )
 
     def _get_make_environment_vars(self) -> Mapping[str, str]:
         """
