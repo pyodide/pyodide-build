@@ -69,6 +69,33 @@ def test_clean_include_dist_removes_dist(tmp_path: Path):
     assert not (pkg_root / "build.log").exists()
 
 
+def test_clean_removes_from_custom_build_dir(tmp_path: Path):
+    recipe_dir = tmp_path / "recipes"
+    custom_build_dir = tmp_path / "custom_build"
+
+    for pkg in ("pkg_a", "pkg_b"):
+        _write_meta(recipe_dir, pkg)
+
+    for pkg in ("pkg_a", "pkg_b"):
+        pkg_build = custom_build_dir / pkg / "build"
+        pkg_build.mkdir(parents=True, exist_ok=True)
+        (pkg_build / "artifact.txt").write_text("build artifact", encoding="utf-8")
+
+    assert (custom_build_dir / "pkg_a" / "build" / "artifact.txt").exists()
+    assert (custom_build_dir / "pkg_b" / "build" / "artifact.txt").exists()
+
+    clean_recipes(
+        recipe_dir,
+        ["pkg_a", "pkg_b"],
+        build_dir=custom_build_dir,
+        include_dist=False,
+    )
+
+    assert not (custom_build_dir / "pkg_a" / "build").exists()
+    assert not (custom_build_dir / "pkg_b" / "build").exists()
+    assert custom_build_dir.exists()
+
+
 def test_resolve_targets_star_selects_all(tmp_path: Path):
     recipe_dir = tmp_path / "recipes"
     _write_meta(recipe_dir, "pkg_a")
