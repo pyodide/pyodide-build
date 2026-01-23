@@ -12,7 +12,6 @@ from pyodide_build.cli import (
     build,
     build_recipes,
     config,
-    create_zipfile,
     py_compile,
     skeleton,
 )
@@ -253,59 +252,6 @@ def test_config_get(cfg_name, env_var, dummy_xbuildenv):
     )
 
     assert result.output.strip() == build_env.get_build_flag(env_var)
-
-
-def test_create_zipfile(temp_python_lib, temp_python_lib2, tmp_path):
-    from zipfile import ZipFile
-
-    output = tmp_path / "python.zip"
-
-    result = runner.invoke(
-        create_zipfile.main,
-        [
-            str(temp_python_lib),
-            str(temp_python_lib2),
-            "--output",
-            str(output),
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "Zip file created" in result.output
-    assert output.exists()
-
-    with ZipFile(output) as zf:
-        assert "module1.py" in zf.namelist()
-        assert "module2.py" in zf.namelist()
-        assert "module3.py" in zf.namelist()
-        assert "module4.py" in zf.namelist()
-
-
-def test_create_zipfile_compile(temp_python_lib, temp_python_lib2, tmp_path):
-    from zipfile import ZipFile
-
-    output = tmp_path / "python.zip"
-
-    result = runner.invoke(
-        create_zipfile.main,
-        [
-            str(temp_python_lib),
-            str(temp_python_lib2),
-            "--output",
-            str(output),
-            "--pycompile",
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "Zip file created" in result.output
-    assert output.exists()
-
-    with ZipFile(output) as zf:
-        assert "module1.pyc" in zf.namelist()
-        assert "module2.pyc" in zf.namelist()
-        assert "module3.pyc" in zf.namelist()
-        assert "module4.pyc" in zf.namelist()
 
 
 @pytest.mark.parametrize("target", ["dir", "file"])

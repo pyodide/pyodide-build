@@ -93,6 +93,7 @@ def test_xbuildenv_install(tmp_path, mock_xbuildenv_url):
     assert result.exit_code == 0, result.output
     assert "Downloading Pyodide cross-build environment" in result.output, result.output
     assert "Installing Pyodide cross-build environment" in result.output, result.output
+    assert str(envpath.resolve()) in result.output, result.output
     assert (envpath / "xbuildenv").is_symlink()
     assert (envpath / "xbuildenv").resolve().exists()
 
@@ -121,8 +122,10 @@ def test_xbuildenv_install_version(tmp_path, fake_xbuildenv_releases_compatible)
     os.environ.pop(CROSS_BUILD_ENV_METADATA_URL_ENV_VAR, None)
 
     assert result.exit_code == 0, result.output
-    assert "Downloading Pyodide cross-build environment" in result.output, result.output
-    assert "Installing Pyodide cross-build environment" in result.output, result.output
+    assert "Pyodide cross-build environment installed at" in result.output, (
+        result.output
+    )
+    assert str(envpath.resolve()) in result.output, result.output
     assert (envpath / "xbuildenv").is_symlink()
     assert (envpath / "xbuildenv").resolve().exists()
     assert (envpath / "0.1.0").exists()
@@ -166,8 +169,10 @@ def test_xbuildenv_install_force_install(
     )
 
     assert result.exit_code == 0, result.output
-    assert "Downloading Pyodide cross-build environment" in result.output, result.output
-    assert "Installing Pyodide cross-build environment" in result.output, result.output
+    assert "Pyodide cross-build environment installed at" in result.output, (
+        result.output
+    )
+    assert str(envpath.resolve()) in result.output, result.output
     assert (envpath / "xbuildenv").is_symlink()
     assert (envpath / "xbuildenv").resolve().exists()
     assert (envpath / "0.1.0").exists()

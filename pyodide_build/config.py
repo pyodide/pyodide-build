@@ -1,13 +1,13 @@
 import os
-import subprocess
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 from types import MappingProxyType
 
 from pyodide_build.common import (
+    IS_WIN,
     _environment_substitute_str,
-    exit_with_stdio,
+    run_command,
     search_pyproject_toml,
 )
 from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
@@ -123,23 +123,24 @@ class CrossBuildEnvConfigManager(ConfigManager):
         Load environment variables from Makefile.envs
         """
         environment = {}
-        result = subprocess.run(
-            ["make", "-f", str(self.pyodide_root / "Makefile.envs"), ".output_vars"],
-            capture_output=True,
-            text=True,
-            env={"PYODIDE_ROOT": str(self.pyodide_root)},
-            check=False,
-        )
+        env = os.environ | {"PYODIDE_ROOT": str(self.pyodide_root)}
+        makefile_path = self.pyodide_root / "Makefile.envs"
 
-        if result.returncode != 0:
-            logger.error(
-                "ERROR: Failed to load environment variables from Makefile.envs"
+        if IS_WIN:
+            logger.debug("Using internal Makefile.envs parser on Windows system")
+            return _parse_makefile_envs(env=env, makefile_path=makefile_path)
+        else:
+            result = run_command(
+                ["make", "-f", str(makefile_path), ".output_vars"],
+                env=env,
+                err_msg="ERROR: Failed to load environment variables from Makefile.envs",
             )
-            exit_with_stdio(result)
 
-        for line in result.stdout.splitlines():
-            equalPos = line.find("=")
-            if equalPos != -1:
+            for line in result.stdout.splitlines():
+                equalPos = line.find("=")
+                if equalPos == -1:
+                    continue
+
                 varname = line[0:equalPos]
 
                 if varname not in BUILD_VAR_TO_KEY:
@@ -149,7 +150,56 @@ class CrossBuildEnvConfigManager(ConfigManager):
                 value = value.strip("'").strip()
                 environment[varname] = value
 
-        return environment
+            return environment
+
+
+def _parse_makefile_envs(
+    env: Mapping[str, str],
+    makefile_path: Path,
+) -> dict[str, str]:
+    """
+    Simple parser for Makefile.envs that doesn't require make.
+    This is a fallback for systems where make is not available (e.g., Windows).
+
+    This function is not a full-featured Makefile parser, but it can handle simple variable assignments.
+    For instance, it does not parse multi-line values or complex Makefile syntax correctly.
+    But it is sufficient to extract the build configuration required for `pyodide venv`.
+    Ideally, we should get rid of Makefile.envs and find a better way to pass build configuration
+    from Pyodide to pyodide-build. Still, to support backward compatibility, we keep this parser for now.
+    """
+    environment = dict(env)
+
+    with open(makefile_path) as f:
+        for line in f:
+            line = line.strip()
+
+            # Skip comments and empty lines
+            if not line or line.startswith("#"):
+                continue
+
+            # Only process export statements
+            if not line.startswith("export "):
+                continue
+
+            line = line.removeprefix("export ").strip()
+
+            # Handle variable assignments
+            if "=" not in line:
+                continue
+
+            # Split on first '=' only
+            parts = line.split("=", 1)
+            varname = parts[0].removesuffix("?").rstrip()  # Remove ?= operator
+            value = parts[1].split("#")[0].strip()  # Remove trailing comments
+
+            # Skip if not a variable we care about
+            if varname not in BUILD_VAR_TO_KEY:
+                continue
+
+            value = _environment_substitute_str(value, environment)
+            environment[varname] = value
+
+    return environment
 
 
 # Configuration variables and corresponding environment variables.
@@ -186,7 +236,6 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "cflags": "SIDE_MODULE_CFLAGS",
     "cxxflags": "SIDE_MODULE_CXXFLAGS",
     "ldflags": "SIDE_MODULE_LDFLAGS",
-    "stdlib_module_cflags": "STDLIB_MODULE_CFLAGS",
     "sysconfigdata_dir": "SYSCONFIGDATA_DIR",
     "sysconfig_name": "SYSCONFIG_NAME",
     "targetinstalldir": "TARGETINSTALLDIR",
@@ -202,6 +251,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "dist_dir": "PYODIDE_DIST_DIR",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
@@ -215,6 +265,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "cflags",
     "cxxflags",
     "ldflags",
+    "rustflags",
     "rust_toolchain",
     "rust_emscripten_target_url",
     "meson_cross_file",
@@ -234,7 +285,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "cmake_toolchain_file": str(TOOLS_DIR / "cmake/Modules/Platform/Emscripten.cmake"),
     "meson_cross_file": str(TOOLS_DIR / "emscripten.meson.cross"),
     # Rust-specific configuration
-    "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT -Z link-native-libraries=no",
+    "rustflags": "-C link-arg=-sSIDE_MODULE=2 -C link-arg=-sWASM_BIGINT",
     "cargo_build_target": "wasm32-unknown-emscripten",
     "cargo_target_wasm32_unknown_emscripten_linker": "emcc",
     "rust_toolchain": "nightly-2025-02-01",
@@ -256,20 +307,19 @@ DEFAULT_CONFIG: dict[str, str] = {
 DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     # Compiler flags
     "cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE)",
-    "cxxflags": "$(CXXFLAGS_BASE)",
+    "cxxflags": "$(CFLAGS_BASE)",
     "ldflags": "$(LDFLAGS_BASE) -s SIDE_MODULE=1",
     # Rust-specific configuration
     "pyo3_cross_lib_dir": "$(CPYTHONINSTALL)/sysconfigdata",  # FIXME: pyodide xbuildenv stores sysconfigdata here
     "pyo3_cross_include_dir": "$(PYTHONINCLUDE)",
     "pyo3_cross_python_version": "$(PYMAJOR).$(PYMINOR)",
-    # Misc
-    "stdlib_module_cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE) -I Include/ -I. -IInclude/internal/",  # TODO: remove this
     # Paths to build dependencies
     "host_install_dir": "$(PYODIDE_ROOT)/packages/.artifacts",
     "host_site_packages": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages",
     "numpy_lib": "$(PYODIDE_ROOT)/packages/.artifacts/lib/python$(PYMAJOR).$(PYMINOR)/site-packages/numpy/",
     "pyodide_interpreter": "$(PYODIDE_ROOT)/dist/python",
     "pyodide_package_index": "$(PYODIDE_ROOT)/package_index",
+    "dist_dir": "$(PYODIDE_ROOT)/dist",
 }
 
 
@@ -288,6 +338,7 @@ PYODIDE_CLI_CONFIGS = {
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
     "pyodide_abi_version": "PYODIDE_ABI_VERSION",
     "pyodide_root": "PYODIDE_ROOT",
+    "dist_dir": "PYODIDE_DIST_DIR",
     "python_include_dir": "PYTHONINCLUDE",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
     "interpreter": "PYODIDE_INTERPRETER",
