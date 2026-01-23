@@ -138,7 +138,7 @@ class CrossBuildEnvConfigManager(ConfigManager):
 
         # Map sysconfigdata variables to sysconfig path names
         # - LIBDEST points to stdlib, BINLIBDEST points to platstdlib
-        # - INCLUDEPY points to include, CONFINCLUDEPY points to platinclude
+        # - INCLUDEPY points to include, CONFINCLUDEPY points to platinclude (or we fall back to INCLUDEPY)
         # - BINDIR points to scripts, prefix points to data
         # and for purelib/platlib, we append site-packages to LIBDEST/BINLIBDEST respectively
         libdest = build_time_vars.get("LIBDEST", "")
