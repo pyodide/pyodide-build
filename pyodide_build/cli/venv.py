@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import typer
+import click
 
 from pyodide_build.build_env import init_environment
 from pyodide_build.out_of_tree import venv
@@ -8,75 +8,90 @@ from pyodide_build.out_of_tree import venv
 
 # TODO: disabled options that can be later supported have been commented out, fix them
 # --copies/--always-copy and symlink_app_data
+@click.group(invoke_without_command=True)
+@click.argument("dest", type=click.Path(path_type=Path))
+@click.option(
+    "--clear/--no-clear",
+    default=False,
+    help="Remove the destination directory if it exists.",
+)
+@click.option(
+    "--no-vcs-ignore",
+    is_flag=True,
+    default=False,
+    help="Don't create VCS ignore directive in the destination directory.",
+)
+@click.option(
+    "--no-download",
+    "--never-download",
+    is_flag=True,
+    default=False,
+    help="Disable download of the latest pip/setuptools from PyPI.",
+)
+@click.option(
+    "--download/--no-download",
+    "download",
+    default=False,
+    help="Enable download of the latest pip/setuptools from PyPI.",
+)
+@click.option(
+    "--extra-search-dir",
+    multiple=True,
+    help="A path containing wheels to extend the internal wheel list.",
+)
+@click.option(
+    "--pip",
+    default="bundle",
+    show_default=True,
+    help="Version of pip to install as seed: embed, bundle, or exact version.",
+)
+@click.option(
+    "--setuptools",
+    default=None,
+    help="Version of setuptools to install as seed: embed, bundle, none or exact version.",
+)
+@click.option(
+    "--no-setuptools",
+    is_flag=True,
+    default=False,
+    help="Do not install setuptools.",
+)
+@click.option(
+    "--no-periodic-update",
+    is_flag=True,
+    default=False,
+    help="Disable the periodic update of the embedded wheels.",
+)
+@click.pass_context
 def main(
-    dest: Path = typer.Argument(
-        ...,
-        help="directory to create virtualenv at",
-    ),
-    clear: bool = typer.Option(
-        False,
-        "--clear/--no-clear",
-        help="Remove the destination directory if it exists",
-    ),
-    no_vcs_ignore: bool = typer.Option(
-        False,
-        "--no-vcs-ignore",
-        help="Don't create VCS ignore directive in the destination directory",
-    ),
-    # copies: bool = typer.Option(
-    #     False, "--copies", "--always-copy", help="Use copies rather than symlinks, even when symlinks are the default"
-    # ),
-    no_download: bool = typer.Option(
-        False,
-        "--no-download",
-        "--never-download",
-        help="Disable download of the latest pip/setuptools from PyPI",
-    ),
-    download: bool = typer.Option(
-        False,
-        "--download/--no-download",
-        help="Enable download of the latest pip/setuptools from PyPI",
-    ),
-    extra_search_dir: list[str] = typer.Option(
-        None,
-        "--extra-search-dir",
-        help="A path containing wheels to extend the internal wheel list",
-    ),
-    pip: str = typer.Option(
-        "bundle",
-        "--pip",
-        help="Version of pip to install as seed: embed, bundle, or exact version.",
-    ),
-    setuptools: str | None = typer.Option(
-        None,
-        "--setuptools",
-        help="Version of setuptools to install as seed: embed, bundle, none or exact version",
-    ),
-    no_setuptools: bool = typer.Option(
-        False, "--no-setuptools", help="Do not install setuptools"
-    ),
-    no_periodic_update: bool = typer.Option(
-        False,
-        "--no-periodic-update",
-        help="Disable the periodic update of the embedded wheels",
-    ),
-    # symlink_app_data: bool = typer.Option(
-    #     False, "--symlink-app-data/--no-symlink-app-data", help="Symlink the python packages from the app-data folder"
-    # ),
+    ctx: click.Context,
+    dest: Path,
+    clear: bool,
+    no_vcs_ignore: bool,
+    no_download: bool,
+    download: bool,
+    extra_search_dir: tuple[str, ...],
+    pip: str,
+    setuptools: str | None,
+    no_setuptools: bool,
+    no_periodic_update: bool,
 ) -> None:
-    """
-    Create a Pyodide virtual environment.
-    Additionally, this interface supports a subset of the arguments that `virtualenv` supports, with some minor differences for Pyodide compatibility.
+    """Create a Pyodide virtual environment.
+
+    Additionally, this interface supports a subset of the arguments that
+    `virtualenv` supports, with some minor differences for Pyodide compatibility.
     Please note that passing extra options is experimental and may be subject to change.
+
+    \b
+    Arguments:
+        DEST: directory to create virtualenv at
     """
+    if ctx.invoked_subcommand is not None:
+        return
+
     init_environment()
 
     venv_args = []
-
-    # if copies:
-    #     venv_args.append("--copies")
-    # if symlink_app_data:
-    #     venv_args.append("--symlink-app-data")
 
     if clear:
         venv_args.append("--clear")

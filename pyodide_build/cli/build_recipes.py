@@ -2,7 +2,7 @@ import dataclasses
 import sys
 from pathlib import Path
 
-import typer
+import click
 
 from pyodide_build import build_env
 from pyodide_build.build_env import BuildArgs, init_environment
@@ -56,54 +56,93 @@ class InstallOptions:
     metadata_files: bool
 
 
+@click.group(invoke_without_command=True)
+@click.argument("packages", nargs=-1, required=True)
+@click.option(
+    "--recipe-dir",
+    default=None,
+    help=(
+        "The directory containing the recipe of packages. "
+        "If not specified, the default is ``./packages``"
+    ),
+)
+@click.option(
+    "--build-dir",
+    default=None,
+    envvar="PYODIDE_RECIPE_BUILD_DIR",
+    show_envvar=True,
+    help=(
+        "The directory where build directories for packages are created. "
+        "Default: recipe_dir."
+    ),
+)
+@click.option(
+    "--cflags",
+    default="",
+    help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS",
+)
+@click.option(
+    "--cxxflags",
+    default="",
+    help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS",
+)
+@click.option(
+    "--ldflags",
+    default="",
+    help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS",
+)
+@click.option(
+    "--target-install-dir",
+    default="",
+    help="The path to the target Python installation. Default: TARGETINSTALLDIR",
+)
+@click.option(
+    "--host-install-dir",
+    default="",
+    help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
+)
+@click.option(
+    "--force-rebuild/--no-force-rebuild",
+    default=False,
+    help="Force rebuild of all packages regardless of whether they appear to have been updated",
+)
+@click.option(
+    "--continue",
+    "continue_",
+    is_flag=True,
+    default=False,
+    help="Continue a build from the middle. For debugging. Implies '--force-rebuild'",
+)
+@click.option(
+    "--skip-rust-setup",
+    is_flag=True,
+    default=False,
+    help="Don't setup rust environment when building a rust package",
+)
+@click.pass_context
 def build_recipes_no_deps(
-    packages: list[str] = typer.Argument(
-        ..., help="Packages to build, or ``*`` for all packages in recipe directory"
-    ),
-    recipe_dir: str = typer.Option(
-        None,
-        help="The directory containing the recipe of packages. "
-        "If not specified, the default is ``./packages``",
-    ),
-    build_dir: str = typer.Option(
-        None,
-        envvar="PYODIDE_RECIPE_BUILD_DIR",
-        help="The directory where build directories for packages are created. "
-        "Default: recipe_dir.",
-    ),
-    cflags: str = typer.Option(
-        "", help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS"
-    ),
-    cxxflags: str = typer.Option(
-        "", help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS"
-    ),
-    ldflags: str = typer.Option(
-        "", help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS"
-    ),
-    target_install_dir: str = typer.Option(
-        "",
-        help="The path to the target Python installation. Default: TARGETINSTALLDIR",
-    ),
-    host_install_dir: str = typer.Option(
-        "",
-        help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
-    ),
-    force_rebuild: bool = typer.Option(
-        False,
-        help="Force rebuild of all packages regardless of whether they appear to have been updated",
-    ),
-    continue_: bool = typer.Option(
-        False,
-        "--continue",
-        help="Continue a build from the middle. For debugging. Implies '--force-rebuild'",
-    ),
-    skip_rust_setup: bool = typer.Option(
-        False,
-        "--skip-rust-setup",
-        help="Don't setup rust environment when building a rust package",
-    ),
+    ctx: click.Context,
+    packages: tuple[str, ...],
+    recipe_dir: str | None,
+    build_dir: str | None,
+    cflags: str,
+    cxxflags: str,
+    ldflags: str,
+    target_install_dir: str,
+    host_install_dir: str,
+    force_rebuild: bool,
+    continue_: bool,
+    skip_rust_setup: bool,
 ) -> None:
-    """Build packages using yaml recipes but don't try to resolve dependencies"""
+    """Build packages using yaml recipes but don't try to resolve dependencies.
+
+    \b
+    Arguments:
+        PACKAGES: Packages to build, or ``*`` for all packages in recipe directory.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+
     init_environment()
 
     if build_env.in_xbuildenv():
@@ -125,7 +164,7 @@ def build_recipes_no_deps(
         skip_rust_setup=skip_rust_setup,
     )
 
-    return build_recipes_no_deps_impl(packages, args, continue_)
+    return build_recipes_no_deps_impl(list(packages), args, continue_)
 
 
 def _rust_setup(recipe_dir: Path, packages: list[str]) -> None:
@@ -154,72 +193,134 @@ def build_recipes_no_deps_impl(
         builder.build()
 
 
-def build_recipes(
-    packages: list[str] = typer.Argument(
-        ..., help="Packages to build, or ``*`` for all packages in recipe directory"
+@click.group(invoke_without_command=True)
+@click.argument("packages", nargs=-1, required=True)
+@click.option(
+    "--recipe-dir",
+    default=None,
+    help=(
+        "The directory containing the recipe of packages. "
+        "If not specified, the default is ``./packages``"
     ),
-    recipe_dir: str = typer.Option(
-        None,
-        help="The directory containing the recipe of packages. "
-        "If not specified, the default is ``./packages``",
+)
+@click.option(
+    "--build-dir",
+    default=None,
+    envvar="PYODIDE_RECIPE_BUILD_DIR",
+    show_envvar=True,
+    help=(
+        "The directory where build directories for packages are created. "
+        "Default: recipe_dir."
     ),
-    build_dir: str = typer.Option(
-        None,
-        envvar="PYODIDE_RECIPE_BUILD_DIR",
-        help="The directory where build directories for packages are created. "
-        "Default: recipe_dir.",
+)
+@click.option(
+    "--install/--no-install",
+    default=False,
+    help=(
+        "If true, install the built packages into the install_dir. "
+        "If false, build packages without installing."
     ),
-    install: bool = typer.Option(
-        False,
-        help="If true, install the built packages into the install_dir. "
-        "If false, build packages without installing.",
+)
+@click.option(
+    "--install-dir",
+    default=None,
+    help=(
+        "Path to install built packages and pyodide-lock.json. "
+        "If not specified, the default is ``./dist``."
     ),
-    install_dir: str = typer.Option(
-        None,
-        help="Path to install built packages and pyodide-lock.json. "
-        "If not specified, the default is ``./dist``.",
-    ),
-    metadata_files: bool = typer.Option(
-        False,
-        help="If true, extract the METADATA file from the built wheels "
+)
+@click.option(
+    "--metadata-files/--no-metadata-files",
+    default=False,
+    help=(
+        "If true, extract the METADATA file from the built wheels "
         "to a matching ``*.whl.metadata`` file. "
-        "If false, no ``*.whl.metadata`` file is produced.",
+        "If false, no ``*.whl.metadata`` file is produced."
     ),
-    no_deps: bool = typer.Option(
-        False, help="Removed, use `pyodide build-recipes-no-deps` instead."
-    ),
-    cflags: str = typer.Option(
-        None, help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS"
-    ),
-    cxxflags: str = typer.Option(
-        None, help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS"
-    ),
-    ldflags: str = typer.Option(
-        None, help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS"
-    ),
-    target_install_dir: str = typer.Option(
-        "",
-        help="The path to the target Python installation. Default: TARGETINSTALLDIR",
-    ),
-    host_install_dir: str = typer.Option(
-        "",
-        help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
-    ),
-    log_dir: str = typer.Option(None, help="Directory to place log files"),
-    force_rebuild: bool = typer.Option(
-        False,
-        help="Force rebuild of all packages regardless of whether they appear to have been updated",
-    ),
-    n_jobs: int = typer.Option(
-        None,
-        help="Number of packages to build in parallel  (default: # of cores in the system)",
-    ),
-    compression_level: int = typer.Option(
-        6,
-        envvar="PYODIDE_ZIP_COMPRESSION_LEVEL",
-        help="Level of zip compression to apply when installing. 0 means no compression.",
-    ),
+)
+@click.option(
+    "--no-deps/--no-no-deps",
+    default=False,
+    help="Removed, use `pyodide build-recipes-no-deps` instead.",
+)
+@click.option(
+    "--cflags",
+    default=None,
+    help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS",
+)
+@click.option(
+    "--cxxflags",
+    default=None,
+    help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS",
+)
+@click.option(
+    "--ldflags",
+    default=None,
+    help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS",
+)
+@click.option(
+    "--target-install-dir",
+    default="",
+    help="The path to the target Python installation. Default: TARGETINSTALLDIR",
+)
+@click.option(
+    "--host-install-dir",
+    default="",
+    help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
+)
+@click.option(
+    "--log-dir",
+    default=None,
+    help="Directory to place log files",
+)
+@click.option(
+    "--force-rebuild/--no-force-rebuild",
+    default=False,
+    help="Force rebuild of all packages regardless of whether they appear to have been updated",
+)
+@click.option(
+    "--n-jobs",
+    default=None,
+    type=int,
+    help="Number of packages to build in parallel (default: # of cores in the system)",
+)
+@click.option(
+    "--compression-level",
+    default=6,
+    show_default=True,
+    envvar="PYODIDE_ZIP_COMPRESSION_LEVEL",
+    show_envvar=True,
+    help="Level of zip compression to apply when installing. 0 means no compression.",
+)
+@click.pass_context
+def build_recipes(
+    ctx: click.Context,
+    packages: tuple[str, ...],
+    recipe_dir: str | None,
+    build_dir: str | None,
+    install: bool,
+    install_dir: str | None,
+    metadata_files: bool,
+    no_deps: bool,
+    cflags: str | None,
+    cxxflags: str | None,
+    ldflags: str | None,
+    target_install_dir: str,
+    host_install_dir: str,
+    log_dir: str | None,
+    force_rebuild: bool,
+    n_jobs: int | None,
+    compression_level: int,
 ) -> None:
+    """Build packages using yaml recipes.
+
+    \b
+    Arguments:
+        PACKAGES: Packages to build, or ``*`` for all packages in recipe directory.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+
     if no_deps:
         logger.error(
             "--no-deps has been removed, use pyodide build-package-no-deps instead",
@@ -242,9 +343,9 @@ def build_recipes(
         build_env.check_emscripten_version()
 
     build_args = BuildArgs(
-        cflags=cflags,
-        cxxflags=cxxflags,
-        ldflags=ldflags,
+        cflags=cflags or "",
+        cxxflags=cxxflags or "",
+        ldflags=ldflags or "",
         target_install_dir=target_install_dir,
         host_install_dir=host_install_dir,
     )
@@ -258,7 +359,7 @@ def build_recipes(
         n_jobs=n_jobs,
     )
     log_dir_ = Path(log_dir).resolve() if log_dir else None
-    build_recipes_impl(packages, args, log_dir_, install_options)
+    build_recipes_impl(list(packages), args, log_dir_, install_options)
 
 
 def build_recipes_impl(

@@ -1,33 +1,58 @@
 import re
 from pathlib import Path
 
-import typer
+import click
 
 from pyodide_build._py_compile import _py_compile_archive, _py_compile_archive_dir
 
 
+@click.group(invoke_without_command=True)
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--silent/--no-silent",
+    default=False,
+    help="Silent mode, do not print anything.",
+)
+@click.option(
+    "--keep/--no-keep",
+    default=False,
+    help="Keep the original wheel / zip file.",
+)
+@click.option(
+    "--compression-level",
+    default=6,
+    show_default=True,
+    help="Compression level to use for the created zip file.",
+)
+@click.option(
+    "--exclude",
+    default="",
+    help="List of files to exclude from compilation, works only for directories. Defaults to no files.",
+)
+@click.pass_context
 def main(
-    path: Path = typer.Argument(
-        ..., help="Path to the input wheel or a folder with wheels or zip files."
-    ),
-    silent: bool = typer.Option(False, help="Silent mode, do not print anything."),
-    keep: bool = typer.Option(False, help="Keep the original wheel / zip file."),
-    compression_level: int = typer.Option(
-        6, help="Compression level to use for the created zip file"
-    ),
-    exclude: str = typer.Option(
-        "",
-        help="List of files to exclude from compilation, works only for directories. Defaults to no files.",
-    ),
+    ctx: click.Context,
+    path: Path,
+    silent: bool,
+    keep: bool,
+    compression_level: int,
+    exclude: str,
 ) -> None:
     """Compile .py files to .pyc in a wheel, a zip file, or a folder with wheels or zip files.
 
     If the provided folder contains the `pyodide-lock.json` file, it will be
     rewritten with the updated wheel / zip file paths and sha256 checksums.
+
+    \b
+    Arguments:
+        PATH: Path to the input wheel or a folder with wheels or zip files.
     """
+    if ctx.invoked_subcommand is not None:
+        return
+
     if not path.exists():
-        typer.echo(f"Error: {path} does not exist")
-        raise typer.Exit(1)
+        click.echo(f"Error: {path} does not exist")
+        raise SystemExit(1)
 
     # Convert the comma / space separated strings to lists
     excludes = [
@@ -36,10 +61,10 @@ def main(
 
     if path.is_file():
         if path.suffix not in [".whl", ".zip"]:
-            typer.echo(
+            click.echo(
                 f"Error: only .whl and .zip files are supported, got {path.name}"
             )
-            raise typer.Exit(1)
+            raise SystemExit(1)
 
         _py_compile_archive(
             path, verbose=not silent, keep=keep, compression_level=compression_level
@@ -53,4 +78,4 @@ def main(
             excludes=excludes,
         )
     else:
-        typer.echo(f"{path=} is not a file or a directory")
+        click.echo(f"{path=} is not a file or a directory")

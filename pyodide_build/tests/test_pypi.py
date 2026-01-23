@@ -9,8 +9,7 @@ from threading import Event, Thread
 from typing import Any
 
 import pytest
-import typer
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
 from pyodide_build.cli import build
 
@@ -224,15 +223,12 @@ def test_fetch_or_build_pypi(dummy_xbuildenv, mock_emscripten):
     # one pure-python package (doesn't need building) and one sdist package (needs building)
     pkgs = ["pytest-pyodide", "pycryptodome==3.15.0"]
 
-    app = typer.Typer()
-    app.command()(build.main)
-
     for p in pkgs:
         result = runner.invoke(
-            app,
+            build.main,
             [p],
         )
-        assert result.exit_code == 0, result.stdout
+        assert result.exit_code == 0, result.output
 
     built_wheels = set(output_dir.glob("*.whl"))
     assert len(built_wheels) == len(pkgs)
@@ -243,15 +239,12 @@ def test_fetch_or_build_pypi_with_deps_and_extras(dummy_xbuildenv, mock_emscript
     # one pure-python package (doesn't need building) which depends on one sdist package (needs building)
     pkgs = ["eth-hash[pycryptodome]==0.5.1", "safe-pysha3 (>=1.0.0)"]
 
-    app = typer.Typer()
-    app.command()(build.main)
-
     for p in pkgs:
         result = runner.invoke(
-            app,
+            build.main,
             [p, "--build-dependencies"],
         )
-        assert result.exit_code == 0, result.stdout
+        assert result.exit_code == 0, result.output
 
     built_wheels = set(output_dir.glob("*.whl"))
     assert len(built_wheels) == 3
@@ -260,15 +253,12 @@ def test_fetch_or_build_pypi_with_deps_and_extras(dummy_xbuildenv, mock_emscript
 def test_fake_pypi_succeed(dummy_xbuildenv, fake_pypi_url, mock_emscripten):
     output_dir = dummy_xbuildenv / "dist"
     # build package that resolves right
-    app = typer.Typer()
-    app.command()(build.main)
-
     result = runner.invoke(
-        app,
+        build.main,
         ["resolves-package", "--build-dependencies"],
     )
 
-    assert result.exit_code == 0, str(result.stdout) + str(result)
+    assert result.exit_code == 0, str(result.output) + str(result)
 
     built_wheels = set(output_dir.glob("*.whl"))
     assert len(built_wheels) == 5
@@ -280,17 +270,13 @@ def test_fake_pypi_resolve_fail(dummy_xbuildenv, fake_pypi_url, mock_emscripten)
     output_dir = dummy_xbuildenv / "dist"
 
     # build package that resolves right
-
-    app = typer.Typer()
-    app.command()(build.main)
-
     result = runner.invoke(
-        app,
+        build.main,
         ["fails-package", "--build-dependencies"],
     )
 
     # this should fail and should not build any wheels
-    assert result.exit_code != 0, result.stdout
+    assert result.exit_code != 0, result.output
     built_wheels = set(output_dir.glob("*.whl"))
     assert len(built_wheels) == 0
 
@@ -298,16 +284,13 @@ def test_fake_pypi_resolve_fail(dummy_xbuildenv, fake_pypi_url, mock_emscripten)
 def test_fake_pypi_extras_build(dummy_xbuildenv, fake_pypi_url, mock_emscripten):
     output_dir = dummy_xbuildenv / "dist"
     # build package that resolves right
-    app = typer.Typer()
-    app.command()(build.main)
-
     result = runner.invoke(
-        app,
+        build.main,
         ["pkg-b[docs]", "--build-dependencies"],
     )
 
     # this should work
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     built_wheels = set(output_dir.glob("*.whl"))
     assert len(built_wheels) == 2
 
@@ -316,9 +299,6 @@ def test_fake_pypi_repeatable_build(dummy_xbuildenv, fake_pypi_url, mock_emscrip
     output_dir = dummy_xbuildenv / "dist"
 
     # build package that resolves right
-    app = typer.Typer()
-    app.command()(build.main)
-
     # override a dependency version and build
     # pkg-a
     with open("requirements.txt", "w") as req_file:
@@ -331,7 +311,7 @@ pkg-a
         )
 
     result = runner.invoke(
-        app,
+        build.main,
         [
             "-r",
             "requirements.txt",
@@ -341,9 +321,9 @@ pkg-a
         ],
     )
     # this should work
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     built_wheels = list(output_dir.glob("*.whl"))
-    assert len(built_wheels) == 2, result.stdout
+    assert len(built_wheels) == 2, result.output
 
     # should have built version 1.0.0 of pkg-c
     for x in built_wheels:
@@ -354,7 +334,7 @@ pkg-a
     # rebuild from package-versions lockfile and
     # check it outputs the same version number
     result = runner.invoke(
-        app,
+        build.main,
         ["-r", "lockfile.txt"],
     )
 
@@ -364,12 +344,10 @@ pkg-a
         if x.name.startswith("pkg_c"):
             assert x.name.find("1.0.0") != -1, x.name
 
-    assert len(built_wheels) == 2, result.stdout
+    assert len(built_wheels) == 2, result.output
 
 
 def test_bad_requirements_text(dummy_xbuildenv, mock_emscripten):
-    app = typer.Typer()
-    app.command()(build.main)
     # test 1 - error on URL location in requirements
     # test 2 - error on advanced options
     # test 3 - error on editable install of package
@@ -379,7 +357,7 @@ def test_bad_requirements_text(dummy_xbuildenv, mock_emscripten):
             req_file.write(line + "\n")
 
         result = runner.invoke(
-            app,
+            build.main,
             ["-r", "requirements.txt"],
         )
         assert result.exit_code != 0 and line.strip() in str(result)
