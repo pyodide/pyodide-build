@@ -6,7 +6,7 @@ import click
 from pyodide_build._py_compile import _py_compile_archive, _py_compile_archive_dir
 
 
-@click.group(invoke_without_command=True)
+@click.command()
 @click.argument("path", type=click.Path(exists=True, path_type=Path))
 @click.option(
     "--silent/--no-silent",
@@ -29,9 +29,7 @@ from pyodide_build._py_compile import _py_compile_archive, _py_compile_archive_d
     default="",
     help="List of files to exclude from compilation, works only for directories. Defaults to no files.",
 )
-@click.pass_context
 def main(
-    ctx: click.Context,
     path: Path,
     silent: bool,
     keep: bool,
@@ -47,9 +45,6 @@ def main(
     Arguments:
         PATH: Path to the input wheel or a folder with wheels or zip files.
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
     if not path.exists():
         click.echo(f"Error: {path} does not exist")
         raise SystemExit(1)

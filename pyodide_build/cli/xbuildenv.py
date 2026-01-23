@@ -233,15 +233,22 @@ def _search(
 
 
 @app.command("install-emscripten")
+@click.option(
+    "--version",
+    default=None,
+    help="Emscripten version corresponding to the target Pyodide version",
+)
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    help="Pyodide cross-env path",
+)
 def _install_emscripten(
-    version: str = typer.Option(
-        None,
-        help="Emscripten version corresponding to the target Pyodide version",
-    ),
-    path: Path = typer.Option(DEFAULT_PATH, help="Pyodide cross-env path"),
+    version: str | None,
+    path: Path,
 ) -> None:
-    """
-    Install Emscripten SDK into the cross-build environment.
+    """Install Emscripten SDK into the cross-build environment.
 
     This command clones the emsdk repository, installs and activates the specified
     Emscripten version, and applies Pyodide-specific patches.

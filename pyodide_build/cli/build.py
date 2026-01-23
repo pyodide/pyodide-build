@@ -142,8 +142,7 @@ def source(
 DEFAULT_PATH = default_xbuildenv_path()
 
 
-@click.group(
-    invoke_without_command=True,
+@click.command(
     context_settings={
         "ignore_unknown_options": True,
         "allow_extra_args": True,
@@ -265,9 +264,6 @@ def main(
             or url to a source dist archive or wheel file. If this is blank, it
             will build the current directory.
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
     init_environment(xbuildenv_path=xbuildenv_path)
     try:
         check_emscripten_version()

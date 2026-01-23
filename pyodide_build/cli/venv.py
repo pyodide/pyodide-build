@@ -8,7 +8,7 @@ from pyodide_build.out_of_tree import venv
 
 # TODO: disabled options that can be later supported have been commented out, fix them
 # --copies/--always-copy and symlink_app_data
-@click.group(invoke_without_command=True)
+@click.command()
 @click.argument("dest", type=click.Path(path_type=Path))
 @click.option(
     "--clear/--no-clear",
@@ -62,9 +62,7 @@ from pyodide_build.out_of_tree import venv
     default=False,
     help="Disable the periodic update of the embedded wheels.",
 )
-@click.pass_context
 def main(
-    ctx: click.Context,
     dest: Path,
     clear: bool,
     no_vcs_ignore: bool,
@@ -86,9 +84,6 @@ def main(
     Arguments:
         DEST: directory to create virtualenv at
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
     init_environment()
 
     venv_args = []

@@ -58,7 +58,7 @@ class InstallOptions:
     metadata_files: bool
 
 
-@click.group(invoke_without_command=True)
+@click.command()
 @click.argument("packages", nargs=-1, required=True)
 @click.option(
     "--recipe-dir",
@@ -121,9 +121,7 @@ class InstallOptions:
     default=False,
     help="Don't setup rust environment when building a rust package",
 )
-@click.pass_context
 def build_recipes_no_deps(
-    ctx: click.Context,
     packages: tuple[str, ...],
     recipe_dir: str | None,
     build_dir: str | None,
@@ -142,9 +140,6 @@ def build_recipes_no_deps(
     Arguments:
         PACKAGES: Packages to build, or ``*`` for all packages in recipe directory.
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
     init_environment()
 
     if build_env.in_xbuildenv():
@@ -195,7 +190,7 @@ def build_recipes_no_deps_impl(
         builder.build()
 
 
-@click.group(invoke_without_command=True)
+@click.command()
 @click.argument("packages", nargs=-1, required=True)
 @click.option(
     "--recipe-dir",
@@ -294,9 +289,7 @@ def build_recipes_no_deps_impl(
     show_envvar=True,
     help="Level of zip compression to apply when installing. 0 means no compression.",
 )
-@click.pass_context
 def build_recipes(
-    ctx: click.Context,
     packages: tuple[str, ...],
     recipe_dir: str | None,
     build_dir: str | None,
@@ -320,9 +313,6 @@ def build_recipes(
     Arguments:
         PACKAGES: Packages to build, or ``*`` for all packages in recipe directory.
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
     if no_deps:
         logger.error(
             "--no-deps has been removed, use pyodide build-package-no-deps instead",

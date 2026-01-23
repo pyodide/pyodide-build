@@ -15,7 +15,7 @@ license = {text = "MPL-2.0"}
 requires-python = ">=3.12"
 dependencies = [
     "build~=1.2.0",
-    "pyodide-cli>=0.4.0",
+    "pyodide-cli>=0.4.1",
     "pyodide-lock~=0.1.0",
     "auditwheel-emscripten~=0.2.0",
     "pydantic>=2,<3",
