@@ -13,6 +13,16 @@ test-recipe: check
 	fi; \
 	$(UV_RUN_PREFIX) pyodide build-recipes --recipe-dir=recipes --install --force-rebuild "$${RECIPE_TARGET}"
 
+# 	colorama test checks for combined behaviour of unvendor-tests and retain-test-patterns, and does it to a wheel.
+	@if [ -f dist/colorama-0.4.6-py2.py3-none-any.whl ]; then \
+		echo "... Verifying colorama test retention"; \
+		TEST_FILES=$$(python -m zipfile -l dist/colorama-0.4.6-py2.py3-none-any.whl | grep 'colorama/tests/' | grep '\.py' | awk '{print $$1}'); \
+		echo "$$TEST_FILES" | grep -q 'colorama/tests/winterm_test.py' || (echo "ERROR: colorama/tests/winterm_test.py not retained" && exit 1); \
+		TEST_COUNT=$$(echo "$$TEST_FILES" | wc -l | tr -d ' '); \
+		[ "$$TEST_COUNT" -eq 1 ] || (echo "ERROR: Expected 1 test file in wheel, found $$TEST_COUNT: $$TEST_FILES" && exit 1); \
+		echo "... colorama test retention verified"; \
+	fi
+
 	@echo "... Passed"
 
 .PHONY: test-src

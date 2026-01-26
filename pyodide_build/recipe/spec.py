@@ -217,6 +217,7 @@ class MetaConfig(BaseModel):
                 "cross_build_files",
                 "exports",
                 "unvendor_tests",
+                "retain_test_patterns",
                 "package_type",
             }
             for key in self.build.model_fields_set:

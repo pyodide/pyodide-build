@@ -73,3 +73,16 @@ def test_is_rust_package_2(reqs):
         **reqs,
     )
     assert not pkg.is_rust_package()
+
+
+def test_wheel_source_with_retain_test_patterns():
+    pkg = MetaConfig(
+        package={"name": "test-pkg", "version": "1.0.0"},
+        source={"url": "test.whl", "sha256": "abc123"},
+        build={
+            "unvendor-tests": True,
+            "_retain-test-patterns": ["*conftest.py", "*test_keep.py"],
+        },
+    )
+    assert pkg.build.unvendor_tests is True
+    assert pkg.build.retain_test_patterns == ["*conftest.py", "*test_keep.py"]

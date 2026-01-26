@@ -89,20 +89,28 @@ def unvendor_tests(
         root_rel = Path(root).relative_to(install_prefix)
         if root_rel.name == "__pycache__" or root_rel.name.endswith(".egg_info"):
             continue
-        if root_rel.name in {"test", "tests"}:
-            # This is a test folder
+
+        is_test_dir = root_rel.name in {"test", "tests"}
+
+        if is_test_dir and not retain_test_patterns:
             (test_install_prefix / root_rel).parent.mkdir(exist_ok=True, parents=True)
             shutil.move(install_prefix / root_rel, test_install_prefix / root_rel)
             n_moved += 1
             continue
+
         out_files.append(root)
         for fpath in files:
-            if (
+            is_test_file = (
                 fnmatch.fnmatchcase(fpath, "test_*.py")
                 or fnmatch.fnmatchcase(fpath, "*_test.py")
                 or fpath == "conftest.py"
-            ):
-                if any(fnmatch.fnmatchcase(fpath, pat) for pat in retain_test_patterns):
+            )
+
+            if is_test_dir or is_test_file:
+                file_rel_path = str(root_rel / fpath)
+                if any(
+                    fnmatch.fnmatch(file_rel_path, pat) for pat in retain_test_patterns
+                ):
                     continue
                 (test_install_prefix / root_rel).mkdir(exist_ok=True, parents=True)
                 shutil.move(
