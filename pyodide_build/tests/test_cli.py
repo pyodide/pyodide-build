@@ -152,6 +152,55 @@ def test_build_recipe_clean(tmp_path, dummy_xbuildenv, mock_emscripten):
         assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
 
 
+def test_build_recipe_clean_custom_build_dir(
+    tmp_path, dummy_xbuildenv, mock_emscripten
+):
+    """Test that --clean with custom --build-dir cleans package build directory correctly."""
+    output_dir = tmp_path / "dist"
+    custom_build_dir = tmp_path / "custom_build_dir"
+    custom_build_dir.mkdir()
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    app = typer.Typer()
+    app.command()(build_recipes.build_recipes)
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+
+    result = runner.invoke(
+        app,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--build-dir",
+            str(custom_build_dir),
+            "--install",
+            "--install-dir",
+            str(output_dir),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"built {pkg} in" in result.stdout
+
+    built_wheels = set(output_dir.glob("*.whl"))
+    assert len(built_wheels) >= len(pkgs_to_build)
+
+    # Verify that package-specific build directories are cleaned
+    for pkg in pkgs_to_build:
+        build_dir = custom_build_dir / pkg / "build"
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
+
+    # Verify that the custom build directory itself still exists and is not deleted
+    assert custom_build_dir.exists(), "Custom build directory should still exist"
+
+
 def test_build_recipe_no_deps_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
@@ -208,6 +257,45 @@ def test_build_recipe_no_deps_clean(tmp_path, dummy_xbuildenv, mock_emscripten):
         dist_dir = RECIPE_DIR / pkg / "dist"
         build_dir = RECIPE_DIR / pkg / "build"
         assert len(list(dist_dir.glob("*.whl"))) == 1
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
+
+
+def test_build_recipe_no_deps_clean_custom_build_dir(
+    tmp_path, dummy_xbuildenv, mock_emscripten
+):
+    """Test that --clean with custom --build-dir cleans package build directory correctly."""
+    custom_build_dir = tmp_path / "custom_build_dir"
+    custom_build_dir.mkdir()
+
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    app = typer.Typer()
+    app.command()(build_recipes.build_recipes_no_deps)
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+    result = runner.invoke(
+        app,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--build-dir",
+            str(custom_build_dir),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"Succeeded building package {pkg}" in result.stdout
+
+    # Verify that package-specific build directories are cleaned
+    assert custom_build_dir.exists(), "Custom build directory should still exist"
+    for pkg in pkgs_to_build:
+        build_dir = custom_build_dir / pkg / "build"
         assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
 
 
