@@ -4,14 +4,22 @@ all:
 
 .PHONY: test-recipe
 test-recipe: check
-	@echo "... Running integration tests for building recipes"
+	@echo "... Running integration tests for building recipes with --clean flag"
 
 	@if [ -z "$(RECIPE_BUILD_TARGET)" ]; then \
 		RECIPE_TARGET='*'; \
 	else \
 		RECIPE_TARGET='$(RECIPE_BUILD_TARGET)'; \
 	fi; \
-	$(UV_RUN_PREFIX) pyodide build-recipes --recipe-dir=recipes --install --force-rebuild "$${RECIPE_TARGET}"
+	$(UV_RUN_PREFIX) pyodide build-recipes --recipe-dir=recipes --install --force-rebuild --clean "$${RECIPE_TARGET}"
+
+	@echo "... Verifying build directories are cleaned"
+	@for dir in recipes/*/build; do \
+		if [ -d "$$dir" ]; then \
+			echo "ERROR: Build directory still exists: $$dir"; \
+			exit 1; \
+		fi; \
+	done
 
 # 	colorama test checks for combined behaviour of unvendor-tests and retain-test-patterns, and does it to a wheel.
 	@if [ -f dist/colorama-0.4.6-py2.py3-none-any.whl ]; then \
