@@ -1,17 +1,18 @@
 from pathlib import Path
 
-import typer
+import click
 
 from pyodide_build import build_env
 from pyodide_build.logger import logger
 from pyodide_build.recipe import cleanup
 
-app = typer.Typer(help="Clean build artifacts.")
 
-
-@app.callback(no_args_is_help=True)
-def callback() -> None:
-    return
+@click.group(invoke_without_command=True)
+@click.pass_context
+def app(ctx: click.Context) -> None:
+    """Clean build artifacts."""
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
 
 
 def _resolve_paths(
@@ -28,23 +29,29 @@ def _resolve_paths(
 
 
 @app.command("recipes")
+@click.argument("targets", nargs=-1, required=False)
+@click.option(
+    "--recipe-dir",
+    default=None,
+    help="Directory containing package recipes. Defaults to <pyodide root>/packages.",
+)
+@click.option(
+    "--build-dir",
+    default=None,
+    envvar="PYODIDE_RECIPE_BUILD_DIR",
+    show_envvar=True,
+    help="Directory where package build artifacts are stored. Defaults to recipe directory.",
+)
 def clean_recipes(
-    targets: list[str] = typer.Argument(
-        None,
-        help="Packages or tags (tag:<name>) to clean. Defaults to all packages.",
-    ),
-    recipe_dir: str | None = typer.Option(
-        None,
-        help="Directory containing package recipes. Defaults to <pyodide root>/packages.",
-    ),
-    build_dir: str | None = typer.Option(
-        None,
-        envvar="PYODIDE_RECIPE_BUILD_DIR",
-        help="Directory where package build artifacts are stored. Defaults to recipe directory.",
-    ),
+    targets: tuple[str, ...],
+    recipe_dir: str | None,
+    build_dir: str | None,
 ) -> None:
-    """
-    Remove build artifacts for recipe packages.
+    """Remove build artifacts for recipe packages.
+
+    \b
+    Arguments:
+        TARGETS: Packages or tags (tag:<name>) to clean. Defaults to all packages.
     """
     recipe_path, build_path = _resolve_paths(
         recipe_dir,
@@ -55,7 +62,7 @@ def clean_recipes(
 
     cleanup.clean_recipes(
         recipe_path,
-        targets or None,
+        list(targets) if targets else None,
         build_dir=build_path,
         include_dist=False,
     )

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
 from pyodide_build.cli.clean import app
 
