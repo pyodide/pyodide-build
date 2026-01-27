@@ -65,5 +65,4 @@ def clean_recipes(
         list(targets) if targets else None,
         build_dir=build_path,
         include_dist=False,
-        include_always_tag=False,
     )

@@ -23,6 +23,7 @@ class Args:
     skip_rust_setup: bool
     force_rebuild: bool
     n_jobs: int
+    clean: bool
 
     def __init__(
         self,
@@ -34,6 +35,7 @@ class Args:
         force_rebuild: bool,
         skip_rust_setup: bool = False,
         n_jobs: int | None = None,
+        clean: bool = False,
     ):
         cwd = Path.cwd()
         root = build_env.search_pyodide_root(cwd) or cwd
@@ -48,6 +50,7 @@ class Args:
         self.force_rebuild = force_rebuild
         self.skip_rust_setup = skip_rust_setup
         self.n_jobs = n_jobs or get_num_cores()
+        self.clean = clean
         if not self.recipe_dir.is_dir():
             raise FileNotFoundError(f"Recipe directory {self.recipe_dir} not found")
 
@@ -121,6 +124,12 @@ class InstallOptions:
     default=False,
     help="Don't setup rust environment when building a rust package",
 )
+@click.option(
+    "--clean",
+    is_flag=True,
+    default=False,
+    help="Remove the build directory after a successful build of each package.",
+)
 def build_recipes_no_deps(
     packages: tuple[str, ...],
     recipe_dir: str | None,
@@ -133,6 +142,7 @@ def build_recipes_no_deps(
     force_rebuild: bool,
     continue_: bool,
     skip_rust_setup: bool,
+    clean: bool,
 ) -> None:
     """Build packages using yaml recipes but don't try to resolve dependencies.
 
@@ -159,6 +169,7 @@ def build_recipes_no_deps(
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
         skip_rust_setup=skip_rust_setup,
+        clean=clean,
     )
 
     return build_recipes_no_deps_impl(list(packages), args, continue_)
@@ -188,6 +199,8 @@ def build_recipes_no_deps_impl(
             continue_,
         )
         builder.build()
+        if args.clean:
+            builder.clean(include_dist=False)
 
 
 @click.command()
@@ -289,6 +302,12 @@ def build_recipes_no_deps_impl(
     show_envvar=True,
     help="Level of zip compression to apply when installing. 0 means no compression.",
 )
+@click.option(
+    "--clean",
+    is_flag=True,
+    default=False,
+    help="Remove the build directory after a successful build of each package.",
+)
 def build_recipes(
     packages: tuple[str, ...],
     recipe_dir: str | None,
@@ -306,6 +325,7 @@ def build_recipes(
     force_rebuild: bool,
     n_jobs: int | None,
     compression_level: int,
+    clean: bool,
 ) -> None:
     """Build packages using yaml recipes.
 
@@ -349,6 +369,7 @@ def build_recipes(
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
         n_jobs=n_jobs,
+        clean=clean,
     )
     log_dir_ = Path(log_dir).resolve() if log_dir else None
     build_recipes_impl(list(packages), args, log_dir_, install_options)
@@ -374,6 +395,7 @@ def build_recipes_impl(
         build_dir=args.build_dir,
         n_jobs=args.n_jobs,
         force_rebuild=args.force_rebuild,
+        clean=args.clean,
     )
     if log_dir:
         graph_builder.copy_logs(pkg_map, log_dir)
