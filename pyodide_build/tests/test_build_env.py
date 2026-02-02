@@ -100,28 +100,22 @@ class TestOutOfTree(TestInTree):
         e = build_env.get_build_environment_vars(pyodide_root)
         assert e["PYODIDE"] == "1"
 
-        monkeypatch.setenv("HOME", "/home/user")
-        monkeypatch.setenv("PATH", "/usr/bin:/bin")
-        # We now inject PKG_CONFIG_LIBDIR inside buildpkg.py
-        # monkeypatch.setenv("PKG_CONFIG_LIBDIR", "/x/y/z:/c/d/e")
+        monkeypatch.setenv("PIP_CONSTRAINT", "/tmp/constraint.txt")
 
         build_env.get_build_environment_vars.cache_clear()
 
         e_host = build_env.get_build_environment_vars(pyodide_root)
-        assert e_host.get("HOME") == os.environ.get("HOME")
-        assert e_host.get("PATH") == os.environ.get("PATH")
-
-        assert e_host.get("HOME") != e.get("HOME")
-        assert e_host.get("PATH") != e.get("PATH")
+        assert e_host.get("PIP_CONSTRAINT") == "/tmp/constraint.txt"
+        assert e_host.get("PIP_CONSTRAINT") != e.get("PIP_CONSTRAINT")
 
         build_env.get_build_environment_vars.cache_clear()
 
-        monkeypatch.delenv("HOME")
+        monkeypatch.delenv("PIP_CONSTRAINT")
         monkeypatch.setenv("RANDOM_ENV", "1234")
 
         build_env.get_build_environment_vars.cache_clear()
         e = build_env.get_build_environment_vars(pyodide_root)
-        assert "HOME" not in e
+        assert "PIP_CONSTRAINT" not in e
         assert "RANDOM_ENV" not in e
 
 
