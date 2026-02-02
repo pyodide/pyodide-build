@@ -328,11 +328,10 @@ def local_versions() -> dict[str, str]:
 
 
 def _create_constraints_file() -> str:
-    # Try to get PIP_BUILD_CONSTRAINT first (for build-time constraints)
+    # PIP_BUILD_CONSTRAINT takes precedence; fall back to PIP_CONSTRAINT for backward compatibility
     try:
         constraints = get_build_flag("PIP_BUILD_CONSTRAINT")
     except ValueError:
-        # Fall back to PIP_CONSTRAINT for backward compatibility
         try:
             constraints = get_build_flag("PIP_CONSTRAINT")
         except ValueError:
