@@ -285,36 +285,6 @@ def get_emscripten_version_info() -> str:
     ).stderr
 
 
-def check_emscripten_version() -> None:
-    skip = get_build_flag("SKIP_EMSCRIPTEN_VERSION_CHECK")
-    if to_bool(skip):
-        return
-
-    needed_version = emscripten_version()
-    try:
-        version_info = get_emscripten_version_info()
-    except FileNotFoundError:
-        raise RuntimeError(
-            f"No Emscripten compiler found. Need Emscripten version {needed_version}"
-        ) from None
-    installed_version = None
-    try:
-        for x in reversed(version_info.partition("\n")[0].split(" ")):
-            # (X.Y.Z) or (X.Y.Z)-git
-            match = re.match(r"(\d+\.\d+\.\d+)(-\w+)?", x)
-            if match:
-                installed_version = match.group(1)
-                break
-    except Exception:
-        raise RuntimeError("Failed to determine Emscripten version.") from None
-    if installed_version is None:
-        raise RuntimeError("Failed to determine Emscripten version.")
-    if installed_version != needed_version:
-        raise RuntimeError(
-            f"Incorrect Emscripten version {installed_version}. Need Emscripten version {needed_version}"
-        )
-
-
 def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
     """
     Source emsdk_env.sh and return the resulting environment variables.
