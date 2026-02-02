@@ -92,8 +92,6 @@ class TestOutOfTree(TestInTree):
         # host environment variables should have precedence over
         # variables defined in Makefile.envs
 
-        import os
-
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
         pyodide_root = manager.pyodide_root
 
