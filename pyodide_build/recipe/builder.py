@@ -476,7 +476,9 @@ class RecipeBuilder:
                     )
                     build_env = runner.env
 
-            build_env["PIP_CONSTRAINT"] = str(self._create_constraints_file())
+            constraints_file = str(self._create_constraints_file())
+            build_env["PIP_CONSTRAINT"] = constraints_file
+            build_env["PIP_BUILD_CONSTRAINT"] = constraints_file
 
             wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings

@@ -216,6 +216,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "pyodide_package_index": "PYODIDE_PACKAGE_INDEX",
     "platform_triplet": "PLATFORM_TRIPLET",
     "pip_constraint": "PIP_CONSTRAINT",
+    "pip_build_constraint": "PIP_BUILD_CONSTRAINT",
     "pymajor": "PYMAJOR",
     "pymicro": "PYMICRO",
     "pyminor": "PYMINOR",
