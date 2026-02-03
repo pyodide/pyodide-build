@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path
 
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
 from pyodide_build.cli import xbuildenv
 
@@ -23,8 +23,8 @@ def test_install_emscripten_no_xbuildenv(tmp_path):
         ],
     )
 
-    assert result.exit_code != 0, result.stdout
-    assert "Cross-build environment not found" in result.stdout, result.stdout
+    assert result.exit_code != 0, result.output
+    assert "Cross-build environment not found" in result.output, result.output
 
 
 def test_install_emscripten_default_version(tmp_path, monkeypatch):
@@ -57,11 +57,11 @@ def test_install_emscripten_default_version(tmp_path, monkeypatch):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Installing emsdk..." in result.stdout, result.stdout
-    assert "Installing emsdk complete." in result.stdout, result.stdout
-    assert "Use `source" in result.stdout, result.stdout
-    assert "emsdk_env.sh` to set up the environment." in result.stdout, result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Installing emsdk..." in result.output, result.output
+    assert "Installing emsdk complete." in result.output, result.output
+    assert "Use `source" in result.output, result.output
+    assert "emsdk_env.sh` to set up the environment." in result.output, result.output
     assert called["version"] == "3.1.46"
 
 
@@ -93,9 +93,9 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Installing emsdk..." in result.stdout, result.stdout
-    assert "Installing emsdk complete." in result.stdout, result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Installing emsdk..." in result.output, result.output
+    assert "Installing emsdk complete." in result.output, result.output
     assert called["version"] == emscripten_version
 
 
@@ -131,10 +131,10 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Installing emsdk..." in result.stdout, result.stdout
-    assert "Installing emsdk complete." in result.stdout, result.stdout
-    assert str(existing_emsdk / "emsdk_env.sh") in result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Installing emsdk..." in result.output, result.output
+    assert "Installing emsdk complete." in result.output, result.output
+    assert str(existing_emsdk / "emsdk_env.sh") in result.output
 
 
 def test_install_emscripten_git_failure(tmp_path, monkeypatch):
@@ -215,10 +215,10 @@ def test_install_emscripten_output_format(tmp_path, monkeypatch):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
 
     # Verify output format - check for key messages (logger adds extra lines)
-    assert "Installing emsdk..." in result.stdout
-    assert "Installing emsdk complete." in result.stdout
-    assert "Use `source" in result.stdout
-    assert "emsdk_env.sh` to set up the environment." in result.stdout
+    assert "Installing emsdk..." in result.output
+    assert "Installing emsdk complete." in result.output
+    assert "Use `source" in result.output
+    assert "emsdk_env.sh` to set up the environment." in result.output

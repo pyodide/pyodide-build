@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import cast, get_args
 from urllib.parse import urlparse
 
+import click
 import requests
-import typer
 from build import ConfigSettingsType
 
 from pyodide_build.build_env import (
@@ -147,83 +147,128 @@ def source(
 DEFAULT_PATH = default_xbuildenv_path()
 
 
-# simple 'pyodide build' command
-def main(
-    source_location: str | None = typer.Argument(
-        "",
-        help="Build source, can be source folder, pypi version specification, "
-        "or url to a source dist archive or wheel file. If this is blank, it "
-        "will build the current directory.",
+@click.command(
+    context_settings={
+        "ignore_unknown_options": True,
+        "allow_extra_args": True,
+        "help_option_names": ["-h", "--help"],
+    },
+)
+@click.argument("source_location", default="", required=False)
+@click.option(
+    "--outdir",
+    "-o",
+    "output_directory",
+    default="",
+    help="which directory should the output be placed into?",
+)
+@click.option(
+    "--requirements",
+    "-r",
+    "requirements_txt",
+    default="",
+    help="Build a list of package requirements from a requirements.txt file",
+)
+@click.option(
+    "--exports",
+    default="requested",
+    envvar="PYODIDE_BUILD_EXPORTS",
+    show_envvar=True,
+    help="Which symbols should be exported when linking .so files?",
+)
+@click.option(
+    "--build-dependencies/--no-build-dependencies",
+    default=False,
+    help="Fetch dependencies from pypi and build them too.",
+)
+@click.option(
+    "--output-lockfile",
+    default="",
+    help="Output list of resolved dependencies to a file in requirements.txt format",
+)
+@click.option(
+    "--skip-dependency",
+    multiple=True,
+    help=(
+        "Skip building or resolving a single dependency, or a pyodide-lock.json file. "
+        "Use multiple times or provide a comma separated list to skip multiple dependencies."
     ),
-    output_directory: str = typer.Option(
-        "",
-        "--outdir",
-        "-o",
-        help="which directory should the output be placed into?",
+)
+@click.option(
+    "--skip-built-in-packages/--no-skip-built-in-packages",
+    default=True,
+    help="Don't build dependencies that are built into the pyodide distribution.",
+)
+@click.option(
+    "--compression-level",
+    default=6,
+    show_default=True,
+    help="Compression level to use for the created zip file",
+)
+@click.option(
+    "--no-isolation",
+    "-n",
+    is_flag=True,
+    default=False,
+    help=(
+        "Disable building the project in an isolated virtual environment. "
+        "Build dependencies must be installed separately when this option is used"
     ),
-    requirements_txt: str = typer.Option(
-        "",
-        "--requirements",
-        "-r",
-        help="Build a list of package requirements from a requirements.txt file",
+)
+@click.option(
+    "--skip-dependency-check",
+    "-x",
+    is_flag=True,
+    default=False,
+    help=(
+        "Do not check that the build dependencies are installed. This option "
+        "is only useful when used with --no-isolation."
     ),
-    exports: str = typer.Option(
-        "requested",
-        envvar="PYODIDE_BUILD_EXPORTS",
-        help="Which symbols should be exported when linking .so files?",
+)
+@click.option(
+    "--config-setting",
+    "-C",
+    "config_setting",
+    multiple=True,
+    metavar="KEY[=VALUE]",
+    help=(
+        "Settings to pass to the backend. "
+        "Works same as the --config-setting option of pypa/build."
     ),
-    build_dependencies: bool = typer.Option(
-        False, help="Fetch dependencies from pypi and build them too."
-    ),
-    output_lockfile: str = typer.Option(
-        "",
-        help="Output list of resolved dependencies to a file in requirements.txt format",
-    ),
-    skip_dependency: list[str] = typer.Option(
-        [],
-        help="Skip building or resolving a single dependency, or a pyodide-lock.json file. "
-        "Use multiple times or provide a comma separated list to skip multiple dependencies.",
-    ),
-    skip_built_in_packages: bool = typer.Option(
-        True,
-        help="Don't build dependencies that are built into the pyodide distribution.",
-    ),
-    compression_level: int = typer.Option(
-        6, help="Compression level to use for the created zip file"
-    ),
-    no_isolation: bool = typer.Option(
-        False,
-        "--no-isolation",
-        "-n",
-        help="Disable building the project in an isolated virtual environment. "
-        "Build dependencies must be installed separately when this option is used",
-    ),
-    skip_dependency_check: bool = typer.Option(
-        False,
-        "--skip-dependency-check",
-        "-x",
-        help="Do not check that the build dependencies are installed. This option "
-        "is only useful when used with --no-isolation.",
-    ),
-    config_setting: list[str] | None = typer.Option(
-        None,
-        "--config-setting",
-        "-C",
-        help=(
-            "Settings to pass to the backend. "
-            "Works same as the --config-setting option of pypa/build."
-        ),
-        metavar="KEY[=VALUE]",
-    ),
-    xbuildenv_path: Path = typer.Option(
-        DEFAULT_PATH,
-        "--xbuildenv-path",
-        envvar="PYODIDE_XBUILDENV_PATH",
-        help="Path to the cross-build environment directory.",
-    ),
-    ctx: typer.Context = typer.Context,  # type: ignore[assignment]
+)
+@click.option(
+    "--xbuildenv-path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    envvar="PYODIDE_XBUILDENV_PATH",
+    show_envvar=True,
+    help="Path to the cross-build environment directory.",
+)
+@click.pass_context
+def main(  # noqa: PLR0915
+    ctx: click.Context,
+    source_location: str,
+    output_directory: str,
+    requirements_txt: str,
+    exports: str,
+    build_dependencies: bool,
+    output_lockfile: str,
+    skip_dependency: tuple[str, ...],
+    skip_built_in_packages: bool,
+    compression_level: int,
+    no_isolation: bool,
+    skip_dependency_check: bool,
+    config_setting: tuple[str, ...],
+    xbuildenv_path: Path,
 ) -> None:
-    """Use pypa/build to build a Python package from source, pypi or url."""
+    """Use pypa/build to build a Python package from source, pypi or url.
+
+    \b
+    Arguments:
+        SOURCE_LOCATION: Build source, can be source folder, pypi version specification,
+            or url to a source dist archive or wheel file. If this is blank, it
+            will build the current directory.
+    """
     init_environment(xbuildenv_path=xbuildenv_path)
     try:
         check_emscripten_version()
@@ -239,11 +284,12 @@ def main(
 
     # For backward compatibility, in addition to the `--config-setting` arguments, we also support
     # passing config settings as positional arguments.
-    config_settings = parse_backend_flags((config_setting or []) + ctx.args)
+    config_settings = parse_backend_flags(list(config_setting) + ctx.args)
 
+    skip_dependency_list = list(skip_dependency)
     if skip_built_in_packages:
         package_lock_json = get_pyodide_root() / "dist" / "pyodide-lock.json"
-        skip_dependency.append(str(package_lock_json.absolute()))
+        skip_dependency_list.append(str(package_lock_json.absolute()))
 
     if len(requirements_txt) > 0:
         # a requirements.txt - build it (and optionally deps)
@@ -274,7 +320,7 @@ def main(
                 reqs,
                 outpath,
                 build_dependencies,
-                skip_dependency,
+                skip_dependency_list,
                 # TODO: should we really use same "exports" value for all of our
                 # dependencies? Not sure this makes sense...
                 convert_exports(exports),
@@ -293,11 +339,12 @@ def main(
             raise e
         return
 
-    if source_location is not None:
-        extras = re.findall(r"\[(\w+)\]", source_location)
+    source_location_: str | None = source_location
+    if source_location_:
+        extras = re.findall(r"\[(\w+)\]", source_location_)
         if len(extras) != 0:
-            source_location = source_location[0 : source_location.find("[")]
-    if not source_location:
+            source_location_ = source_location_[0 : source_location_.find("[")]
+    if not source_location_:
         # build the current folder
         wheel = source(
             Path.cwd(),
@@ -307,29 +354,29 @@ def main(
             isolation=not no_isolation,
             skip_dependency_check=skip_dependency_check,
         )
-    elif source_location.find("://") != -1:
+    elif source_location_.find("://") != -1:
         wheel = url(
-            source_location,
+            source_location_,
             outpath,
             exports,
             config_settings,
             isolation=not no_isolation,
             skip_dependency_check=skip_dependency_check,
         )
-    elif Path(source_location).is_dir():
+    elif Path(source_location_).is_dir():
         # a folder, build it
         wheel = source(
-            Path(source_location).resolve(),
+            Path(source_location_).resolve(),
             outpath,
             exports,
             config_settings,
             isolation=not no_isolation,
             skip_dependency_check=skip_dependency_check,
         )
-    elif source_location.find("/") == -1:
+    elif source_location_.find("/") == -1:
         # try fetch or build from pypi
         wheel = pypi(
-            source_location,
+            source_location_,
             outpath,
             exports,
             config_settings,
@@ -337,14 +384,15 @@ def main(
             skip_dependency_check=skip_dependency_check,
         )
     else:
-        raise RuntimeError(f"Couldn't determine source type for {source_location}")
+        raise RuntimeError(f"Couldn't determine source type for {source_location_}")
+
     # now build deps for wheel
     if build_dependencies:
         try:
             build_dependencies_for_wheel(
                 wheel,
                 extras,
-                skip_dependency,
+                skip_dependency_list,
                 # TODO: should we really use same "exports" value for all of our
                 # dependencies? Not sure this makes sense...
                 convert_exports(exports),
@@ -364,12 +412,3 @@ def main(
             print("Failed building dependencies for wheel:", traceback.format_exc())
             wheel.unlink()
             raise e
-
-
-main.typer_kwargs = {  # type: ignore[attr-defined]
-    "context_settings": {
-        "ignore_unknown_options": True,
-        "allow_extra_args": True,
-        "help_option_names": ["-h", "--help"],
-    },
-}

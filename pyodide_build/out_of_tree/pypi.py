@@ -332,6 +332,18 @@ class PyPIProvider:
             deps.append(req)
         return deps
 
+    def narrow_requirement_selection(
+        self,
+        identifiers,
+        resolutions,
+        candidates,
+        information,
+        backtrack_causes,
+    ):
+        # Default implementation: return all identifiers unchanged
+        # This method is required by resolvelib >= 1.1.0
+        return identifiers
+
 
 def _get_json_package_list(fname: Path) -> Generator[str, None, None]:
     json_data = json.load(fname.open())

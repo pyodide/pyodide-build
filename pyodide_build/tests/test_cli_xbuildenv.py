@@ -4,8 +4,8 @@ import shutil
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 from pyodide_lock import PyodideLockSpec
-from typer.testing import CliRunner
 
 from pyodide_build.cli import (
     xbuildenv,
@@ -90,10 +90,10 @@ def test_xbuildenv_install(tmp_path, mock_xbuildenv_url):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Downloading Pyodide cross-build environment" in result.stdout, result.stdout
-    assert "Installing Pyodide cross-build environment" in result.stdout, result.stdout
-    assert str(envpath.resolve()) in result.stdout, result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Downloading Pyodide cross-build environment" in result.output, result.output
+    assert "Installing Pyodide cross-build environment" in result.output, result.output
+    assert str(envpath.resolve()) in result.output, result.output
     assert (envpath / "xbuildenv").is_symlink()
     assert (envpath / "xbuildenv").resolve().exists()
 
@@ -121,11 +121,11 @@ def test_xbuildenv_install_version(tmp_path, fake_xbuildenv_releases_compatible)
 
     os.environ.pop(CROSS_BUILD_ENV_METADATA_URL_ENV_VAR, None)
 
-    assert result.exit_code == 0, result.stdout
-    assert "Pyodide cross-build environment installed at" in result.stdout, (
-        result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Pyodide cross-build environment installed at" in result.output, (
+        result.output
     )
-    assert str(envpath.resolve()) in result.stdout, result.stdout
+    assert str(envpath.resolve()) in result.output, result.output
     assert (envpath / "xbuildenv").is_symlink()
     assert (envpath / "xbuildenv").resolve().exists()
     assert (envpath / "0.1.0").exists()
@@ -155,7 +155,7 @@ def test_xbuildenv_install_force_install(
     )
 
     # should fail if no force option is given
-    assert result.exit_code != 0, result.stdout
+    assert result.exit_code != 0, result.output
 
     result = runner.invoke(
         xbuildenv.app,
@@ -168,11 +168,11 @@ def test_xbuildenv_install_force_install(
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Pyodide cross-build environment installed at" in result.stdout, (
-        result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Pyodide cross-build environment installed at" in result.output, (
+        result.output
     )
-    assert str(envpath.resolve()) in result.stdout, result.stdout
+    assert str(envpath.resolve()) in result.output, result.output
     assert (envpath / "xbuildenv").is_symlink()
     assert (envpath / "xbuildenv").resolve().exists()
     assert (envpath / "0.1.0").exists()
@@ -200,8 +200,8 @@ def test_xbuildenv_version(tmp_path):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "0.26.0" in result.stdout, result.stdout
+    assert result.exit_code == 0, result.output
+    assert "0.26.0" in result.output, result.output
 
 
 def test_xbuildenv_versions(tmp_path):
@@ -221,10 +221,10 @@ def test_xbuildenv_versions(tmp_path):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "  0.25.0" in result.stdout, result.stdout
-    assert "  0.25.1" in result.stdout, result.stdout
-    assert "* 0.26.0" in result.stdout, result.stdout
+    assert result.exit_code == 0, result.output
+    assert "  0.25.0" in result.output, result.output
+    assert "  0.25.1" in result.output, result.output
+    assert "* 0.26.0" in result.output, result.output
 
 
 def test_xbuildenv_use(tmp_path):
@@ -245,9 +245,9 @@ def test_xbuildenv_use(tmp_path):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Pyodide cross-build environment 0.25.0 is now in use" in result.stdout, (
-        result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Pyodide cross-build environment 0.25.0 is now in use" in result.output, (
+        result.output
     )
 
 
@@ -269,9 +269,9 @@ def test_xbuildenv_uninstall(tmp_path):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Pyodide cross-build environment 0.25.0 uninstalled" in result.stdout, (
-        result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Pyodide cross-build environment 0.25.0 uninstalled" in result.output, (
+        result.output
     )
 
     result = runner.invoke(
@@ -284,9 +284,9 @@ def test_xbuildenv_uninstall(tmp_path):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "Pyodide cross-build environment 0.26.0 uninstalled" in result.stdout, (
-        result.stdout
+    assert result.exit_code == 0, result.output
+    assert "Pyodide cross-build environment 0.26.0 uninstalled" in result.output, (
+        result.output
     )
 
     result = runner.invoke(
@@ -299,7 +299,7 @@ def test_xbuildenv_uninstall(tmp_path):
         ],
     )
 
-    assert result.exit_code != 0, result.stdout
+    assert result.exit_code != 0, result.output
     assert isinstance(result.exception, ValueError), result.exception
 
 
@@ -315,8 +315,8 @@ def test_xbuildenv_search(
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
-    assert "0.1.0" in result.stdout, result.stdout
+    assert result.exit_code == 0, result.output
+    assert "0.1.0" in result.output, result.output
 
     result = runner.invoke(
         xbuildenv.app,
@@ -327,11 +327,11 @@ def test_xbuildenv_search(
         ],
     )
 
-    assert result.exit_code != 0, result.stdout
+    assert result.exit_code != 0, result.output
     assert (
-        "No compatible cross-build environment found for your system" in result.stdout
+        "No compatible cross-build environment found for your system" in result.output
     )
-    assert "0.1.0" not in result.stdout, result.stdout
+    assert "0.1.0" not in result.output, result.output
 
     result = runner.invoke(
         xbuildenv.app,
@@ -343,9 +343,9 @@ def test_xbuildenv_search(
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
 
-    lines = result.stdout.splitlines()
+    lines = result.output.splitlines()
     header = lines[1].strip().split("│")[1:-1]
     assert [col.strip() for col in header] == [
         "Version",
@@ -372,10 +372,10 @@ def test_xbuildenv_search_json(tmp_path, fake_xbuildenv_releases_compatible):
     )
 
     # Sanity check
-    assert result.exit_code == 0, result.stdout
-    assert is_valid_json(result.stdout), "Output is not valid JSON"
+    assert result.exit_code == 0, result.output
+    assert is_valid_json(result.output), "Output is not valid JSON"
 
-    output = json.loads(result.stdout)
+    output = json.loads(result.output)
 
     # First, check overall structure of JSON response
     assert isinstance(output, dict), "Output should be a dictionary"

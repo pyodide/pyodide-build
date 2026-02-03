@@ -15,7 +15,7 @@ license = {text = "MPL-2.0"}
 requires-python = ">=3.12"
 dependencies = [
     "build~=1.2.0",
-    "pyodide-cli>=0.3.0",
+    "pyodide-cli>=0.4.1",
     "pyodide-lock~=0.1.0",
     "auditwheel-emscripten~=0.2.0",
     "pydantic>=2,<3",
@@ -24,10 +24,9 @@ dependencies = [
     "packaging",
     "virtualenv",
     "requests",
-    "typer>=0.13",
+    "click",
     "rich",
     "platformdirs",
-    # TODO: make this a extra dependency
 ]
 dynamic = ["version"]
 
@@ -52,7 +51,6 @@ venv = "pyodide_build.cli.venv:main"
 skeleton = "pyodide_build.cli.skeleton:app"
 py-compile = "pyodide_build.cli.py_compile:main"
 config = "pyodide_build.cli.config:app"
-create-zipfile = "pyodide_build.cli.create_zipfile:main"
 xbuildenv = "pyodide_build.cli.xbuildenv:app"
 
 [project.optional-dependencies]
@@ -117,7 +115,6 @@ module = [
   "test",
   "tomli",
   "tomllib",
-  "typer",
   "unearth",
   "unearth.*",
   "virtualenv>=20.31.2",
@@ -164,7 +161,7 @@ target-version = "py312"
 ]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["typer.Argument", "typer.Option"]
+extend-immutable-calls = []
 
 [tool.ruff.lint.isort]
 known-first-party = [
@@ -180,7 +177,7 @@ max-complexity = 31  # C901: Recommended goal is 10
 
 [tool.ruff.lint.pylint]
 allow-magic-value-types = ["bytes", "int", "str"]
-max-args = 16        # Default is 5
+max-args = 20        # Default is 5
 max-branches = 27    # Default is 12
 max-returns = 12     # Default is 6
 max-statements = 67  # Default is 50

@@ -4,20 +4,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import typer
-from typer.testing import CliRunner
+from click.testing import CliRunner
 
-import pyodide_build
-from pyodide_build import build_env, cli, common
+from pyodide_build import build_env, common
 from pyodide_build.cli import (
     build,
     build_recipes,
     config,
-    create_zipfile,
     py_compile,
     skeleton,
 )
 from pyodide_build.config import PYODIDE_CLI_CONFIGS
+from pyodide_build.out_of_tree import build as out_of_tree_build
 
 runner = CliRunner()
 
@@ -26,7 +24,7 @@ RECIPE_DIR = Path(__file__).parent / "recipe" / "_test_recipes"
 
 def assert_runner_succeeded(result):
     __tracebackhide__ = True
-    print(result.stdout)
+    print(result.output)
     if result.exception:
         import traceback
 
@@ -51,7 +49,7 @@ def test_skeleton_pypi(tmp_path):
         ],
     )
     assert_runner_succeeded(result)
-    assert "pytest-pyodide/meta.yaml" in result.stdout
+    assert "pytest-pyodide/meta.yaml" in result.output
 
     result = runner.invoke(
         skeleton.app,
@@ -66,13 +64,13 @@ def test_skeleton_pypi(tmp_path):
         ],
     )
     assert_runner_succeeded(result)
-    assert f"Updated {test_pkg} from {old_version} to {new_version}" in result.stdout
+    assert f"Updated {test_pkg} from {old_version} to {new_version}" in result.output
 
     result = runner.invoke(
         skeleton.app, ["pypi", test_pkg, "--recipe-dir", str(tmp_path)]
     )
     assert result.exit_code != 0
-    assert "already exists" in str(result.stderr)
+    assert "already exists" in str(result.output)
     assert isinstance(result.exception, SystemExit)
 
 
@@ -90,13 +88,11 @@ def test_build_recipe_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes)
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
 
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes,
         [
             *pkgs.keys(),
             "--recipe-dir",
@@ -109,24 +105,104 @@ def test_build_recipe_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     assert_runner_succeeded(result)
 
     for pkg in pkgs_to_build:
-        assert f"built {pkg} in" in result.stdout
+        assert f"built {pkg} in" in result.output
 
     built_wheels = set(output_dir.glob("*.whl"))
     assert len(built_wheels) == len(pkgs_to_build)
+
+
+def test_build_recipe_clean(tmp_path, dummy_xbuildenv, mock_emscripten):
+    output_dir = tmp_path / "dist"
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+
+    result = runner.invoke(
+        build_recipes.build_recipes,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--install",
+            "--install-dir",
+            str(output_dir),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"built {pkg} in" in result.stdout
+
+    built_wheels = set(output_dir.glob("*.whl"))
+    assert len(built_wheels) >= len(pkgs_to_build)
+
+    for pkg in pkgs_to_build:
+        build_dir = RECIPE_DIR / pkg / "build"
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
+
+
+def test_build_recipe_clean_custom_build_dir(
+    tmp_path, dummy_xbuildenv, mock_emscripten
+):
+    """Test that --clean with custom --build-dir cleans package build directory correctly."""
+    output_dir = tmp_path / "dist"
+    custom_build_dir = tmp_path / "custom_build_dir"
+    custom_build_dir.mkdir()
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+
+    result = runner.invoke(
+        build_recipes.build_recipes,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--build-dir",
+            str(custom_build_dir),
+            "--install",
+            "--install-dir",
+            str(output_dir),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"built {pkg} in" in result.stdout
+
+    built_wheels = set(output_dir.glob("*.whl"))
+    assert len(built_wheels) >= len(pkgs_to_build)
+
+    # Verify that package-specific build directories are cleaned
+    for pkg in pkgs_to_build:
+        build_dir = custom_build_dir / pkg / "build"
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
+
+    # Verify that the custom build directory itself still exists and is not deleted
+    assert custom_build_dir.exists(), "Custom build directory should still exist"
 
 
 def test_build_recipe_no_deps_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes_no_deps)
-
     pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             *pkgs_to_build,
             "--recipe-dir",
@@ -136,23 +212,84 @@ def test_build_recipe_no_deps_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     assert_runner_succeeded(result)
 
     for pkg in pkgs_to_build:
-        assert f"Succeeded building package {pkg}" in result.stdout
+        assert f"Succeeded building package {pkg}" in result.output
 
     for pkg in pkgs_to_build:
         dist_dir = RECIPE_DIR / pkg / "dist"
         assert len(list(dist_dir.glob("*.whl"))) == 1
 
 
+def test_build_recipe_no_deps_clean(tmp_path, dummy_xbuildenv, mock_emscripten):
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+    result = runner.invoke(
+        build_recipes.build_recipes_no_deps,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"Succeeded building package {pkg}" in result.stdout
+
+    for pkg in pkgs_to_build:
+        dist_dir = RECIPE_DIR / pkg / "dist"
+        build_dir = RECIPE_DIR / pkg / "build"
+        assert len(list(dist_dir.glob("*.whl"))) == 1
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
+
+
+def test_build_recipe_no_deps_clean_custom_build_dir(
+    tmp_path, dummy_xbuildenv, mock_emscripten
+):
+    """Test that --clean with custom --build-dir cleans package build directory correctly."""
+    custom_build_dir = tmp_path / "custom_build_dir"
+    custom_build_dir.mkdir()
+
+    for build_dir in RECIPE_DIR.rglob("build"):
+        shutil.rmtree(build_dir)
+
+    pkgs_to_build = ["pkg_test_graph1", "pkg_test_graph3"]
+    for recipe in RECIPE_DIR.glob("**/meta.yaml"):
+        recipe.touch()
+    result = runner.invoke(
+        build_recipes.build_recipes_no_deps,
+        [
+            *pkgs_to_build,
+            "--recipe-dir",
+            str(RECIPE_DIR),
+            "--build-dir",
+            str(custom_build_dir),
+            "--clean",
+        ],
+    )
+    assert_runner_succeeded(result)
+
+    for pkg in pkgs_to_build:
+        assert f"Succeeded building package {pkg}" in result.stdout
+
+    # Verify that package-specific build directories are cleaned
+    assert custom_build_dir.exists(), "Custom build directory should still exist"
+    for pkg in pkgs_to_build:
+        build_dir = custom_build_dir / pkg / "build"
+        assert not build_dir.exists(), f"Build directory should be cleaned: {build_dir}"
+
+
 def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emscripten):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes_no_deps)
-
     pkg = "pkg_test_graph1"
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -162,7 +299,7 @@ def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emsc
     assert_runner_succeeded(result)
 
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -171,10 +308,10 @@ def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emsc
     )
 
     assert_runner_succeeded(result)
-    assert f"Succeeded building package {pkg}" in result.stdout
+    assert f"Succeeded building package {pkg}" in result.output
 
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -184,8 +321,7 @@ def test_build_recipe_no_deps_force_rebuild(tmp_path, dummy_xbuildenv, mock_emsc
     )
 
     assert result.exit_code == 0
-    # assert "Creating virtualenv isolated environment" in result.stdout
-    assert f"Succeeded building package {pkg}" in result.stdout
+    assert f"Succeeded building package {pkg}" in result.output
 
 
 def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripten):
@@ -194,12 +330,9 @@ def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripte
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes_no_deps)
-
     pkg = "pkg_test_graph1"
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -208,11 +341,10 @@ def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripte
     )
 
     assert_runner_succeeded(result)
-    assert f"Succeeded building package {pkg}" in result.stdout
+    assert f"Succeeded building package {pkg}" in result.output
 
     pyproject_toml = next((RECIPE_DIR / pkg / "build").rglob("pyproject.toml"))
 
-    # Modify some metadata and check it is applied when rebuilt with --continue flag
     with open(pyproject_toml, encoding="utf-8") as f:
         pyproject_data = f.read()
 
@@ -222,7 +354,7 @@ def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripte
     pyproject_toml.write_text(pyproject_data)
 
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -232,7 +364,7 @@ def test_build_recipe_no_deps_continue(tmp_path, dummy_xbuildenv, mock_emscripte
     )
 
     assert_runner_succeeded(result)
-    assert f"Succeeded building package {pkg}" in result.stdout
+    assert f"Succeeded building package {pkg}" in result.output
     wheel = next((RECIPE_DIR / pkg / "dist").rglob("*.whl"))
 
     metadata = tmp_path / "METADATA"
@@ -248,7 +380,7 @@ def test_config_list(dummy_xbuildenv):
         ],
     )
 
-    envs = result.stdout.splitlines()
+    envs = result.output.splitlines()
     keys = [env.split("=")[0] for env in envs]
 
     for cfg_name in PYODIDE_CLI_CONFIGS:
@@ -265,66 +397,7 @@ def test_config_get(cfg_name, env_var, dummy_xbuildenv):
         ],
     )
 
-    assert result.stdout.strip() == build_env.get_build_flag(env_var)
-
-
-def test_create_zipfile(temp_python_lib, temp_python_lib2, tmp_path):
-    from zipfile import ZipFile
-
-    output = tmp_path / "python.zip"
-
-    app = typer.Typer()
-    app.command()(create_zipfile.main)
-
-    result = runner.invoke(
-        app,
-        [
-            str(temp_python_lib),
-            str(temp_python_lib2),
-            "--output",
-            str(output),
-        ],
-    )
-
-    assert result.exit_code == 0, result.stdout
-    assert "Zip file created" in result.stdout
-    assert output.exists()
-
-    with ZipFile(output) as zf:
-        assert "module1.py" in zf.namelist()
-        assert "module2.py" in zf.namelist()
-        assert "module3.py" in zf.namelist()
-        assert "module4.py" in zf.namelist()
-
-
-def test_create_zipfile_compile(temp_python_lib, temp_python_lib2, tmp_path):
-    from zipfile import ZipFile
-
-    output = tmp_path / "python.zip"
-
-    app = typer.Typer()
-    app.command()(create_zipfile.main)
-
-    result = runner.invoke(
-        app,
-        [
-            str(temp_python_lib),
-            str(temp_python_lib2),
-            "--output",
-            str(output),
-            "--pycompile",
-        ],
-    )
-
-    assert result.exit_code == 0, result.stdout
-    assert "Zip file created" in result.stdout
-    assert output.exists()
-
-    with ZipFile(output) as zf:
-        assert "module1.pyc" in zf.namelist()
-        assert "module2.pyc" in zf.namelist()
-        assert "module3.pyc" in zf.namelist()
-        assert "module4.pyc" in zf.namelist()
+    assert result.output.strip() == build_env.get_build_flag(env_var)
 
 
 @pytest.mark.parametrize("target", ["dir", "file"])
@@ -336,16 +409,19 @@ def test_py_compile(tmp_path, target, compression_level):
 
     if target == "dir":
         target_path = tmp_path
-    elif target == "file":
+    else:
         target_path = wheel_path
 
-    py_compile.main(
-        path=target_path,
-        silent=False,
-        keep=False,
-        compression_level=compression_level,
-        exclude="",
+    result = runner.invoke(
+        py_compile.main,
+        [
+            str(target_path),
+            "--compression-level",
+            str(compression_level),
+        ],
     )
+    assert result.exit_code == 0, result.output
+
     with zipfile.ZipFile(tmp_path / "python.zip", "r") as fh:
         if compression_level > 0:
             assert fh.filelist[0].compress_type == zipfile.ZIP_DEFLATED
@@ -385,11 +461,11 @@ def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
     srcdir = tmp_path / "in"
     outdir = tmp_path / "out"
     srcdir.mkdir()
-    app = typer.Typer()
-    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
-    result = runner.invoke(app, [str(srcdir), "--outdir", str(outdir), "x", "y", "z"])
+    result = runner.invoke(
+        build.main, [str(srcdir), "--outdir", str(outdir), "x", "y", "z"]
+    )
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     assert results["srcdir"] == srcdir
     assert results["outdir"] == outdir
     assert results["backend_flags"] == {"x": "", "y": "", "z": ""}
@@ -418,9 +494,7 @@ def test_build2_replace_so_abi_tags(
 
     srcdir = Path(__file__).parent / "replace_so_abi_tags_test_package"
     outdir = tmp_path / "out"
-    app = typer.Typer()
-    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
-    runner.invoke(app, [str(srcdir), "--outdir", str(outdir)])
+    runner.invoke(build.main, [str(srcdir), "--outdir", str(outdir)])
     wheel_file = next(outdir.glob("*.whl"))
     print(zipfile.ZipFile(wheel_file).namelist())
     so_file = next(
@@ -450,19 +524,16 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
         nonlocal exports_
         exports_ = exports
 
-    monkeypatch.setattr(cli.build, "check_emscripten_version", lambda: None)
-    monkeypatch.setattr(cli.build, "download_url", download_url_shim)
+    monkeypatch.setattr(build, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build, "download_url", download_url_shim)
     monkeypatch.setattr(shutil, "unpack_archive", unpack_archive_shim)
-    monkeypatch.setattr(pyodide_build.out_of_tree.build, "run", run_shim)
-
-    app = typer.Typer()
-    app.command()(build.main)
+    monkeypatch.setattr(out_of_tree_build, "run", run_shim)
 
     def run(*args):
         nonlocal exports_
         exports_ = None
         result = runner.invoke(
-            app,
+            build.main,
             [".", *args],
         )
         print("output", result.output)
@@ -495,15 +566,6 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
 
 
 def test_build_config_settings(monkeypatch, dummy_xbuildenv):
-    app = typer.Typer()
-
-    app.command(
-        context_settings={
-            "ignore_unknown_options": True,
-            "allow_extra_args": True,
-        }
-    )(build.main)
-
     config_settings_passed = None
 
     def run(
@@ -517,16 +579,15 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         nonlocal config_settings_passed
         config_settings_passed = config_settings
 
-    monkeypatch.setattr(cli.build, "check_emscripten_version", lambda: None)
-    monkeypatch.setattr(pyodide_build.out_of_tree.build, "run", run)
+    monkeypatch.setattr(build, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(out_of_tree_build, "run", run)
 
-    # Accept `-C`
     result = runner.invoke(
-        app,
+        build.main,
         [".", "-C--key1", "-C--key2=value2", "-C=value3", "-Ckey4=value4"],
     )
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     assert config_settings_passed == {
         "--key1": "",
         "--key2": "value2",
@@ -535,7 +596,7 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
     }
 
     result = runner.invoke(
-        app,
+        build.main,
         [
             ".",
             "--config-setting",
@@ -547,7 +608,7 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     assert config_settings_passed == {
         "--key1": "",
         "--key2": "--value2",
@@ -555,9 +616,8 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         "--key4": "--value4",
     }
 
-    # For backwards compatibility, extra flags are interpreted as config settings
     result = runner.invoke(
-        app,
+        build.main,
         [
             ".",
             "-C--key1=value1",
@@ -567,7 +627,7 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         ],
     )
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     assert config_settings_passed == {
         "--key1": "value1",
         "--key2": "value2",
@@ -580,14 +640,11 @@ def test_build_cpython_module(tmp_path, dummy_xbuildenv, mock_emscripten):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes_no_deps)
-
     pkg = "pydecimal"
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -596,7 +653,7 @@ def test_build_cpython_module(tmp_path, dummy_xbuildenv, mock_emscripten):
     )
     assert_runner_succeeded(result)
 
-    assert f"Succeeded building package {pkg}" in result.stdout
+    assert f"Succeeded building package {pkg}" in result.output
 
     dist_dir = RECIPE_DIR / pkg / "dist"
     results = list(dist_dir.glob("*.whl"))
@@ -609,14 +666,11 @@ def test_wheel_download_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscrip
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes_no_deps)
-
     pkg = "xarray"
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -624,6 +678,7 @@ def test_wheel_download_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscrip
         ],
     )
     assert result.exit_code == 1
+    assert result.exception is not None
     assert (
         result.exception.args[0]
         == "Version mismatch in xarray: version in meta.yaml is '2025.01.2' but version from wheel name is '2025.1.2'"
@@ -634,14 +689,11 @@ def test_wheel_build_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes_no_deps)
-
     pkg = "pkg_test_version_mismatch"
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -649,6 +701,7 @@ def test_wheel_build_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten
         ],
     )
     assert result.exit_code == 1
+    assert result.exception is not None
     assert (
         result.exception.args[0]
         == "Version mismatch in pkg_test_version_mismatch: version in meta.yaml is '1.0.0' but version from wheel name is '1.0.1'"
@@ -659,14 +712,11 @@ def test_build_constraint(tmp_path, dummy_xbuildenv, mock_emscripten, capsys):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
-    app = typer.Typer()
-    app.command()(build_recipes.build_recipes_no_deps)
-
     pkg = "pkg_test_constraint"
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
     result = runner.invoke(
-        app,
+        build_recipes.build_recipes_no_deps,
         [
             pkg,
             "--recipe-dir",
@@ -675,7 +725,7 @@ def test_build_constraint(tmp_path, dummy_xbuildenv, mock_emscripten, capsys):
     )
     assert_runner_succeeded(result)
 
-    assert f"Succeeded building package {pkg}" in result.stdout
+    assert f"Succeeded building package {pkg}" in result.output
     build_dir = RECIPE_DIR / pkg / "build"
     assert (build_dir / "setuptools.version").read_text() == "74.1.3"
     assert (build_dir / "pytest.version").read_text() == "7.0.0"
@@ -725,9 +775,6 @@ def test_build_isolation_flags(
 
     monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
 
-    app = typer.Typer()
-    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
-
     srcdir = tmp_path / "in"
     outdir = tmp_path / "out"
     srcdir.mkdir()
@@ -736,12 +783,11 @@ def test_build_isolation_flags(
     if isolation_flag:
         args.append(isolation_flag)
 
-    result = runner.invoke(app, args)
+    result = runner.invoke(build.main, args)
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     assert len(build_calls) == 1
 
-    # Check that isolation was properly passed
     expected_isolation = isolation_flag is None
     assert build_calls[0]["isolation"] == expected_isolation
 
@@ -749,7 +795,7 @@ def test_build_isolation_flags(
 @pytest.mark.parametrize(
     "skip_check_flag",
     [
-        None,  # Default: with dependency check
+        None,
         "--skip-dependency-check",
         "-x",
     ],
@@ -791,9 +837,6 @@ def test_build_skip_dependency_check(
 
     monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
 
-    app = typer.Typer()
-    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
-
     srcdir = tmp_path / "in"
     outdir = tmp_path / "out"
     srcdir.mkdir()
@@ -802,12 +845,11 @@ def test_build_skip_dependency_check(
     if skip_check_flag:
         args.append(skip_check_flag)
 
-    result = runner.invoke(app, args)
+    result = runner.invoke(build.main, args)
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     assert len(build_calls) == 1
 
-    # Check that skip_dependency_check was properly passed
     expected_skip = skip_check_flag is not None
     assert build_calls[0]["skip_dependency_check"] == expected_skip
 
@@ -815,7 +857,7 @@ def test_build_skip_dependency_check(
 @pytest.mark.parametrize(
     "isolation,skip_check",
     [
-        (True, False),  # default: with isolation, without skipping dependency checking
+        (True, False),
         (False, False),
         (True, True),
         (False, True),
@@ -858,9 +900,6 @@ def test_build_combined_flags(
 
     monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
 
-    app = typer.Typer()
-    app.command(**build.main.typer_kwargs)(build.main)  # type:ignore[attr-defined]
-
     srcdir = tmp_path / "in"
     outdir = tmp_path / "out"
     srcdir.mkdir()
@@ -871,9 +910,9 @@ def test_build_combined_flags(
     if skip_check:
         args.append("--skip-dependency-check")
 
-    result = runner.invoke(app, args)
+    result = runner.invoke(build.main, args)
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 0, result.output
     assert len(build_calls) == 1
     assert build_calls[0]["isolation"] == isolation
     assert build_calls[0]["skip_dependency_check"] == skip_check

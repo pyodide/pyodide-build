@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.2] - 2026/01/26
+
+### Added
+
+- Added `--clean` option to clean up temporary build files after building a package with `pyodide build-recipes`.
+  [#282](https://github.com/pyodide/pyodide-build/pull/282)
+
+## [0.31.1] - 2026/01/05
+
+### Fixed
+
+- Fixed an issue where pip inside the Pyodide venv would not correctly handle the arguments with spaces.
+  [#281](https://github.com/pyodide/pyodide-build/pull/281)
+
+## [0.31.0] - 2026/01/05
+
+### Added
+
+- `pyodide venv` now works in Windows. It only works with Pyodide 0.29.1 and later.
+  [#274](https://github.com/pyodide/pyodide-build/pull/274)
+
+### Removed
+
+- Removed `pyodide create-zipfile` subcommand. This command is was used only for building pyodide runtime and not for building packages.
+  [#276](https://github.com/pyodide/pyodide-build/pull/276)
+
 ### Fixed
 
 - Fixed an issue where the compiler flags such as `cflags`, `cxxflags`, and `ldflags` from
