@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026/02/03
+
+### Changed
+
+- Emscripten will not be auto installed when running `pyodide build` and `pyodide build-recipes` if
+  the host system does not have emscripten installed.
+  [#293](https://github.com/pyodide/pyodide-build/pull/293)
+
 ## [0.31.2] - 2026/01/26
 
 ### Added

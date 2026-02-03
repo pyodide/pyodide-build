@@ -244,8 +244,6 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "cflags_base": "CFLAGS_BASE",
     "cxxflags_base": "CXXFLAGS_BASE",
     "ldflags_base": "LDFLAGS_BASE",
-    "home": "HOME",
-    "path": "PATH",
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
     "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",

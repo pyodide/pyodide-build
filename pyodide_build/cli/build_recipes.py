@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from pyodide_build import build_env
-from pyodide_build.build_env import BuildArgs, init_environment
+from pyodide_build.build_env import BuildArgs, ensure_emscripten, init_environment
 from pyodide_build.common import get_num_cores
 from pyodide_build.logger import logger
 from pyodide_build.recipe import graph_builder, loader
@@ -130,6 +130,14 @@ class InstallOptions:
     default=False,
     help="Remove the build directory after a successful build of each package.",
 )
+@click.option(
+    "--skip-emscripten-install",
+    is_flag=True,
+    default=False,
+    envvar="PYODIDE_SKIP_EMSCRIPTEN_INSTALL",
+    show_envvar=True,
+    help="Skip automatic installation of Emscripten if not found.",
+)
 def build_recipes_no_deps(
     packages: tuple[str, ...],
     recipe_dir: str | None,
@@ -143,6 +151,7 @@ def build_recipes_no_deps(
     continue_: bool,
     skip_rust_setup: bool,
     clean: bool,
+    skip_emscripten_install: bool,
 ) -> None:
     """Build packages using yaml recipes but don't try to resolve dependencies.
 
@@ -153,7 +162,7 @@ def build_recipes_no_deps(
     init_environment()
 
     if build_env.in_xbuildenv():
-        build_env.check_emscripten_version()
+        ensure_emscripten(skip_install=skip_emscripten_install)
 
     build_args = BuildArgs(
         cflags=cflags,
@@ -308,6 +317,14 @@ def build_recipes_no_deps_impl(
     default=False,
     help="Remove the build directory after a successful build of each package.",
 )
+@click.option(
+    "--skip-emscripten-install",
+    is_flag=True,
+    default=False,
+    envvar="PYODIDE_SKIP_EMSCRIPTEN_INSTALL",
+    show_envvar=True,
+    help="Skip automatic installation of Emscripten if not found.",
+)
 def build_recipes(
     packages: tuple[str, ...],
     recipe_dir: str | None,
@@ -326,6 +343,7 @@ def build_recipes(
     n_jobs: int | None,
     compression_level: int,
     clean: bool,
+    skip_emscripten_install: bool,
 ) -> None:
     """Build packages using yaml recipes.
 
@@ -352,7 +370,7 @@ def build_recipes(
     init_environment()
 
     if build_env.in_xbuildenv():
-        build_env.check_emscripten_version()
+        ensure_emscripten(skip_install=skip_emscripten_install)
 
     build_args = BuildArgs(
         cflags=cflags or "",

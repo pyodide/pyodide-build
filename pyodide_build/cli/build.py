@@ -11,7 +11,7 @@ import requests
 from build import ConfigSettingsType
 
 from pyodide_build.build_env import (
-    check_emscripten_version,
+    ensure_emscripten,
     get_pyodide_root,
     init_environment,
 )
@@ -239,6 +239,14 @@ DEFAULT_PATH = default_xbuildenv_path()
     show_envvar=True,
     help="Path to the cross-build environment directory.",
 )
+@click.option(
+    "--skip-emscripten-install",
+    is_flag=True,
+    default=False,
+    envvar="PYODIDE_SKIP_EMSCRIPTEN_INSTALL",
+    show_envvar=True,
+    help="Skip automatic installation of Emscripten if not found.",
+)
 @click.pass_context
 def main(  # noqa: PLR0915
     ctx: click.Context,
@@ -255,6 +263,7 @@ def main(  # noqa: PLR0915
     skip_dependency_check: bool,
     config_setting: tuple[str, ...],
     xbuildenv_path: Path,
+    skip_emscripten_install: bool,
 ) -> None:
     """Use pypa/build to build a Python package from source, pypi or url.
 
@@ -266,7 +275,7 @@ def main(  # noqa: PLR0915
     """
     init_environment(xbuildenv_path=xbuildenv_path)
     try:
-        check_emscripten_version()
+        ensure_emscripten(skip_install=skip_emscripten_install)
     except RuntimeError as e:
         print(e.args[0], file=sys.stderr)
         sys.exit(1)

@@ -157,9 +157,6 @@ jobs:
           fi
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
 
-      - name: Install Emscripten
-        run: pyodide xbuildenv install-emscripten
-
       - name: Get number of cores on the runner
         id: get-cores
         run: echo "CORES=$(nproc)" >> $GITHUB_OUTPUT
@@ -167,7 +164,6 @@ jobs:
       - name: Run tests marked with integration
         if: matrix.task.name == 'test-integration-marker'
         run: |
-          source $(pyodide config get pyodide_root)/../../emsdk/emsdk_env.sh
           pytest --junitxml=test-results/junit.xml --cov=pyodide-build pyodide_build -m "integration"
 
       - name: Run the recipe integration tests (${{ matrix.task.name }})
@@ -176,7 +172,6 @@ jobs:
           PYODIDE_JOBS: ${{ steps.get-cores.outputs.CORES }}
         working-directory: integration_tests
         run: |
-          source $(pyodide config get pyodide_root)/../../emsdk/emsdk_env.sh
           # https://github.com/pyodide/pyodide-build/issues/147
           # disable package with scikit-build-core
           if [[ ${{ matrix.os }} == "macos-latest" ]]; then
