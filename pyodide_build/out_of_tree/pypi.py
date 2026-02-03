@@ -25,7 +25,6 @@ from packaging.version import Version
 
 if TYPE_CHECKING:
     from resolvelib import BaseReporter, Resolver
-    from resolvelib.providers import AbstractProvider
     from unearth.evaluator import TargetPython
     from unearth.finder import PackageFinder
 
