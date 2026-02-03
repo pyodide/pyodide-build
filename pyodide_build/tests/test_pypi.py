@@ -11,6 +11,9 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
+pytest.importorskip("resolvelib")
+pytest.importorskip("unearth")
+
 from pyodide_build.cli import build
 
 runner = CliRunner()
