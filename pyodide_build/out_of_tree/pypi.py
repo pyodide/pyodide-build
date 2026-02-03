@@ -25,8 +25,17 @@ from packaging.version import Version
 
 if TYPE_CHECKING:
     from resolvelib import BaseReporter, Resolver
+    from resolvelib.providers import AbstractProvider
     from unearth.evaluator import TargetPython
     from unearth.finder import PackageFinder
+
+try:
+    from resolvelib.providers import AbstractProvider as _AbstractProvider
+except ImportError:
+
+    class _AbstractProvider:  # type: ignore[no-redef]
+        pass
+
 
 from pyodide_build import build_env
 from pyodide_build.common import repack_zip_archive
@@ -266,7 +275,7 @@ def get_metadata_for_wheel(url):
     return EmailMessage()
 
 
-class PyPIProvider:
+class PyPIProvider(_AbstractProvider):
     BUILD_FLAGS: ConfigSettingsType = {}
     BUILD_SKIP: list[str] = []
     BUILD_EXPORTS: _BuildSpecExports = []
@@ -331,18 +340,6 @@ class PyPIProvider:
             req = self.get_base_requirement(candidate)
             deps.append(req)
         return deps
-
-    def narrow_requirement_selection(
-        self,
-        identifiers,
-        resolutions,
-        candidates,
-        information,
-        backtrack_causes,
-    ):
-        # Default implementation: return all identifiers unchanged
-        # This method is required by resolvelib >= 1.1.0
-        return identifiers
 
 
 def _get_json_package_list(fname: Path) -> Generator[str, None, None]:
