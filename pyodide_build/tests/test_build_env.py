@@ -237,3 +237,65 @@ def test_wheel_paths(dummy_xbuildenv):
             f"{current_version}-none-any",
         ]
     )
+
+
+def test_create_constraints_file_with_pip_build_constraint(
+    tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+):
+    """Test that _create_constraints_file prioritizes PIP_BUILD_CONSTRAINT."""
+    # Set up a test constraints file
+    constraints_file = tmp_path / "build_constraints.txt"
+    constraints_file.write_text("numpy<2.0\n")
+
+    # Set PIP_BUILD_CONSTRAINT via environment - this will override the computed default
+    monkeypatch.setenv("PIP_BUILD_CONSTRAINT", str(constraints_file))
+
+    # Clear caches to pick up the new environment variable
+    build_env.get_build_environment_vars.cache_clear()
+    build_env.get_pyodide_root.cache_clear()
+
+    result = build_env._create_constraints_file()
+    # Should use PIP_BUILD_CONSTRAINT when explicitly set
+    assert result == str(constraints_file)
+
+
+def test_create_constraints_file_uses_default_from_xbuildenv(
+    dummy_xbuildenv, reset_env_vars, reset_cache
+):
+    """Test that _create_constraints_file uses values from xbuildenv when no override is provided."""
+    # Don't set any environment overrides - use what comes from xbuildenv
+    # The xbuildenv has PIP_CONSTRAINT set, and pip_build_constraint defaults to it
+
+    # Clear caches
+    build_env.get_build_environment_vars.cache_clear()
+    build_env.get_pyodide_root.cache_clear()
+
+    result = build_env._create_constraints_file()
+    # Should get the default constraint file path from xbuildenv
+    assert "constraints.txt" in result
+    assert result  # Should not be empty
+
+
+def test_create_constraints_file_pip_build_constraint_takes_precedence(
+    tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+):
+    """Test that PIP_BUILD_CONSTRAINT takes precedence over PIP_CONSTRAINT."""
+    # Set up two different constraints files
+    build_constraints_file = tmp_path / "build_constraints.txt"
+    build_constraints_file.write_text("numpy<2.0\n")
+
+    regular_constraints_file = tmp_path / "constraints.txt"
+    regular_constraints_file.write_text("scipy<2.0\n")
+
+    # Set both environment variables
+    monkeypatch.setenv("PIP_BUILD_CONSTRAINT", str(build_constraints_file))
+    monkeypatch.setenv("PIP_CONSTRAINT", str(regular_constraints_file))
+
+    # Clear caches to pick up the new environment variables
+    build_env.get_build_environment_vars.cache_clear()
+    build_env.get_pyodide_root.cache_clear()
+
+    # PIP_BUILD_CONSTRAINT should take precedence
+    result = build_env._create_constraints_file()
+    assert result == str(build_constraints_file)
+    assert result != str(regular_constraints_file)
