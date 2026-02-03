@@ -113,7 +113,7 @@ class TestOutOfTree(TestInTree):
 
         build_env.get_build_environment_vars.cache_clear()
         e = build_env.get_build_environment_vars(pyodide_root)
-        assert "PIP_CONSTRAINT" not in e
+        assert "PIP_CONSTRAINT" in e
         assert "RANDOM_ENV" not in e
 
 
