@@ -381,8 +381,9 @@ class PyodideVenv(ABC):
             # have to restore the correct value of pip. Iterate through all of the
             # pip variants in the folder and remove them and replace with a symlink
             # to pip_patched.
+            # Avoid using pathlib as it might mess up the path calculation on cross-platform environments.
             f"""
-            file_path = pathlib.Path(os.path.dirname(__file__)) / f"pip{exe_suffix}"
+            file_path = os.path.join(os.path.dirname(__file__), "pip{exe_suffix}")
 
 
             def pip_is_okay():
@@ -398,16 +399,17 @@ class PyodideVenv(ABC):
                 if pip_is_okay():
                     return
 
-                venv_bin = file_path.parent
-                pip_patched = venv_bin / "{pip_patched_name}"
-                for pip in venv_bin.glob("pip*"):
-                    if pip == pip_patched:
+                venv_bin = os.path.dirname(file_path)
+                pip_patched = os.path.join(venv_bin, "{pip_patched_name}")
+                for pip in os.listdir(venv_bin):
+                    if pip == "{pip_patched_name}":
                         continue
-                    pip.unlink(missing_ok=True)
-                    patched_pip_exe = pip.with_suffix("{exe_suffix}")
+                    pip_path = os.path.join(venv_bin, pip)
+                    os.unlink(pip_path)
+                    patched_pip_exe = os.path.join(venv_bin, f"pip{exe_suffix}")
                     if patched_pip_exe != pip_patched:
-                        patched_pip_exe.unlink(missing_ok=True)
-                        patched_pip_exe.symlink_to(pip_patched)
+                        os.unlink(patched_pip_exe)
+                        os.symlink(pip_patched, patched_pip_exe)
 
 
             import atexit
