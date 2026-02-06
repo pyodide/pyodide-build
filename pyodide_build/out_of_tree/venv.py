@@ -382,7 +382,7 @@ class PyodideVenv(ABC):
             # pip variants in the folder and remove them and replace with a symlink
             # to pip_patched.
             f"""
-            file_path = pathlib.WindowsPath(__file__).parent / f"pip{exe_suffix}"
+            file_path = pathlib.Path(os.path.dirname(__file__)) / f"pip{exe_suffix}"
 
 
             def pip_is_okay():
