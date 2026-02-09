@@ -388,7 +388,7 @@ class PyodideVenv(ABC):
 
             def pip_is_okay():
                 try:
-                    return file_path.readlink() == file_path.with_name("{pip_patched_name}")
+                    return os.readlink(file_path) == os.path.join(os.path.dirname(file_path), "{pip_patched_name}")
                 except OSError as e:
                     if e.strerror != "Invalid argument":
                         raise
@@ -408,7 +408,10 @@ class PyodideVenv(ABC):
                     os.unlink(pip_path)
                     patched_pip_exe = os.path.join(venv_bin, f"pip{exe_suffix}")
                     if patched_pip_exe != pip_patched:
-                        os.unlink(patched_pip_exe)
+                        try:
+                            os.unlink(patched_pip_exe)
+                        except FileNotFoundError:
+                            pass
                         os.symlink(pip_patched, patched_pip_exe)
 
 
