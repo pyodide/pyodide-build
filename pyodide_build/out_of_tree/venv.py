@@ -311,6 +311,7 @@ class PyodideVenv(ABC):
         sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
         pip_patched_name = self.pip_patched_path.name
         exe_suffix = self.exe_suffix
+        pyodide_platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
         return dedent(
             """\
             import os
@@ -355,13 +356,8 @@ class PyodideVenv(ABC):
             """
             f"""
             os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
-            if os.name == "nt":
-                # Replace pathlib.Path with pathlib.WindowsPath to avoid issues on Windows in path calculation
-                pathlib.Path = pathlib.WindowsPath
 
-            os.name = os_name
             os.getuid = os.getuid if hasattr(os, "getuid") else lambda: 0
-            sys.platform = sys_platform
             sys.platlibdir = "lib"
             sys.implementation._multiarch = multiarch
             sys.abiflags = getattr(sys, "abiflags", "")  # ensure abiflags exists even in Windows
@@ -373,6 +369,30 @@ class PyodideVenv(ABC):
             import sysconfig
             sysconfig._init_config_vars()
             del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
+            """
+            # On windows, patching sys.platform or os.name breaks how pip internals work (e.g. Pathlib)
+            # So instead, we use `--platform` option to inject the correct platform to pip commands.
+            # However, pip does not allow cross-platform installation unless `--target` flag is given,
+            # but `--target` behaves differently from normal installation (e.g. it does not support upgrading/downgrading packages very well, etc).
+            # so we ended up monkey-patching the cli option check function to allow using `--platform` without `--target`.
+            f"""
+            if os.name == "nt":
+                import pip._internal.cli.cmdoptions as cmdoptions
+
+                _original_check = cmdoptions.check_dist_restriction
+
+                def _patched_check_dist_restriction(options, check_target=False):
+                    _original_check(options, check_target=False)  # always skip target check
+
+                cmdoptions.check_dist_restriction = _patched_check_dist_restriction
+
+                if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
+                    if "--platform" not in sys.argv:
+                        sys.argv.extend(["--platform", "{pyodide_platform}"])
+                    if "--only-binary" not in sys.argv:
+                        sys.argv.extend(["--only-binary", ":all:"])
+            else:
+                sys.platform = sys_platform
             """
             # Handle pip updates.
             #
