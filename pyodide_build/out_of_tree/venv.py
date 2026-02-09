@@ -388,7 +388,7 @@ class PyodideVenv(ABC):
 
             def pip_is_okay():
                 try:
-                    return file_path.readlink() == file_path.with_name("{pip_patched_name}")
+                    return os.readlink(file_path) == os.path.join(os.path.dirname(file_path), "{pip_patched_name}")
                 except OSError as e:
                     if e.strerror != "Invalid argument":
                         raise
