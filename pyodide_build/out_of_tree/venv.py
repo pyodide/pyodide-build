@@ -402,10 +402,15 @@ class PyodideVenv(ABC):
                 venv_bin = os.path.dirname(file_path)
                 pip_patched = os.path.join(venv_bin, "{pip_patched_name}")
                 for pip in os.listdir(venv_bin):
+                    if not pip.startswith("pip"):
+                        continue
                     if pip == "{pip_patched_name}":
                         continue
                     pip_path = os.path.join(venv_bin, pip)
-                    os.unlink(pip_path)
+                    try:
+                        os.unlink(pip_path)
+                    except FileNotFoundError:
+                        pass
                     patched_pip_exe = os.path.join(venv_bin, f"pip{exe_suffix}")
                     if patched_pip_exe != pip_patched:
                         try:
