@@ -285,6 +285,16 @@ def get_emscripten_version_info() -> str:
     ).stderr
 
 
+# Env variables that are set by emsdk_env.sh
+EMSDK_ENV_VARS = {
+    "PATH",
+    "EMSDK",
+    "EMSDK_NODE",
+    "EMSDK_PYTHON",
+    "SSL_CERT_FILE",
+}
+
+
 def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
     """
     Source emsdk_env.sh and return the resulting environment variables.
@@ -316,7 +326,8 @@ def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
     for line in result.stdout.splitlines():
         if "=" in line:
             key, _, value = line.partition("=")
-            env_vars[key] = value
+            if key in EMSDK_ENV_VARS:
+                env_vars[key] = value
 
     return env_vars
 
