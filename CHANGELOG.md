@@ -7,13 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.32.0] - 2026/02/03
+## [0.32.0] - 2026/02/11
+
+### Added
+
+- Added support for `PIP_BUILD_CONSTRAINT` environment variable for pip 26.2+ compatibility.
+  The build system now prioritizes `PIP_BUILD_CONSTRAINT` over `PIP_CONSTRAINT` when determining
+  build-time constraints, while maintaining backward compatibility.
 
 ### Changed
 
-- Emscripten will not be auto installed when running `pyodide build` and `pyodide build-recipes` if
+- Emscripten will now be auto installed when running `pyodide build` and `pyodide build-recipes` if
   the host system does not have emscripten installed.
   [#293](https://github.com/pyodide/pyodide-build/pull/293)
+
+- The feature to build packages with dependencies is now opt-in feature. It needs to be enabled by
+  installing pyodide-build with `pip install pyodide-build[resolve]`.
+  [#277](https://github.com/pyodide/pyodide-build/pull/277)
 
 ## [0.31.2] - 2026/01/26
 

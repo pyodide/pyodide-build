@@ -27,9 +27,6 @@ dependencies = [
     "click",
     "rich",
     "platformdirs",
-    # TODO: make this a extra dependency
-    "resolvelib",
-    "unearth~=0.6",
 ]
 dynamic = ["version"]
 
@@ -57,6 +54,10 @@ config = "pyodide_build.cli.config:app"
 xbuildenv = "pyodide_build.cli.xbuildenv:app"
 
 [project.optional-dependencies]
+resolve = [
+    "resolvelib",
+    "unearth~=0.6",
+]
 test = [
     "pytest",
     "pytest-httpserver",
@@ -108,11 +109,14 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = [
   "loky",
+  "resolvelib",
   "ruamel.yaml",
   "termcolor",
   "test",
   "tomli",
   "tomllib",
+  "unearth",
+  "unearth.*",
   "virtualenv>=20.31.2",
   "auditwheel_emscripten.*"
 ]
@@ -176,7 +180,7 @@ allow-magic-value-types = ["bytes", "int", "str"]
 max-args = 20        # Default is 5
 max-branches = 27    # Default is 12
 max-returns = 12     # Default is 6
-max-statements = 58  # Default is 50
+max-statements = 67  # Default is 50
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
