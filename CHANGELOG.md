@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.1] - 2026/02/20
+
 ### Added
 
 - Added `--skip-cross-build-packages` flag (and `PYODIDE_SKIP_CROSS_BUILD_PACKAGES` env var) to
@@ -28,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed `pyodide venv` not working in Windows with virtualenv 20.38.
   [#298](https://github.com/pyodide/pyodide-build/pull/298)
+
+## [0.32.0] - 2026/01/27
+
+### Changed
+
+- Dropped `typer` dependency in favor of `click`.
+  [#287](https://github.com/pyodide/pyodide-build/pull/287)
 
 ## [0.31.2] - 2026/01/26
 
