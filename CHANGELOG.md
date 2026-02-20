@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installing pyodide-build with `pip install pyodide-build[resolve]`.
   [#277](https://github.com/pyodide/pyodide-build/pull/277)
 
+### Fixed
+
+- Fixed `pyodide venv` not working in Windows with virtualenv 20.38.
+  [#298](https://github.com/pyodide/pyodide-build/pull/298)
+
 ## [0.31.2] - 2026/01/26
 
 ### Added
