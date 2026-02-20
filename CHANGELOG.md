@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.2] - 2026/02/20
+
+### Fixed
+
+- Fixed `pyodide venv` not working in Windows + Python 3.14.
+  [#299](https://github.com/pyodide/pyodide-build/pull/299)
+
 ## [0.32.1] - 2026/02/20
 
 ### Added
