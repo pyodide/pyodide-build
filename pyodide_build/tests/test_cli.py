@@ -525,7 +525,7 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
         exports_ = exports
 
     monkeypatch.setattr(build, "check_emscripten_version", lambda: None)
-    monkeypatch.setattr(build, "download_url", download_url_shim)
+    monkeypatch.setattr(build, "_download_url", download_url_shim)
     monkeypatch.setattr(shutil, "unpack_archive", unpack_archive_shim)
     monkeypatch.setattr(out_of_tree_build, "run", run_shim)
 
