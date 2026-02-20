@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.32.1] - 2026/02/20
 
 ### Added
 
@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed `pyodide venv` not working in Windows with virtualenv 20.38.
   [#298](https://github.com/pyodide/pyodide-build/pull/298)
+
+## [0.32.0] - 2026/01/27
+
+### Changed
+
+- Dropped `typer` dependency in favor of `click`.
+  [#287](https://github.com/pyodide/pyodide-build/pull/287)
 
 ## [0.31.2] - 2026/01/26
 
