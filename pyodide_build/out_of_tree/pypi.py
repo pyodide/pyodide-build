@@ -22,10 +22,19 @@ from build import ConfigSettingsType
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import Version
-from resolvelib import BaseReporter, Resolver
-from resolvelib.providers import AbstractProvider
-from unearth.evaluator import TargetPython
-from unearth.finder import PackageFinder
+
+if TYPE_CHECKING:
+    from resolvelib import BaseReporter, Resolver
+    from unearth.evaluator import TargetPython
+    from unearth.finder import PackageFinder
+
+try:
+    from resolvelib.providers import AbstractProvider as _AbstractProvider
+except ImportError:
+
+    class _AbstractProvider:  # type: ignore[no-redef]
+        pass
+
 
 from pyodide_build import build_env
 from pyodide_build.common import repack_zip_archive
@@ -35,6 +44,34 @@ from pyodide_build.spec import _BuildSpecExports
 
 _PYPI_INDEX = ["https://pypi.org/simple/"]
 _PYPI_TRUSTED_HOSTS = ["pypi.org"]
+
+
+class MissingOptionalDependencyError(RuntimeError):
+    pass
+
+
+def _missing_resolve_extra_error() -> MissingOptionalDependencyError:
+    return MissingOptionalDependencyError(
+        "This functionality requires optional dependencies 'resolvelib' and 'unearth'. "
+        "Install them with `pip install pyodide-build[resolve]`"
+    )
+
+
+def _import_unearth() -> tuple[type["TargetPython"], type["PackageFinder"]]:
+    try:
+        from unearth.evaluator import TargetPython
+        from unearth.finder import PackageFinder
+    except ImportError as e:
+        raise _missing_resolve_extra_error() from e
+    return TargetPython, PackageFinder
+
+
+def _import_resolvelib() -> tuple[type["BaseReporter"], type["Resolver"]]:
+    try:
+        from resolvelib import BaseReporter, Resolver
+    except ImportError as e:
+        raise _missing_resolve_extra_error() from e
+    return BaseReporter, Resolver
 
 
 @contextmanager
@@ -168,15 +205,11 @@ class Candidate:
         return self._dependencies
 
 
-if TYPE_CHECKING:
-    APBase = AbstractProvider[Requirement, Candidate, str]
-else:
-    APBase = AbstractProvider
-
 PYTHON_VERSION = Version(python_version())
 
 
 def get_target_python():
+    TargetPython, _ = _import_unearth()
     PYMAJOR = build_env.get_pyversion_major()
     PYMINOR = build_env.get_pyversion_minor()
     tp = TargetPython(
@@ -189,6 +222,7 @@ def get_target_python():
 
 def get_project_from_pypi(package_name, extras):
     """Return candidates created from the project name and extras."""
+    _, PackageFinder = _import_unearth()
     pf = PackageFinder(
         index_urls=_PYPI_INDEX,
         trusted_hosts=_PYPI_TRUSTED_HOSTS,
@@ -240,7 +274,7 @@ def get_metadata_for_wheel(url):
     return EmailMessage()
 
 
-class PyPIProvider(APBase):
+class PyPIProvider(_AbstractProvider):
     BUILD_FLAGS: ConfigSettingsType = {}
     BUILD_SKIP: list[str] = []
     BUILD_EXPORTS: _BuildSpecExports = []
@@ -343,6 +377,7 @@ def _resolve_and_build(
     skip_dependency_check: bool = False,
     compression_level: int = 6,
 ) -> None:
+    BaseReporter, Resolver = _import_resolvelib()
     requirements = []
 
     target_env = {
@@ -361,7 +396,7 @@ def _resolve_and_build(
     # Create the (reusable) resolver.
     provider = PyPIProvider(build_dependencies=build_dependencies)
     reporter = BaseReporter()
-    resolver: Resolver[Requirement, Candidate, str] = Resolver(provider, reporter)
+    resolver = Resolver(provider, reporter)
 
     # Kick off the resolution process, and get the final result.
     result = resolver.resolve(requirements)
@@ -468,6 +503,7 @@ def build_dependencies_for_wheel(
 
 
 def fetch_pypi_package(package_spec: str, destdir: Path) -> Path:
+    _, PackageFinder = _import_unearth()
     pf = PackageFinder(
         index_urls=_PYPI_INDEX,
         trusted_hosts=_PYPI_TRUSTED_HOSTS,

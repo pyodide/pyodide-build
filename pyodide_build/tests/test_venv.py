@@ -91,11 +91,11 @@ def test_venv_cli_args(monkeypatch, options, expected_calls, tmp_path):
         "pyodide_build.out_of_tree.venv.PyodideVenv._create_pip_conf", lambda self: None
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pip_script",
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_pip_script",
         lambda self: None,
     )
     monkeypatch.setattr(
-        "pyodide_build.out_of_tree.venv.UnixPyodideVenv.create_pyodide_script",
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_pyodide_script",
         lambda self: None,
     )
     monkeypatch.setattr(
@@ -266,7 +266,7 @@ def test_pytest_invoke(base_test_dir):
     if platform.system() == "Darwin":
         pytest.skip("TODO: Why doesn't this work on Mac OS?")
     venv_path = base_test_dir / "test_venv"
-    venv.create_pyodide_venv(venv_path, [])
+    builder = venv.create_pyodide_venv(venv_path, [])
     pip = venv_path / "bin" / "pip"
     subprocess.run(
         [
@@ -276,7 +276,7 @@ def test_pytest_invoke(base_test_dir):
         ],
         check=True,
     )
-    venv_pytest = venv_path / "bin" / "pytest"
+    venv_pytest = builder.venv_bin / "pytest"
 
     (base_test_dir / "test_a.py").write_text(
         dedent(
@@ -355,9 +355,14 @@ def test_create_app_data_dir(tmp_path, clear_app_data_cache):
     ) as app_data_dir:
         # virtualenv creates the app data file named by the sha256 hash of the target python executable path
         # not the best way to test, but can't think of a better one right now
-        py_info_dir = Path(app_data_dir) / "py_info" / "2"
+        # The version subdirectory (e.g. "2", "3") may change across virtualenv releases, so scan dynamically.
+        py_info_base = Path(app_data_dir) / "py_info"
         filename = (
             sha256(str(target_python_executable).encode("utf-8")).hexdigest() + ".json"
         )
-        assert (py_info_dir / filename).exists()
+        assert any(
+            (version_dir / filename).exists()
+            for version_dir in py_info_base.iterdir()
+            if version_dir.is_dir()
+        ), f"{filename} not found in any subdirectory of {py_info_base}"
         clear_app_data_cache(app_data_dir)

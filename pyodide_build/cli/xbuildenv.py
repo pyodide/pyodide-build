@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import typer
+import click
 
 from pyodide_build.build_env import get_build_flag, local_versions
 from pyodide_build.common import default_xbuildenv_path
@@ -13,86 +13,116 @@ from pyodide_build.xbuildenv_releases import (
 
 DEFAULT_PATH = default_xbuildenv_path()
 
-app = typer.Typer(no_args_is_help=True)
 
-
-@app.callback()
-def callback():
-    """
-    Manage cross-build environment for building packages for Pyodide.
-    """
+@click.group(invoke_without_command=True)
+@click.pass_context
+def app(ctx: click.Context) -> None:
+    """Manage cross-build environment for building packages for Pyodide."""
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
 
 
 def check_xbuildenv_root(path: Path) -> None:
     if not path.is_dir():
-        typer.echo(f"Cross-build environment not found in {path.resolve()}")
-        raise typer.Exit(1)
+        click.echo(f"Cross-build environment not found in {path.resolve()}")
+        raise SystemExit(1)
 
 
 @app.command("install")
+@click.argument("version", default=None, required=False)
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    envvar="PYODIDE_XBUILDENV_PATH",
+    show_envvar=True,
+    help="destination to download cross-build environment directory to.",
+)
+@click.option(
+    "--url",
+    default=None,
+    help="URL to download cross-build environment from.",
+)
+@click.option(
+    "--force",
+    "-f",
+    "force_install",
+    is_flag=True,
+    default=False,
+    help="force installation even if the version is not compatible.",
+)
+@click.option(
+    "--skip-cross-build-packages",
+    is_flag=True,
+    default=False,
+    envvar="PYODIDE_SKIP_CROSS_BUILD_PACKAGES",
+    show_envvar=True,
+    help="skip installing cross-build packages (e.g. numpy, scipy) into the environment.",
+)
 def _install(
-    version: str = typer.Argument(
-        None, help="version of cross-build environment to install"
-    ),
-    path: Path = typer.Option(
-        DEFAULT_PATH,
-        envvar="PYODIDE_XBUILDENV_PATH",
-        help="destination to download cross-build environment directory to.",
-    ),
-    url: str = typer.Option(None, help="URL to download cross-build environment from"),
-    force_install: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="force installation even if the version is not compatible",
-    ),
+    version: str | None,
+    path: Path,
+    url: str | None,
+    force_install: bool,
+    skip_cross_build_packages: bool,
 ) -> None:
-    """
-    Install cross-build environment.
+    """Install cross-build environment.
 
     The installed environment is the same as the one that would result from
     `PYODIDE_PACKAGES='scipy' make` except that it is much faster.
     The goal is to enable out-of-tree builds for binary packages that depend
     on numpy or scipy.
+
+    \b
+    Arguments:
+        VERSION: version of cross-build environment to install (optional)
     """
     manager = CrossBuildEnvManager(path)
 
     if url:
-        manager.install(url=url, force_install=force_install)
+        manager.install(
+            url=url,
+            force_install=force_install,
+            skip_install_cross_build_packages=skip_cross_build_packages,
+        )
     else:
-        manager.install(version=version, force_install=force_install)
+        manager.install(
+            version=version,
+            force_install=force_install,
+            skip_install_cross_build_packages=skip_cross_build_packages,
+        )
 
-    typer.echo(f"Pyodide cross-build environment installed at {path.resolve()}")
+    click.echo(f"Pyodide cross-build environment installed at {path.resolve()}")
 
 
 @app.command("version")
-def _version(
-    path: Path = typer.Option(
-        DEFAULT_PATH, help="path to cross-build environment directory"
-    ),
-) -> None:
-    """
-    Print current version of cross-build environment.
-    """
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    help="path to cross-build environment directory.",
+)
+def _version(path: Path) -> None:
+    """Print current version of cross-build environment."""
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     version = manager.current_version
     if not version:
-        typer.echo("No version selected")
-        raise typer.Exit(1)
+        click.echo("No version selected")
+        raise SystemExit(1)
     else:
-        typer.echo(version)
+        click.echo(version)
 
 
 @app.command("versions")
-def _versions(
-    path: Path = typer.Option(
-        DEFAULT_PATH, help="path to cross-build environment directory"
-    ),
-) -> None:
-    """
-    Print all installed versions of cross-build environment.
-    """
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    help="path to cross-build environment directory.",
+)
+def _versions(path: Path) -> None:
+    """Print all installed versions of cross-build environment."""
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     versions = manager.list_versions()
@@ -100,71 +130,87 @@ def _versions(
 
     for version in versions:
         if version == current_version:
-            typer.echo(f"* {version}")
+            click.echo(f"* {version}")
         else:
-            typer.echo(f"  {version}")
+            click.echo(f"  {version}")
 
 
 @app.command("uninstall")
-def _uninstall(
-    version: str = typer.Argument(
-        None, help="version of cross-build environment to uninstall"
-    ),
-    path: Path = typer.Option(
-        DEFAULT_PATH, help="path to cross-build environment directory"
-    ),
-) -> None:
-    """
-    Uninstall cross-build environment.
+@click.argument("version", default=None, required=False)
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    help="path to cross-build environment directory.",
+)
+def _uninstall(version: str | None, path: Path) -> None:
+    """Uninstall cross-build environment.
+
+    \b
+    Arguments:
+        VERSION: version of cross-build environment to uninstall (optional)
     """
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     v = manager.uninstall_version(version)
-    typer.echo(f"Pyodide cross-build environment {v} uninstalled")
+    click.echo(f"Pyodide cross-build environment {v} uninstalled")
 
 
 @app.command("use")
-def _use(
-    version: str = typer.Argument(
-        ..., help="version of cross-build environment to use"
-    ),
-    path: Path = typer.Option(
-        DEFAULT_PATH, help="path to cross-build environment directory"
-    ),
-) -> None:
-    """
-    Select a version of cross-build environment to use.
+@click.argument("version")
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    help="path to cross-build environment directory.",
+)
+def _use(version: str, path: Path) -> None:
+    """Select a version of cross-build environment to use.
+
+    \b
+    Arguments:
+        VERSION: version of cross-build environment to use (required)
     """
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     manager.use_version(version)
-    typer.echo(f"Pyodide cross-build environment {version} is now in use")
+    click.echo(f"Pyodide cross-build environment {version} is now in use")
 
 
 @app.command("search")
+@click.option(
+    "--metadata",
+    "metadata_path",
+    default=None,
+    help=(
+        "path to cross-build environment metadata file. It can be a URL or a local file. "
+        "If not given, the default metadata file is used."
+    ),
+)
+@click.option(
+    "--all",
+    "-a",
+    "show_all",
+    is_flag=True,
+    default=False,
+    help="search all versions, without filtering out incompatible ones.",
+)
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    default=False,
+    help="output results in JSON format.",
+)
 def _search(
-    metadata_path: str = typer.Option(
-        None,
-        "--metadata",
-        help="path to cross-build environment metadata file. It can be a URL or a local file. If not given, the default metadata file is used.",
-    ),
-    show_all: bool = typer.Option(
-        False,
-        "--all",
-        "-a",
-        help="search all versions, without filtering out incompatible ones",
-    ),
-    json_output: bool = typer.Option(
-        False,
-        "--json",
-        help="output results in JSON format",
-    ),
+    metadata_path: str | None,
+    show_all: bool,
+    json_output: bool,
 ) -> None:
-    """
-    Search for available versions of cross-build environment.
-    """
+    """Search for available versions of cross-build environment."""
 
     # TODO: cache the metadata file somewhere to avoid downloading it every time
+
     metadata_path = metadata_path or cross_build_env_metadata_url()
     metadata = load_cross_build_env_metadata(metadata_path)
     local = local_versions()
@@ -178,12 +224,11 @@ def _search(
         )
 
     if not releases:
-        typer.echo(
+        click.echo(
             "No compatible cross-build environment found for your system. Try using --all to see all versions."
         )
-        raise typer.Exit(1)
+        raise SystemExit(1)
 
-    # Generate views for the metadata objects (currently tabular or JSON)
     views = [
         MetadataView(
             version=release.version,
@@ -208,15 +253,22 @@ def _search(
 
 
 @app.command("install-emscripten")
+@click.option(
+    "--version",
+    default=None,
+    help="Emscripten version corresponding to the target Pyodide version",
+)
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_PATH,
+    help="Pyodide cross-env path",
+)
 def _install_emscripten(
-    version: str = typer.Option(
-        None,
-        help="Emscripten version corresponding to the target Pyodide version",
-    ),
-    path: Path = typer.Option(DEFAULT_PATH, help="Pyodide cross-env path"),
+    version: str | None,
+    path: Path,
 ) -> None:
-    """
-    Install Emscripten SDK into the cross-build environment.
+    """Install Emscripten SDK into the cross-build environment.
 
     This command clones the emsdk repository, installs and activates the specified
     Emscripten version, and applies Pyodide-specific patches.

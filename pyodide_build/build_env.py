@@ -328,17 +328,21 @@ def local_versions() -> dict[str, str]:
 
 
 def _create_constraints_file() -> str:
+    # PIP_BUILD_CONSTRAINT takes precedence; fall back to PIP_CONSTRAINT for backward compatibility
     try:
-        constraints = get_build_flag("PIP_CONSTRAINT")
+        constraints = get_build_flag("PIP_BUILD_CONSTRAINT")
     except ValueError:
-        return ""
+        try:
+            constraints = get_build_flag("PIP_CONSTRAINT")
+        except ValueError:
+            return ""
 
     if not constraints:
         return ""
 
     if len(constraints.split(maxsplit=1)) > 1:
         raise ValueError(
-            "PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to pyodide has no spaces.\n"
+            "PIP_BUILD_CONSTRAINT/PIP_CONSTRAINT contains spaces so pip will misinterpret it. Make sure the path to pyodide has no spaces.\n"
             "See https://github.com/pypa/pip/issues/13283"
         )
 

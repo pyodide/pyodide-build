@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.2] - 2026/02/20
+
+### Fixed
+
+- Fixed `pyodide venv` not working in Windows + Python 3.14.
+  [#299](https://github.com/pyodide/pyodide-build/pull/299)
+
+## [0.32.1] - 2026/02/20
+
+### Added
+
+- Added `--skip-cross-build-packages` flag (and `PYODIDE_SKIP_CROSS_BUILD_PACKAGES` env var) to
+  `pyodide xbuildenv install`, allowing users to skip installing cross-build packages (numpy,
+  scipy, cffi, pycparser) into the host site-packages. This is useful in locked-down environments
+  where packages need to be pre-approved, and the user is building packages that don't depend on
+  these at cross-compile time.
+- Added support for `PIP_BUILD_CONSTRAINT` environment variable for pip 26.2+ compatibility.
+  The build system now prioritizes `PIP_BUILD_CONSTRAINT` over `PIP_CONSTRAINT` when determining
+  build-time constraints, while maintaining backward compatibility.
+
+### Changed
+
+- The feature to build packages with dependencies is now opt-in feature. It needs to be enabled by
+  installing pyodide-build with `pip install pyodide-build[resolve]`.
+  [#277](https://github.com/pyodide/pyodide-build/pull/277)
+
+### Fixed
+
+- Fixed `pyodide venv` not working in Windows with virtualenv 20.38.
+  [#298](https://github.com/pyodide/pyodide-build/pull/298)
+
+## [0.32.0] - 2026/01/27
+
+### Changed
+
+- Dropped `typer` dependency in favor of `click`.
+  [#287](https://github.com/pyodide/pyodide-build/pull/287)
+
+## [0.31.2] - 2026/01/26
+
+### Added
+
+- Added `--clean` option to clean up temporary build files after building a package with `pyodide build-recipes`.
+  [#282](https://github.com/pyodide/pyodide-build/pull/282)
+
+## [0.31.1] - 2026/01/05
+
+### Fixed
+
+- Fixed an issue where pip inside the Pyodide venv would not correctly handle the arguments with spaces.
+  [#281](https://github.com/pyodide/pyodide-build/pull/281)
+
+## [0.31.0] - 2026/01/05
+
+### Added
+
+- `pyodide venv` now works in Windows. It only works with Pyodide 0.29.1 and later.
+  [#274](https://github.com/pyodide/pyodide-build/pull/274)
+
+### Removed
+
+- Removed `pyodide create-zipfile` subcommand. This command is was used only for building pyodide runtime and not for building packages.
+  [#276](https://github.com/pyodide/pyodide-build/pull/276)
+
 ### Fixed
 
 - Fixed an issue where the compiler flags such as `cflags`, `cxxflags`, and `ldflags` from

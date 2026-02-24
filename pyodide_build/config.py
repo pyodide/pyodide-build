@@ -216,6 +216,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "pyodide_package_index": "PYODIDE_PACKAGE_INDEX",
     "platform_triplet": "PLATFORM_TRIPLET",
     "pip_constraint": "PIP_CONSTRAINT",
+    "pip_build_constraint": "PIP_BUILD_CONSTRAINT",
     "pymajor": "PYMAJOR",
     "pymicro": "PYMICRO",
     "pyminor": "PYMINOR",
@@ -265,6 +266,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "cflags",
     "cxxflags",
     "ldflags",
+    "rustflags",
     "rust_toolchain",
     "rust_emscripten_target_url",
     "meson_cross_file",
@@ -319,6 +321,8 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     "pyodide_interpreter": "$(PYODIDE_ROOT)/dist/python",
     "pyodide_package_index": "$(PYODIDE_ROOT)/package_index",
     "dist_dir": "$(PYODIDE_ROOT)/dist",
+    # Pip constraints - defaults to PIP_CONSTRAINT if not set
+    "pip_build_constraint": "$(PIP_CONSTRAINT)",
 }
 
 
