@@ -566,7 +566,10 @@ class RecipeBuilder:
             "PKGDIR": str(self.pkg_root),
             "PKG_VERSION": self.version,
             "PKG_BUILD_DIR": str(self.src_extract_dir),
+            # deprecated
             "DISTDIR": str(self.src_dist_dir),
+            # tells Makefile to install to this directory
+            "DESTDIR": str(self.src_dist_dir),
             # TODO: rename this to something more compatible with Makefile or CMake conventions
             "WASM_LIBRARY_DIR": str(self.library_install_prefix),
             # Emscripten will use this variable to configure pkg-config in emconfigure
