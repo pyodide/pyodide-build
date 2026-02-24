@@ -184,4 +184,4 @@ max-statements = 58  # Default is 50
 ban-relative-imports = "all"
 
 [tool.pyodide.build]
-default_cross_build_env_url = "https://github.com/pyodide/pyodide-build-environment-nightly/releases/download/20251216/xbuildenv.tar.bz2"
+default_cross_build_env_url = "https://github.com/pyodide/pyodide-build-environment-nightly/releases/download/20260220/xbuildenv.tar.bz2"
