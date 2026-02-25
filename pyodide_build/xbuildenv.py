@@ -102,7 +102,9 @@ class CrossBuildEnvManager:
             If no active xbuildenv is selected.
         """
         if not self.symlink_dir.exists():
-            raise ValueError("No active xbuildenv. Run `pyodide xbuildenv install` first.")
+            raise ValueError(
+                "No active xbuildenv. Run `pyodide xbuildenv install` first."
+            )
         return self.symlink_dir.resolve()
 
     def cross_build_packages_installed(self, version_path: Path | None = None) -> bool:

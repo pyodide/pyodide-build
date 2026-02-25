@@ -122,7 +122,9 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
         from pyodide_build.common import default_xbuildenv_path
         from pyodide_build.xbuildenv import CrossBuildEnvManager
 
-        CrossBuildEnvManager(default_xbuildenv_path()).ensure_cross_build_packages_installed()
+        CrossBuildEnvManager(
+            default_xbuildenv_path()
+        ).ensure_cross_build_packages_installed()
 
     for name in get_unisolated_packages():
         for path in chain(
