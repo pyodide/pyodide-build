@@ -106,6 +106,24 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
     host_site_packages = Path(get_hostsitepackages())
+    unisolated_packages = get_unisolated_packages()
+
+    needs_cross_build_install = any(
+        not any(
+            chain(
+                host_site_packages.glob(f"{name}*"),
+                host_site_packages.glob(f"_{name}*"),
+            )
+        )
+        for name in unisolated_packages
+    )
+
+    if needs_cross_build_install:
+        from pyodide_build.common import default_xbuildenv_path
+        from pyodide_build.xbuildenv import CrossBuildEnvManager
+
+        CrossBuildEnvManager(default_xbuildenv_path()).ensure_cross_build_packages_installed()
+
     for name in get_unisolated_packages():
         for path in chain(
             host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
