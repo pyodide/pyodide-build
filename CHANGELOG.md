@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Cross-build package installation is now lazy by default. `pyodide xbuildenv install` can skip eager installation, and cross-build packages are installed on first build-time use.
+- Added marker-based idempotency for cross-build package installation, so repeated checks do not reinstall packages once they are already present.
+
+### Added
+
+- Added internal marker file `.cross-build-packages-installed` and `CrossBuildEnvManager.ensure_cross_build_packages_installed()` to support on-demand installation.
+- Added tests covering lazy installation trigger path and idempotent installation behavior.
+
 ## [0.32.2] - 2026/02/20
 
 ### Fixed

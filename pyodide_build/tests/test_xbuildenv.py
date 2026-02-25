@@ -398,6 +398,26 @@ class TestCrossBuildEnvManager:
         monkeypatch.setattr(sys, "version_info", VersionInfo(3, 12))
         build_env._init_xbuild_env(xbuildenv_path=tmp_path)
         assert manager.current_version >= "0.27.7"
+    
+    def test_ensure_cross_build_packages_installed_idempotent(
+    self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        pip_called_with = monkeypatch_subprocess_run_pip
+        manager = CrossBuildEnvManager(tmp_path)
+
+        # Install xbuildenv lazily (no pip call expected here)
+        manager.install(version=None, url=dummy_xbuildenv_url, skip_install_cross_build_packages=True)
+        assert pip_called_with == []
+
+        manager.ensure_cross_build_packages_installed()
+        assert len(pip_called_with) == 9  # one pip invocation argv captured
+
+        manager.ensure_cross_build_packages_installed()
+        assert len(pip_called_with) == 9  # unchanged: idempotent
+
+        marker = manager.symlink_dir.resolve() / ".cross-build-packages-installed"
+        assert marker.exists()
+
 
 
 @pytest.mark.parametrize(

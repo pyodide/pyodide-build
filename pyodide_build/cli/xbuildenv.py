@@ -54,7 +54,7 @@ def check_xbuildenv_root(path: Path) -> None:
 @click.option(
     "--skip-cross-build-packages",
     is_flag=True,
-    default=False,
+    default=True,
     envvar="PYODIDE_SKIP_CROSS_BUILD_PACKAGES",
     show_envvar=True,
     help="skip installing cross-build packages (e.g. numpy, scipy) into the environment.",
