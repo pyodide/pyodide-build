@@ -82,6 +82,7 @@ clean:
 	rm -rf .pyodide-xbuildenv*
 	rm -rf recipes/*/build
 	rm -rf test_venv
+	rm -rf test-cmdline-runner
 	rm -rf src/numpy-*
 	rm -rf src/numpy-*.tar.gz
 	rm -rf numpy-*

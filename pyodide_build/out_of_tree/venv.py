@@ -234,7 +234,7 @@ class PyodideVenv(ABC):
             # In the xbuildenv, we don't have the packages locally. We will include
             # in the xbuildenv a PEP 503 index for the vendored Pyodide packages
             # https://peps.python.org/pep-0503/
-            repo = f"extra-index-url=file:{get_pyodide_root() / 'package_index'}"
+            repo = f"extra-index-url={(get_pyodide_root() / 'package_index').as_uri()}"
         else:
             # In the Pyodide development environment, the Pyodide dist directory
             # should contain the needed wheels. find-links
@@ -311,6 +311,7 @@ class PyodideVenv(ABC):
         sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
         pip_patched_name = self.pip_patched_path.name
         exe_suffix = self.exe_suffix
+        pyodide_platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
         return dedent(
             """\
             import os
@@ -355,13 +356,8 @@ class PyodideVenv(ABC):
             """
             f"""
             os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
-            if os.name == "nt":
-                # Replace pathlib.Path with pathlib.WindowsPath to avoid issues on Windows in path calculation
-                pathlib.Path = pathlib.WindowsPath
 
-            os.name = os_name
             os.getuid = os.getuid if hasattr(os, "getuid") else lambda: 0
-            sys.platform = sys_platform
             sys.platlibdir = "lib"
             sys.implementation._multiarch = multiarch
             sys.abiflags = getattr(sys, "abiflags", "")  # ensure abiflags exists even in Windows
@@ -374,6 +370,30 @@ class PyodideVenv(ABC):
             sysconfig._init_config_vars()
             del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
             """
+            # On windows, patching sys.platform or os.name breaks how pip internals work (e.g. Pathlib)
+            # So instead, we use `--platform` option to inject the correct platform to pip commands.
+            # However, pip does not allow cross-platform installation unless `--target` flag is given,
+            # but `--target` behaves differently from normal installation (e.g. it does not support upgrading/downgrading packages very well, etc).
+            # so we ended up monkey-patching the cli option check function to allow using `--platform` without `--target`.
+            f"""
+            if os.name == "nt":
+                import pip._internal.cli.cmdoptions as cmdoptions
+
+                _original_check = cmdoptions.check_dist_restriction
+
+                def _patched_check_dist_restriction(options, check_target=False):
+                    _original_check(options, check_target=False)  # always skip target check
+
+                cmdoptions.check_dist_restriction = _patched_check_dist_restriction
+
+                if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
+                    if "--platform" not in sys.argv:
+                        sys.argv.extend(["--platform", "{pyodide_platform}"])
+                    if "--only-binary" not in sys.argv:
+                        sys.argv.extend(["--only-binary", ":all:"])
+            else:
+                sys.platform = sys_platform
+            """
             # Handle pip updates.
             #
             # The pip executable should be a symlink to pip_patched. If it is not a
@@ -381,15 +401,14 @@ class PyodideVenv(ABC):
             # have to restore the correct value of pip. Iterate through all of the
             # pip variants in the folder and remove them and replace with a symlink
             # to pip_patched.
+            # Avoid using pathlib as it might mess up the path calculation on cross-platform environments.
             f"""
-            from pathlib import Path
-
-            file_path = Path(__file__).parent / f"pip{exe_suffix}"
+            file_path = os.path.join(os.path.dirname(__file__), "pip{exe_suffix}")
 
 
             def pip_is_okay():
                 try:
-                    return file_path.readlink() == file_path.with_name("{pip_patched_name}")
+                    return os.readlink(file_path) == os.path.join(os.path.dirname(file_path), "{pip_patched_name}")
                 except OSError as e:
                     if e.strerror != "Invalid argument":
                         raise
@@ -400,16 +419,25 @@ class PyodideVenv(ABC):
                 if pip_is_okay():
                     return
 
-                venv_bin = file_path.parent
-                pip_patched = venv_bin / "{pip_patched_name}"
-                for pip in venv_bin.glob("pip*"):
-                    if pip == pip_patched:
+                venv_bin = os.path.dirname(file_path)
+                pip_patched = os.path.join(venv_bin, "{pip_patched_name}")
+                for pip in os.listdir(venv_bin):
+                    if not pip.startswith("pip"):
                         continue
-                    pip.unlink(missing_ok=True)
-                    patched_pip_exe = pip.with_suffix("{exe_suffix}")
+                    if pip == "{pip_patched_name}":
+                        continue
+                    pip_path = os.path.join(venv_bin, pip)
+                    try:
+                        os.unlink(pip_path)
+                    except FileNotFoundError:
+                        pass
+                    patched_pip_exe = os.path.join(venv_bin, f"pip{exe_suffix}")
                     if patched_pip_exe != pip_patched:
-                        patched_pip_exe.unlink(missing_ok=True)
-                        patched_pip_exe.symlink_to(pip_patched)
+                        try:
+                            os.unlink(patched_pip_exe)
+                        except FileNotFoundError:
+                            pass
+                        os.symlink(pip_patched, patched_pip_exe)
 
 
             import atexit
