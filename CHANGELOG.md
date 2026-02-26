@@ -7,19 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+## [0.33.0] - 2026/02/26
 
-- Cross-build package installation is now lazy by default. `pyodide xbuildenv install` can skip eager installation, and cross-build packages are installed on first build-time use.
-- Added marker-based idempotency for cross-build package installation, so repeated checks do not reinstall packages once they are already present.
+## Changed
 
-### Added
+- Emscripten will now be auto installed when running `pyodide build` and `pyodide build-recipes` if
+  the host system does not have emscripten installed.
+  [#293](https://github.com/pyodide/pyodide-build/pull/293)
 
-- Added internal marker file `.cross-build-packages-installed` and `CrossBuildEnvManager.ensure_cross_build_packages_installed()` to support on-demand installation.
-- Added tests covering lazy installation trigger path and idempotent installation behavior.
-
-## [0.32.2] - 2026/02/20
-
-### Fixed
+## Fixed
 
 - Fixed `pyodide venv` not working in Windows + Python 3.14.
   [#299](https://github.com/pyodide/pyodide-build/pull/299)

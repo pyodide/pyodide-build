@@ -92,107 +92,29 @@ class TestOutOfTree(TestInTree):
         # host environment variables should have precedence over
         # variables defined in Makefile.envs
 
-        import os
-
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
         pyodide_root = manager.pyodide_root
 
         e = build_env.get_build_environment_vars(pyodide_root)
         assert e["PYODIDE"] == "1"
 
-        monkeypatch.setenv("HOME", "/home/user")
-        monkeypatch.setenv("PATH", "/usr/bin:/bin")
-        # We now inject PKG_CONFIG_LIBDIR inside buildpkg.py
-        # monkeypatch.setenv("PKG_CONFIG_LIBDIR", "/x/y/z:/c/d/e")
+        monkeypatch.setenv("PIP_CONSTRAINT", "/tmp/constraint.txt")
 
         build_env.get_build_environment_vars.cache_clear()
 
         e_host = build_env.get_build_environment_vars(pyodide_root)
-        assert e_host.get("HOME") == os.environ.get("HOME")
-        assert e_host.get("PATH") == os.environ.get("PATH")
-
-        assert e_host.get("HOME") != e.get("HOME")
-        assert e_host.get("PATH") != e.get("PATH")
+        assert e_host.get("PIP_CONSTRAINT") == "/tmp/constraint.txt"
+        assert e_host.get("PIP_CONSTRAINT") != e.get("PIP_CONSTRAINT")
 
         build_env.get_build_environment_vars.cache_clear()
 
-        monkeypatch.delenv("HOME")
+        monkeypatch.delenv("PIP_CONSTRAINT")
         monkeypatch.setenv("RANDOM_ENV", "1234")
 
         build_env.get_build_environment_vars.cache_clear()
         e = build_env.get_build_environment_vars(pyodide_root)
-        assert "HOME" not in e
+        assert "PIP_CONSTRAINT" in e
         assert "RANDOM_ENV" not in e
-
-
-def test_check_emscripten_version(dummy_xbuildenv, monkeypatch):
-    s = None
-
-    def get_emscripten_version_info():
-        nonlocal s
-        return s
-
-    needed_version = build_env.emscripten_version()
-    monkeypatch.setattr(
-        build_env, "get_emscripten_version_info", get_emscripten_version_info
-    )
-    s = """\
-emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.4 (14cd48e6ead13b02a79f47df1a252abc501a3269)
-clang version 15.0.0 (https://github.com/llvm/llvm-project ce5588fdf478b6af724977c11a405685cebc3d26)
-Target: wasm32-unknown-emscripten
-Thread model: posix
-"""
-    with pytest.raises(
-        RuntimeError,
-        match=f"Incorrect Emscripten version 3.1.4. Need Emscripten version {needed_version}",
-    ):
-        build_env.check_emscripten_version()
-
-    s = """\
-emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 1.39.20
-clang version 12.0.0 (/b/s/w/ir/cache/git/chromium.googlesource.com-external-github.com-llvm-llvm--project 55fa315b0352b63454206600d6803fafacb42d5e)
-"""
-
-    with pytest.raises(
-        RuntimeError,
-        match=f"Incorrect Emscripten version 1.39.20. Need Emscripten version {needed_version}",
-    ):
-        build_env.check_emscripten_version()
-
-    s = f"""\
-emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) {build_env.emscripten_version()} (4343cbec72b7db283ea3bda1adc6cb1811ae9a73)
-clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b8955821b8fdbd4f8f303e2)
-"""
-    build_env.check_emscripten_version()
-
-    s = f"""\
-emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) {build_env.emscripten_version()}-git
-clang version 15.0.0 (https://github.com/llvm/llvm-project 7effcbda49ba32991b8955821b8fdbd4f8f303e2)
-"""
-    build_env.check_emscripten_version()
-
-    def get_emscripten_version_info():  # type: ignore[no-redef]
-        raise FileNotFoundError()
-
-    monkeypatch.setattr(
-        build_env, "get_emscripten_version_info", get_emscripten_version_info
-    )
-
-    with pytest.raises(
-        RuntimeError,
-        match=f"No Emscripten compiler found. Need Emscripten version {needed_version}",
-    ):
-        build_env.check_emscripten_version()
-
-
-def test_check_emscripten_version_skip(dummy_xbuildenv, monkeypatch, reset_cache):
-    with pytest.raises(RuntimeError):
-        monkeypatch.setenv("SKIP_EMSCRIPTEN_VERSION_CHECK", "0")
-        build_env.check_emscripten_version()
-
-    reset_cache()
-    monkeypatch.setenv("SKIP_EMSCRIPTEN_VERSION_CHECK", "1")
-    build_env.check_emscripten_version()
 
 
 def test_wheel_paths(dummy_xbuildenv):
@@ -237,6 +159,155 @@ def test_wheel_paths(dummy_xbuildenv):
             f"{current_version}-none-any",
         ]
     )
+
+
+def test_ensure_emscripten_auto_installs_when_missing(dummy_xbuildenv, monkeypatch):
+    needed_version = build_env.emscripten_version()
+    install_called = False
+    activate_called = False
+    call_count = [0]
+
+    def mock_get_emscripten_version_info():
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise FileNotFoundError()
+        return f"emcc (Emscripten) {needed_version} (abc123)\nclang version 15.0.0"
+
+    def mock_install_emscripten(self, version=None):
+        nonlocal install_called
+        install_called = True
+        return dummy_xbuildenv / "emsdk"
+
+    def mock_activate_emscripten_env(emsdk_dir):
+        nonlocal activate_called
+        activate_called = True
+        return {"EMSDK": str(emsdk_dir), "PATH": f"{emsdk_dir}/bin"}
+
+    monkeypatch.setattr(
+        build_env, "get_emscripten_version_info", mock_get_emscripten_version_info
+    )
+    monkeypatch.setattr(
+        CrossBuildEnvManager, "install_emscripten", mock_install_emscripten
+    )
+    monkeypatch.setattr(
+        build_env, "activate_emscripten_env", mock_activate_emscripten_env
+    )
+
+    build_env.ensure_emscripten()
+
+    assert install_called
+    assert activate_called
+    assert "EMSDK" in os.environ
+
+
+def test_ensure_emscripten_skipped_with_env_var(dummy_xbuildenv, monkeypatch):
+    needed_version = build_env.emscripten_version()
+    install_called = False
+
+    def mock_get_emscripten_version_info():
+        raise FileNotFoundError()
+
+    def mock_install_emscripten(self, version=None):
+        nonlocal install_called
+        install_called = True
+        return dummy_xbuildenv / "emsdk"
+
+    monkeypatch.setattr(
+        build_env, "get_emscripten_version_info", mock_get_emscripten_version_info
+    )
+    monkeypatch.setattr(
+        CrossBuildEnvManager, "install_emscripten", mock_install_emscripten
+    )
+    monkeypatch.setenv("PYODIDE_SKIP_EMSCRIPTEN_INSTALL", "1")
+
+    with pytest.raises(
+        RuntimeError,
+        match=f"No Emscripten compiler found. Need Emscripten version {needed_version}",
+    ):
+        build_env.ensure_emscripten()
+
+    assert not install_called
+
+
+def test_ensure_emscripten_skipped_with_flag(dummy_xbuildenv, monkeypatch):
+    needed_version = build_env.emscripten_version()
+    install_called = False
+
+    def mock_get_emscripten_version_info():
+        raise FileNotFoundError()
+
+    def mock_install_emscripten(self, version=None):
+        nonlocal install_called
+        install_called = True
+        return dummy_xbuildenv / "emsdk"
+
+    monkeypatch.setattr(
+        build_env, "get_emscripten_version_info", mock_get_emscripten_version_info
+    )
+    monkeypatch.setattr(
+        CrossBuildEnvManager, "install_emscripten", mock_install_emscripten
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=f"No Emscripten compiler found. Need Emscripten version {needed_version}",
+    ):
+        build_env.ensure_emscripten(skip_install=True)
+
+    assert not install_called
+
+
+def test_ensure_emscripten_already_installed(dummy_xbuildenv, monkeypatch):
+    needed_version = build_env.emscripten_version()
+    install_called = False
+
+    def mock_get_emscripten_version_info():
+        return f"emcc (Emscripten) {needed_version} (abc123)\nclang version 15.0.0"
+
+    def mock_install_emscripten(self, version=None):
+        nonlocal install_called
+        install_called = True
+        return dummy_xbuildenv / "emsdk"
+
+    monkeypatch.setattr(
+        build_env, "get_emscripten_version_info", mock_get_emscripten_version_info
+    )
+    monkeypatch.setattr(
+        CrossBuildEnvManager, "install_emscripten", mock_install_emscripten
+    )
+
+    build_env.ensure_emscripten()
+
+    assert not install_called
+
+
+def test_ensure_emscripten_version_mismatch(dummy_xbuildenv, monkeypatch):
+    needed_version = build_env.emscripten_version()
+    wrong_version = "3.1.0"
+    install_called = False
+
+    def mock_get_emscripten_version_info():
+        return f"emcc (Emscripten) {wrong_version} (abc123)\nclang version 15.0.0"
+
+    def mock_install_emscripten(self, version=None):
+        nonlocal install_called
+        install_called = True
+        return dummy_xbuildenv / "emsdk"
+
+    monkeypatch.setattr(
+        build_env, "get_emscripten_version_info", mock_get_emscripten_version_info
+    )
+    monkeypatch.setattr(
+        CrossBuildEnvManager, "install_emscripten", mock_install_emscripten
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=f"Incorrect Emscripten version {wrong_version}. Need Emscripten version {needed_version}",
+    ):
+        build_env.ensure_emscripten()
+
+    assert not install_called
 
 
 def test_create_constraints_file_with_pip_build_constraint(
