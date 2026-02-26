@@ -21,8 +21,8 @@ from pyodide_build.build_env import (
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
-    platform,
     in_xbuildenv,
+    platform,
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
@@ -111,10 +111,7 @@ def symlink_unisolated_packages(
     host_site_packages = Path(get_hostsitepackages())
     unisolated_packages = set(get_unisolated_packages())
 
-    required = {
-        Requirement(req).name.lower()
-        for req in (reqs or set())
-    }
+    required = {Requirement(req).name.lower() for req in (reqs or set())}
 
     needs_cross_build_install = bool(unisolated_packages & required)
 

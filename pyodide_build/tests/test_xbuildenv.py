@@ -425,8 +425,6 @@ class TestCrossBuildEnvManager:
         assert marker.exists()
 
 
-
-
 @pytest.mark.parametrize(
     "url, version",
     [
