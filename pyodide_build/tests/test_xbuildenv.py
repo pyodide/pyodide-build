@@ -399,6 +399,31 @@ class TestCrossBuildEnvManager:
         build_env._init_xbuild_env(xbuildenv_path=tmp_path)
         assert manager.current_version >= "0.27.7"
 
+    def test_ensure_cross_build_packages_installed_idempotent(
+        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        pip_called_with = monkeypatch_subprocess_run_pip
+        manager = CrossBuildEnvManager(tmp_path)
+
+        # Lazy install path: no cross-build packages installed yet
+        manager.install(
+            version=None,
+            url=dummy_xbuildenv_url,
+            skip_install_cross_build_packages=True,
+        )
+        assert pip_called_with == []
+
+        # First ensure installs once
+        manager.ensure_cross_build_packages_installed()
+        assert len(pip_called_with) == 9
+
+        # Second ensure is a no-op
+        manager.ensure_cross_build_packages_installed()
+        assert len(pip_called_with) == 9
+
+        marker = manager.symlink_dir.resolve() / ".cross-build-packages-installed"
+        assert marker.exists()
+
 
 @pytest.mark.parametrize(
     "url, version",

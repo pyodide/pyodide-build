@@ -97,3 +97,51 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "cxxflags" in wasmcross_args
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
+
+
+def test_symlink_unisolated_packages_triggers_lazy_install(
+    tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+):
+    called = {"count": 0}
+
+    def _ensure(self):
+        called["count"] += 1
+
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.ensure_cross_build_packages_installed",
+        _ensure,
+    )
+    monkeypatch.setattr(
+        "pyodide_build.build_env.get_unisolated_packages",
+        lambda: ["numpy"],
+    )
+
+    class DummyEnv:
+        path = str(tmp_path / "venv")
+
+    pypabuild.symlink_unisolated_packages(DummyEnv(), reqs={"numpy>=1.0"})
+    assert called["count"] == 1
+
+
+def test_symlink_unisolated_packages_does_not_trigger_without_unisolated_requirements(
+    tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+):
+    called = {"count": 0}
+
+    def _ensure(self):
+        called["count"] += 1
+
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.ensure_cross_build_packages_installed",
+        _ensure,
+    )
+    monkeypatch.setattr(
+        "pyodide_build.build_env.get_unisolated_packages",
+        lambda: ["numpy"],
+    )
+
+    class DummyEnv:
+        path = str(tmp_path / "venv")
+
+    pypabuild.symlink_unisolated_packages(DummyEnv(), reqs={"wheel"})
+    assert called["count"] == 0
