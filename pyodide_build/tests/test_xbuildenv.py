@@ -405,7 +405,7 @@ class TestCrossBuildEnvManager:
         pip_called_with = monkeypatch_subprocess_run_pip
         manager = CrossBuildEnvManager(tmp_path)
 
-        # Install xbuildenv lazily (no pip call expected here)
+        # Lazy install path: no cross-build packages installed yet
         manager.install(
             version=None,
             url=dummy_xbuildenv_url,
@@ -413,14 +413,18 @@ class TestCrossBuildEnvManager:
         )
         assert pip_called_with == []
 
+        # First ensure installs once
         manager.ensure_cross_build_packages_installed()
-        assert len(pip_called_with) == 9  # one pip invocation argv captured
+        assert len(pip_called_with) == 9
 
+        # Second ensure is a no-op
         manager.ensure_cross_build_packages_installed()
-        assert len(pip_called_with) == 9  # unchanged: idempotent
+        assert len(pip_called_with) == 9
 
         marker = manager.symlink_dir.resolve() / ".cross-build-packages-installed"
         assert marker.exists()
+
+
 
 
 @pytest.mark.parametrize(

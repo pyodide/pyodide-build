@@ -22,6 +22,7 @@ from pyodide_build.build_env import (
     get_pyversion,
     get_unisolated_packages,
     platform,
+    in_xbuildenv,
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
@@ -91,7 +92,9 @@ def _gen_runner(
     return _runner
 
 
-def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
+def symlink_unisolated_packages(
+    env: DefaultIsolatedEnv, reqs: set[str] | None = None
+) -> None:
     from pyodide_build.build_env import get_build_flag, get_unisolated_packages
 
     pyversion = get_pyversion()
@@ -106,19 +109,16 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
     host_site_packages = Path(get_hostsitepackages())
-    unisolated_packages = get_unisolated_packages()
+    unisolated_packages = set(get_unisolated_packages())
 
-    needs_cross_build_install = any(
-        not any(
-            chain(
-                host_site_packages.glob(f"{name}*"),
-                host_site_packages.glob(f"_{name}*"),
-            )
-        )
-        for name in unisolated_packages
-    )
+    required = {
+        Requirement(req).name.lower()
+        for req in (reqs or set())
+    }
 
-    if needs_cross_build_install:
+    needs_cross_build_install = bool(unisolated_packages & required)
+
+    if in_xbuildenv() and needs_cross_build_install:
         from pyodide_build.common import default_xbuildenv_path
         from pyodide_build.xbuildenv import CrossBuildEnvManager
 
@@ -184,7 +184,7 @@ def _build_in_isolated_env(
         )
 
         # first install the build dependencies
-        symlink_unisolated_packages(env)
+        symlink_unisolated_packages(env, builder.build_system_requires)
         install_reqs(build_env, env, builder.build_system_requires)
         build_reqs: set[str] | None = None
         try:
@@ -209,6 +209,7 @@ def _build_in_isolated_env(
                     config_settings,
                 )
 
+        symlink_unisolated_packages(env, build_reqs)
         install_reqs(build_env, env, build_reqs)
 
         with common.replace_env(build_env):
