@@ -54,10 +54,11 @@ def check_xbuildenv_root(path: Path) -> None:
 @click.option(
     "--skip-cross-build-packages",
     is_flag=True,
-    default=True,
+    default=False,
     envvar="PYODIDE_SKIP_CROSS_BUILD_PACKAGES",
     show_envvar=True,
-    help="skip installing cross-build packages (e.g. numpy, scipy) into the environment.",
+    help="Deprecated, no-op. Cross-build packages are installed lazily "
+        "when required by build dependencies.",
 )
 def _install(
     version: str | None,
@@ -83,13 +84,11 @@ def _install(
         manager.install(
             url=url,
             force_install=force_install,
-            skip_install_cross_build_packages=skip_cross_build_packages,
         )
     else:
         manager.install(
             version=version,
             force_install=force_install,
-            skip_install_cross_build_packages=skip_cross_build_packages,
         )
 
     click.echo(f"Pyodide cross-build environment installed at {path.resolve()}")
