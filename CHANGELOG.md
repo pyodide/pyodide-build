@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.32.2] - 2026/02/20
+## [0.33.0] - 2026/02/26
 
-### Fixed
+## Changed
+
+- Emscripten will now be auto installed when running `pyodide build` and `pyodide build-recipes` if
+  the host system does not have emscripten installed.
+  [#293](https://github.com/pyodide/pyodide-build/pull/293)
+
+## Fixed
 
 - Fixed `pyodide venv` not working in Windows + Python 3.14.
   [#299](https://github.com/pyodide/pyodide-build/pull/299)
