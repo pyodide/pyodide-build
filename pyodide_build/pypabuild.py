@@ -21,8 +21,8 @@ from pyodide_build.build_env import (
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
-    platform,
     in_xbuildenv,
+    platform,
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
@@ -111,15 +111,13 @@ def symlink_unisolated_packages(
     host_site_packages = Path(get_hostsitepackages())
     unisolated_packages = set(get_unisolated_packages())
 
-    required = {
-        Requirement(req).name.lower()
-        for req in (reqs or set())
-    }
+    required = {Requirement(req).name.lower() for req in (reqs or set())}
 
     needs_cross_build_install = bool(unisolated_packages & required)
 
     if in_xbuildenv() and needs_cross_build_install:
         from pyodide_build.build_env import get_current_xbuildenv_manager
+
         get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
 
     for name in get_unisolated_packages():
@@ -211,9 +209,11 @@ def _build_in_isolated_env(
             Requirement(req).name.lower() for req in builder.build_system_requires
         }
         new_build_reqs = {
-            req for req in build_reqs if Requirement(req).name.lower() not in base_req_names
+            req
+            for req in build_reqs
+            if Requirement(req).name.lower() not in base_req_names
         }
-        
+
         # We run install_reqs here if there are new packages to install
         # No need to install packages unless we have to install cross-build packages that are used
         if new_build_reqs:

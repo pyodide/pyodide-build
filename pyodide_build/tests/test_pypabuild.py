@@ -1,6 +1,3 @@
-import shutil
-from pathlib import Path
-
 from pyodide_build import pypabuild, pywasmcross
 from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
 
@@ -101,6 +98,7 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
 
+
 def test_symlink_unisolated_packages_triggers_lazy_install(
     tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
 ):
@@ -123,6 +121,7 @@ def test_symlink_unisolated_packages_triggers_lazy_install(
 
     pypabuild.symlink_unisolated_packages(DummyEnv(), reqs={"numpy>=1.0"})
     assert called["count"] == 1
+
 
 def test_symlink_unisolated_packages_does_not_trigger_without_unisolated_requirements(
     tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
@@ -204,6 +203,7 @@ def test_build_in_isolated_env_skips_second_pass_when_no_new_dynamic_reqs(
     assert symlink_calls == [{"setuptools", "wheel"}]
     assert install_calls == [{"setuptools", "wheel"}]
 
+
 def test_build_in_isolated_env_second_pass_installs_only_new_dynamic_reqs(
     tmp_path, monkeypatch
 ):
@@ -263,5 +263,3 @@ def test_build_in_isolated_env_second_pass_installs_only_new_dynamic_reqs(
     # Second pass should include only the newly discovered requirement
     assert symlink_calls[1] == {"numpy>=1.26"}
     assert install_calls[1] == {"numpy>=1.26"}
-
-

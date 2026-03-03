@@ -58,7 +58,7 @@ def check_xbuildenv_root(path: Path) -> None:
     envvar="PYODIDE_SKIP_CROSS_BUILD_PACKAGES",
     show_envvar=True,
     help="Deprecated, no-op. Cross-build packages are installed lazily "
-        "when required by build dependencies.",
+    "when required by build dependencies.",
 )
 def _install(
     version: str | None,
