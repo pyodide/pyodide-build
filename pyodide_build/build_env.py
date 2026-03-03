@@ -102,6 +102,14 @@ def get_pyodide_root() -> Path:
     return Path(os.environ["PYODIDE_ROOT"])
 
 
+def get_current_xbuildenv_manager():
+    from pyodide_build.xbuildenv import CrossBuildEnvManager
+    pyodide_root = get_pyodide_root()
+
+    xbuild_version_dir = pyodide_root.parent.parent
+    return CrossBuildEnvManager(xbuild_version_dir.parent)
+
+
 def search_pyodide_root(curdir: str | Path, *, max_depth: int = 10) -> Path | None:
     """
     Recursively search for the root of the Pyodide repository,

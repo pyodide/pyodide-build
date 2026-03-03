@@ -107,28 +107,6 @@ class CrossBuildEnvManager:
             )
         return self.symlink_dir.resolve()
 
-    def cross_build_packages_installed(self, version_path: Path | None = None) -> bool:
-        """
-        Check whether cross-build packages are already installed for an xbuildenv version.
-
-        Parameters
-        ----------
-        version_path
-            Optional concrete xbuildenv version directory. If omitted, checks the
-            currently active version. If no active version exists, returns False.
-
-        Returns
-        -------
-        bool
-            True if the installation marker exists, otherwise False.
-        """
-        if version_path is None:
-            try:
-                version_path = self._current_version_path()
-            except ValueError:
-                return False
-        return self._cross_build_packages_marker_path(version_path).exists()
-
     def ensure_cross_build_packages_installed(self) -> None:
         """
         Install cross-build packages for the active xbuildenv only when needed.

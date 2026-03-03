@@ -148,3 +148,120 @@ def test_symlink_unisolated_packages_does_not_trigger_without_unisolated_require
     assert called["count"] == 0
 
 
+def test_build_in_isolated_env_skips_second_pass_when_no_new_dynamic_reqs(
+    tmp_path, monkeypatch
+):
+    symlink_calls: list[set[str]] = []
+    install_calls: list[set[str]] = []
+
+    class DummyIsolatedEnv:
+        def __init__(self, installer):
+            self.path = str(tmp_path / "isolated")
+            self.scripts_dir = str(tmp_path / "isolated" / "bin")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class DummyProjectBuilder:
+        build_system_requires = {"setuptools", "wheel"}
+
+        @classmethod
+        def from_isolated_env(cls, env, srcdir, runner=None):
+            return cls()
+
+        def get_requires_for_build(self, distribution, config_settings=None):
+            # No new requirements beyond build_system_requires
+            return {"wheel>=0.40"}
+
+        def build(self, distribution, outdir, config_settings):
+            return "dummy.whl"
+
+    monkeypatch.setattr(pypabuild, "_DefaultIsolatedEnv", DummyIsolatedEnv)
+    monkeypatch.setattr(pypabuild, "_ProjectBuilder", DummyProjectBuilder)
+    monkeypatch.setattr(pypabuild.uv_helper, "should_use_uv", lambda: False)
+    monkeypatch.setattr(
+        pypabuild,
+        "symlink_unisolated_packages",
+        lambda env, reqs=None: symlink_calls.append(set(reqs or set())),
+    )
+    monkeypatch.setattr(
+        pypabuild,
+        "install_reqs",
+        lambda build_env, env, reqs: install_calls.append(set(reqs)),
+    )
+
+    pypabuild._build_in_isolated_env(
+        build_env={},
+        srcdir=tmp_path,
+        outdir=str(tmp_path),
+        distribution="wheel",
+        config_settings={},
+    )
+
+    assert symlink_calls == [{"setuptools", "wheel"}]
+    assert install_calls == [{"setuptools", "wheel"}]
+
+def test_build_in_isolated_env_second_pass_installs_only_new_dynamic_reqs(
+    tmp_path, monkeypatch
+):
+    symlink_calls: list[set[str]] = []
+    install_calls: list[set[str]] = []
+
+    class DummyIsolatedEnv:
+        def __init__(self, installer):
+            self.path = str(tmp_path / "isolated")
+            self.scripts_dir = str(tmp_path / "isolated" / "bin")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class DummyProjectBuilder:
+        build_system_requires = {"setuptools", "wheel"}
+
+        @classmethod
+        def from_isolated_env(cls, env, srcdir, runner=None):
+            return cls()
+
+        def get_requires_for_build(self, distribution, config_settings=None):
+            # Adds one new dynamic requirement
+            return {"wheel>=0.40", "numpy>=1.26"}
+
+        def build(self, distribution, outdir, config_settings):
+            return "dummy.whl"
+
+    monkeypatch.setattr(pypabuild, "_DefaultIsolatedEnv", DummyIsolatedEnv)
+    monkeypatch.setattr(pypabuild, "_ProjectBuilder", DummyProjectBuilder)
+    monkeypatch.setattr(pypabuild.uv_helper, "should_use_uv", lambda: False)
+    monkeypatch.setattr(
+        pypabuild,
+        "symlink_unisolated_packages",
+        lambda env, reqs=None: symlink_calls.append(set(reqs or set())),
+    )
+    monkeypatch.setattr(
+        pypabuild,
+        "install_reqs",
+        lambda build_env, env, reqs: install_calls.append(set(reqs)),
+    )
+
+    pypabuild._build_in_isolated_env(
+        build_env={},
+        srcdir=tmp_path,
+        outdir=str(tmp_path),
+        distribution="wheel",
+        config_settings={},
+    )
+
+    assert symlink_calls[0] == {"setuptools", "wheel"}
+    assert install_calls[0] == {"setuptools", "wheel"}
+
+    # Second pass should include only the newly discovered requirement
+    assert symlink_calls[1] == {"numpy>=1.26"}
+    assert install_calls[1] == {"numpy>=1.26"}
+
+
