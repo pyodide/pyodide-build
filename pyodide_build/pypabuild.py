@@ -12,12 +12,12 @@ from typing import Literal, cast
 
 from build import BuildBackendException, ConfigSettingsType
 from build.env import DefaultIsolatedEnv
-from pyodide_build.build_env import get_current_xbuildenv_manager
 from packaging.requirements import Requirement
 
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_current_xbuildenv_manager,
     get_host_build_flag,
     get_hostsitepackages,
     get_pyversion,
