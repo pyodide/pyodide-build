@@ -122,7 +122,7 @@ class CrossBuildEnvManager:
         RuntimeError
             If package installation fails.
         """
-        version_path = self._current_version_path()
+        version_path = self.symlink_dir.resolve()
         marker = self._cross_build_packages_marker_path(version_path)
         if marker.exists():
             return

@@ -12,6 +12,7 @@ from typing import Literal, cast
 
 from build import BuildBackendException, ConfigSettingsType
 from build.env import DefaultIsolatedEnv
+from pyodide_build.build_env import get_current_xbuildenv_manager
 from packaging.requirements import Requirement
 
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
@@ -116,8 +117,6 @@ def symlink_unisolated_packages(
     needs_cross_build_install = bool(unisolated_packages & required)
 
     if in_xbuildenv() and needs_cross_build_install:
-        from pyodide_build.build_env import get_current_xbuildenv_manager
-
         get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
 
     for name in get_unisolated_packages():
@@ -203,22 +202,7 @@ def _build_in_isolated_env(
                     config_settings,
                 )
 
-        # We have the below lines for dynamic requirements discovered at runtime
-        # This second pass compares new requirements to static base_req_names
-        base_req_names = {
-            Requirement(req).name.lower() for req in builder.build_system_requires
-        }
-        new_build_reqs = {
-            req
-            for req in build_reqs
-            if Requirement(req).name.lower() not in base_req_names
-        }
-
-        # We run install_reqs here if there are new packages to install
-        # No need to install packages unless we have to install cross-build packages that are used
-        if new_build_reqs:
-            symlink_unisolated_packages(env, new_build_reqs)
-            install_reqs(build_env, env, new_build_reqs)
+        install_reqs(build_env, env, build_reqs)
 
         with common.replace_env(build_env):
             return builder.build(
