@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.33.0] - 2026/02/26
+### Changed
+
+### Added
+
+- pyodide xbuildenv install can skip eager installation, and cross-build packages are installed on first build-time use.
+
+## [0.32.2] - 2026/02/20
 
 ## Changed
 
