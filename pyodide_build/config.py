@@ -305,9 +305,9 @@ DEFAULT_CONFIG: dict[str, str] = {
 # TODO: Remove dependency on Makefile.envs
 DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     # Compiler flags
-    "cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE)",
-    "cxxflags": "$(CFLAGS_BASE)",
-    "ldflags": "$(LDFLAGS_BASE) -s SIDE_MODULE=1",
+    "cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE) -Oz",
+    "cxxflags": "$(CFLAGS_BASE) -Oz",
+    "ldflags": "$(LDFLAGS_BASE) -s SIDE_MODULE=1 -Oz",
     # Rust-specific configuration
     "pyo3_cross_lib_dir": "$(CPYTHONINSTALL)/sysconfigdata",  # FIXME: pyodide xbuildenv stores sysconfigdata here
     "pyo3_cross_include_dir": "$(PYTHONINCLUDE)",
