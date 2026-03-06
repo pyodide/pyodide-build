@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Changed
+
+- `vendor_sharedlib` option is now enabled by default.
+  [#304](https://github.com/pyodide/pyodide-build/pull/304)
+
 ## [0.33.0] - 2026/02/26
 
 ## Changed
