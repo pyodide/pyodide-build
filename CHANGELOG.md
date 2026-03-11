@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- pyodide xbuildenv install can skip eager installation, and cross-build packages are installed on first build-time use.
+
 ## Changed
 
 - `vendor_sharedlib` option is now enabled by default.

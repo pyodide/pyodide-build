@@ -18,6 +18,7 @@ from pyodide_build.xbuildenv_releases import (
 
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
 PYTHON_VERSION_MARKER_FILE = ".build-python-version"
+CROSS_BUILD_PACKAGES_MARKER_FILE = ".cross-build-packages-installed"
 
 
 class CrossBuildEnvManager:
@@ -80,6 +81,44 @@ class CrossBuildEnvManager:
         """Returns the path to the xbuildenv for the given version."""
         return self.env_dir / version
 
+    def _cross_build_packages_marker_path(self, version_path: Path) -> Path:
+        """
+        Return the marker file path used to record cross-build package installation.
+
+        Parameters
+        ----------
+        version_path
+            Path to a concrete xbuildenv version directory (for example, `.../<version>`).
+        """
+        return version_path / CROSS_BUILD_PACKAGES_MARKER_FILE
+
+    def ensure_cross_build_packages_installed(self) -> None:
+        """
+        Install cross-build packages for the active xbuildenv only when needed.
+
+        This method is idempotent: if the marker file is already present, it does
+        nothing. Otherwise it installs packages into HOSTSITEPACKAGES and writes
+        the marker on success.
+
+        Raises
+        ------
+        ValueError
+            If no active xbuildenv is selected.
+        RuntimeError
+            If package installation fails.
+        """
+        version_path = self.symlink_dir.resolve()
+        marker = self._cross_build_packages_marker_path(version_path)
+        if marker.exists():
+            return
+
+        xbuildenv_root = version_path / "xbuildenv"
+        xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
+
+        logger.info("Installing cross-build packages for %s", version_path.name)
+        self._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
+        marker.touch()
+
     def list_versions(self) -> list[str]:
         """
         List the downloaded xbuildenv versions.
@@ -135,7 +174,7 @@ class CrossBuildEnvManager:
         version: str | None = None,
         *,
         url: str | None = None,
-        skip_install_cross_build_packages: bool = False,
+        skip_install_cross_build_packages: bool = True,
         force_install: bool = False,
     ) -> Path:
         """
@@ -216,6 +255,7 @@ class CrossBuildEnvManager:
                     self._install_cross_build_packages(
                         xbuildenv_root, xbuildenv_pyodide_root
                     )
+                    self._cross_build_packages_marker_path(download_path).touch()
 
                 if not url:
                     # If installed from url, skip creating the PyPI index (version is not known)

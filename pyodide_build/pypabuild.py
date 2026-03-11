@@ -17,10 +17,12 @@ from packaging.requirements import Requirement
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_current_xbuildenv_manager,
     get_host_build_flag,
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
+    in_xbuildenv,
     platform,
 )
 from pyodide_build.spec import _BuildSpecExports
@@ -91,7 +93,9 @@ def _gen_runner(
     return _runner
 
 
-def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
+def symlink_unisolated_packages(
+    env: DefaultIsolatedEnv, reqs: set[str] | None = None
+) -> None:
     from pyodide_build.build_env import get_build_flag, get_unisolated_packages
 
     pyversion = get_pyversion()
@@ -106,6 +110,15 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
     host_site_packages = Path(get_hostsitepackages())
+    unisolated_packages = set(get_unisolated_packages())
+
+    required = {Requirement(req).name.lower() for req in (reqs or set())}
+
+    needs_cross_build_install = bool(unisolated_packages & required)
+
+    if in_xbuildenv() and needs_cross_build_install:
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+
     for name in get_unisolated_packages():
         for path in chain(
             host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
@@ -164,7 +177,7 @@ def _build_in_isolated_env(
         )
 
         # first install the build dependencies
-        symlink_unisolated_packages(env)
+        symlink_unisolated_packages(env, builder.build_system_requires)
         install_reqs(build_env, env, builder.build_system_requires)
         build_reqs: set[str] | None = None
         try:
