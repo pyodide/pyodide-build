@@ -4,6 +4,7 @@ from typing import Literal, Self
 import pydantic
 from pydantic import BaseModel, ConfigDict, Field
 
+from pyodide_build.optimizers.config import OptimizerConfig
 from pyodide_build.spec import _BuildSpecExports
 
 
@@ -92,6 +93,7 @@ class _BuildSpec(BaseModel):
     vendor_sharedlib: bool = Field(True, alias="vendor-sharedlib")
     cross_build_env: bool = Field(False, alias="cross-build-env")
     cross_build_files: list[str] = Field([], alias="cross-build-files")
+    optimizer: OptimizerConfig = Field(default_factory=OptimizerConfig)
     model_config = ConfigDict(extra="forbid")
 
     @pydantic.model_validator(mode="after")
@@ -108,6 +110,7 @@ class _BuildSpec(BaseModel):
             "script",
             "exports",
             "unvendor_tests",
+            "optimizer",
         }
 
         typ = self.package_type
@@ -219,6 +222,7 @@ class MetaConfig(BaseModel):
                 "unvendor_tests",
                 "retain_test_patterns",
                 "package_type",
+                "optimizer",
             }
             for key in self.build.model_fields_set:
                 if key not in allowed_keys:

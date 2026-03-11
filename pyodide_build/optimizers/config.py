@@ -53,6 +53,36 @@ def load_optimizer_config(
     return OptimizerConfig(**optimizer_section)
 
 
+def merge_optimizer_configs(
+    global_config: OptimizerConfig,
+    package_config: OptimizerConfig,
+) -> OptimizerConfig:
+    """Merge a global (pyproject.toml) config with a per-package (meta.yaml) override.
+
+    Fields explicitly set in *package_config* take precedence.  Unset fields
+    in *package_config* fall through to the *global_config* value.
+
+    If the per-package config sets ``disable_all = True`` the result has every
+    optimizer disabled, regardless of what the global config says.
+
+    Parameters
+    ----------
+    global_config
+        Base configuration loaded from ``pyproject.toml``.
+    package_config
+        Per-package overrides from ``meta.yaml``'s ``build.optimizer`` section.
+
+    Returns
+    -------
+    OptimizerConfig
+        Merged configuration.
+    """
+    merged = global_config.model_dump()
+    for field_name in package_config.model_fields_set:
+        merged[field_name] = getattr(package_config, field_name)
+    return OptimizerConfig(**merged)
+
+
 def _extract_optimizer_section(
     configs: dict[str, Any],
 ) -> dict[str, Any] | None:

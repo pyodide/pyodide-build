@@ -3,8 +3,6 @@
 It spans multiple lines and should be removed.
 """
 
-import os
-
 # A regular comment — should be preserved.
 VERSION = "1.0.0"
 

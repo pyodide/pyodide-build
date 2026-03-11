@@ -9,7 +9,6 @@ from pyodide_build.optimizers.base import (
 from pyodide_build.optimizers.config import OptimizerConfig
 from pyodide_build.optimizers.pipeline import OptimizerPipeline, _resolve_optimizers
 
-
 # ---------------------------------------------------------------------------
 # Stub optimizers for testing pipeline behaviour
 # ---------------------------------------------------------------------------

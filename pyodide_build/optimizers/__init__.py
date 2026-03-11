@@ -4,7 +4,11 @@ from pyodide_build.optimizers.base import (
     ORDER_NORMAL,
     WheelOptimizer,
 )
-from pyodide_build.optimizers.config import OptimizerConfig, load_optimizer_config
+from pyodide_build.optimizers.config import (
+    OptimizerConfig,
+    load_optimizer_config,
+    merge_optimizer_configs,
+)
 from pyodide_build.optimizers.pipeline import OptimizerPipeline
 
 __all__ = [
@@ -15,4 +19,5 @@ __all__ = [
     "OptimizerPipeline",
     "WheelOptimizer",
     "load_optimizer_config",
+    "merge_optimizer_configs",
 ]
