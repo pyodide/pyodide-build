@@ -89,7 +89,7 @@ class _BuildSpec(BaseModel):
     post: str | None = None
     unvendor_tests: bool = Field(True, alias="unvendor-tests")
     retain_test_patterns: list[str] = Field([], alias="_retain-test-patterns")
-    vendor_sharedlib: bool = Field(False, alias="vendor-sharedlib")
+    vendor_sharedlib: bool = Field(True, alias="vendor-sharedlib")
     cross_build_env: bool = Field(False, alias="cross-build-env")
     cross_build_files: list[str] = Field([], alias="cross-build-files")
     model_config = ConfigDict(extra="forbid")
