@@ -92,21 +92,6 @@ class CrossBuildEnvManager:
         """
         return version_path / CROSS_BUILD_PACKAGES_MARKER_FILE
 
-    def _current_version_path(self) -> Path:
-        """
-        Return the currently selected concrete xbuildenv version directory.
-
-        Raises
-        ------
-        ValueError
-            If no active xbuildenv is selected.
-        """
-        if not self.symlink_dir.exists():
-            raise ValueError(
-                "No active xbuildenv. Run `pyodide xbuildenv install` first."
-            )
-        return self.symlink_dir.resolve()
-
     def ensure_cross_build_packages_installed(self) -> None:
         """
         Install cross-build packages for the active xbuildenv only when needed.
