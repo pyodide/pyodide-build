@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `vendor_sharedlib` option is now enabled by default.
   [#304](https://github.com/pyodide/pyodide-build/pull/304)
 
+- By default, `-Oz` flag is used for C/C++ compilation instead of `-O2`, to reduce binary size.
+  This can be overridden by setting `cflags` and `cxxflags` in `pyproject.toml`.
+  [#306](https://github.com/pyodide/pyodide-build/pull/306)
+
 ## [0.33.0] - 2026/02/26
 
 ## Changed
