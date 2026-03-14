@@ -6,6 +6,7 @@ from build import ConfigSettingsType
 
 from pyodide_build import build_env, common, pypabuild
 from pyodide_build.build_env import get_pyodide_root, wheel_platform
+from pyodide_build.optimizers import OptimizerPipeline, load_optimizer_config
 from pyodide_build.spec import _BuildSpecExports
 
 
@@ -88,5 +89,7 @@ def run(
         wheel_path = common.retag_wheel(wheel_path, wheel_platform())
     with common.modify_wheel(wheel_path) as wheel_dir:
         build_env.replace_so_abi_tags(wheel_dir)
+        optimizer_config = load_optimizer_config(srcdir)
+        OptimizerPipeline(optimizer_config).run(wheel_dir)
 
     return wheel_path

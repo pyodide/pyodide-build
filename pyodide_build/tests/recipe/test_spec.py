@@ -86,3 +86,49 @@ def test_wheel_source_with_retain_test_patterns():
     )
     assert pkg.build.unvendor_tests is True
     assert pkg.build.retain_test_patterns == ["*conftest.py", "*test_keep.py"]
+
+
+def test_build_optimizer_defaults():
+    spec = _BuildSpec()
+    assert spec.optimizer.disable_all is False
+    assert spec.optimizer.remove_docstrings is False
+
+
+def test_build_optimizer_explicit():
+    spec = _BuildSpec(optimizer={"remove_docstrings": True})
+    assert spec.optimizer.remove_docstrings is True
+    assert spec.optimizer.disable_all is False
+
+
+def test_build_optimizer_rejects_unknown():
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        _BuildSpec(optimizer={"fake_optimizer": True})
+
+
+def test_build_optimizer_in_meta_config():
+    pkg = MetaConfig(
+        package={"name": "a", "version": "1.0"},
+        source={"url": "test.tar", "sha256": "abc"},
+        build={"optimizer": {"remove_docstrings": True}},
+    )
+    assert pkg.build.optimizer.remove_docstrings is True
+
+
+def test_build_optimizer_model_fields_set():
+    spec = _BuildSpec(optimizer={"remove_docstrings": True})
+    assert "remove_docstrings" in spec.optimizer.model_fields_set
+    assert "disable_all" not in spec.optimizer.model_fields_set
+
+
+def test_build_optimizer_allowed_for_wheel_source():
+    pkg = MetaConfig(
+        package={"name": "a", "version": "1.0"},
+        source={"url": "test.whl", "sha256": "abc"},
+        build={"optimizer": {"remove_docstrings": True}},
+    )
+    assert pkg.build.optimizer.remove_docstrings is True
+
+
+def test_build_optimizer_allowed_for_static_library():
+    spec = _BuildSpec(type="static_library", optimizer={"disable_all": True})
+    assert spec.optimizer.disable_all is True

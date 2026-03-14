@@ -44,6 +44,11 @@ from pyodide_build.common import (
     run_command,
 )
 from pyodide_build.logger import logger
+from pyodide_build.optimizers import (
+    OptimizerPipeline,
+    load_optimizer_config,
+    merge_optimizer_configs,
+)
 from pyodide_build.recipe.bash_runner import (
     BashRunnerWithSharedEnvironment,
     get_bash_runner,
@@ -622,6 +627,10 @@ class RecipeBuilderPackage(RecipeBuilder):
             # update so abi tags after build is complete but before running post script
             # to maximize sanity.
             replace_so_abi_tags(wheel_dir)
+            global_config = load_optimizer_config(self.pkg_root)
+            package_config = self.build_metadata.optimizer
+            merged_config = merge_optimizer_configs(global_config, package_config)
+            OptimizerPipeline(merged_config).run(wheel_dir)
             bash_runner.run(
                 self.build_metadata.post, script_name="post script", cwd=wheel_dir
             )
