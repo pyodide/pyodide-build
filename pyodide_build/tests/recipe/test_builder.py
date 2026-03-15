@@ -339,3 +339,75 @@ def test_extract_tarballname():
 
     for header, tarballname in zip(headers, tarballnames, strict=True):
         assert _builder._extract_tarballname(url, header) == tarballname
+
+
+class TestInstallToLibraryDir:
+    """Tests for _install_to_library_dir method."""
+
+    def test_copies_distdir_to_library_install_prefix(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+
+        # Create fake artifacts in src_dist_dir
+        builder.src_dist_dir.mkdir(parents=True, exist_ok=True)
+        lib_dir = builder.src_dist_dir / "lib"
+        include_dir = builder.src_dist_dir / "include"
+        lib_dir.mkdir()
+        include_dir.mkdir()
+        (lib_dir / "libtest.a").write_text("fake static lib")
+        (include_dir / "test.h").write_text("fake header")
+
+        builder._install_to_library_dir()
+
+        # Verify artifacts were copied to library_install_prefix
+        assert (builder.library_install_prefix / "lib" / "libtest.a").exists()
+        assert (
+            builder.library_install_prefix / "lib" / "libtest.a"
+        ).read_text() == "fake static lib"
+        assert (builder.library_install_prefix / "include" / "test.h").exists()
+        assert (
+            builder.library_install_prefix / "include" / "test.h"
+        ).read_text() == "fake header"
+
+    def test_noop_when_distdir_missing(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+
+        # src_dist_dir does not exist, should not raise
+        assert not builder.src_dist_dir.exists()
+        builder._install_to_library_dir()
+        assert not builder.library_install_prefix.exists()
+
+    def test_merges_with_existing_library_dir(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+
+        # Pre-populate library_install_prefix with existing artifacts
+        lib_dir = builder.library_install_prefix / "lib"
+        lib_dir.mkdir(parents=True)
+        (lib_dir / "libexisting.a").write_text("existing lib")
+
+        # Create new artifacts in src_dist_dir
+        builder.src_dist_dir.mkdir(parents=True, exist_ok=True)
+        dist_lib_dir = builder.src_dist_dir / "lib"
+        dist_lib_dir.mkdir()
+        (dist_lib_dir / "libtest.a").write_text("new lib")
+
+        builder._install_to_library_dir()
+
+        # Both old and new artifacts should exist
+        assert (
+            builder.library_install_prefix / "lib" / "libexisting.a"
+        ).read_text() == "existing lib"
+        assert (
+            builder.library_install_prefix / "lib" / "libtest.a"
+        ).read_text() == "new lib"
