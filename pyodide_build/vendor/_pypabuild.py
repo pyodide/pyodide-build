@@ -46,7 +46,7 @@ _COLORS = {
     "underline": "\33[4m",
     "reset": "\33[0m",
 }
-_NO_COLORS = {color: "" for color in _COLORS}
+_NO_COLORS = dict.fromkeys(_COLORS, "")
 
 _styles = contextvars.ContextVar("_styles", default=_COLORS)
 
@@ -75,15 +75,11 @@ def _error(msg: str, code: int = 1) -> NoReturn:  # pragma: no cover
     :param msg: Error message
     :param code: Error code
     """
-    _cprint("{red}ERROR{reset} {}", msg)
+    _cprint("{red}ERROR{reset} {}", msg, file=sys.stderr)
     raise SystemExit(code)
 
 
 class _DefaultIsolatedEnv(DefaultIsolatedEnv):
-    @staticmethod
-    def log(message: str) -> None:
-        _cprint("{bold}* {}{reset}", message)
-
     @property
     def scripts_dir(self) -> str:
         if hasattr(self, "_env_backend"):  # pypabuild >= 1.2.0
@@ -116,4 +112,8 @@ def _handle_build_error() -> Iterator[None]:
         else:
             tb = traceback.format_exc(-1)  # type: ignore[unreachable]
         _cprint("\n{dim}{}{reset}\n", tb.strip("\n"))
+        _error(str(e))
+    except Exception as e:  # pragma: no cover
+        tb = traceback.format_exc().strip("\n")
+        _cprint("\n{dim}{}{reset}\n", tb)
         _error(str(e))
