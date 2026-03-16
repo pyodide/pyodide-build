@@ -21,13 +21,14 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import contextlib
+import contextvars
 import os
 import subprocess
 import sys
 import traceback
 import warnings
 from collections.abc import Iterator
-from typing import NoReturn
+from typing import NoReturn, TextIO
 
 from build import (
     BuildBackendException,
@@ -47,25 +48,24 @@ _COLORS = {
 }
 _NO_COLORS = {color: "" for color in _COLORS}
 
+_styles = contextvars.ContextVar("_styles", default=_COLORS)
 
-def _init_colors() -> dict[str, str]:
+
+def _init_colors() -> None:
     if "NO_COLOR" in os.environ:
         if "FORCE_COLOR" in os.environ:
             warnings.warn(
                 "Both NO_COLOR and FORCE_COLOR environment variables are set, disabling color",
                 stacklevel=2,
             )
-        return _NO_COLORS
+        _styles.set(_NO_COLORS)
     elif "FORCE_COLOR" in os.environ or sys.stdout.isatty():
-        return _COLORS
-    return _NO_COLORS
+        return
+    _styles.set(_NO_COLORS)
 
 
-_STYLES = _init_colors()
-
-
-def _cprint(fmt: str = "", msg: str = "") -> None:
-    print(fmt.format(msg, **_STYLES), flush=True)
+def _cprint(fmt: str = "", msg: str = "", file: TextIO | None = None) -> None:
+    print(fmt.format(msg, **_styles.get()), file=file, flush=True)
 
 
 def _error(msg: str, code: int = 1) -> NoReturn:  # pragma: no cover

@@ -27,10 +27,10 @@ from pyodide_build.build_env import (
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
-    _STYLES,
     _DefaultIsolatedEnv,
     _error,
     _handle_build_error,
+    _styles,
 )
 
 # corresponding env variables for symlinks
@@ -387,10 +387,14 @@ def build(
                     config_settings,
                     skip_dependency_check,
                 )
-            print("{bold}{green}Successfully built {}{reset}".format(built, **_STYLES))
+            print(
+                "{bold}{green}Successfully built {}{reset}".format(
+                    built, **_styles.get()
+                )
+            )
             return built
     except Exception as e:  # pragma: no cover
         tb = traceback.format_exc().strip("\n")
-        print("\n{dim}{}{reset}\n".format(tb, **_STYLES))
+        print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
         _error(str(e))
         sys.exit(1)
