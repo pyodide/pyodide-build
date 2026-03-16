@@ -10,7 +10,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Literal, cast
 
-from build import BuildBackendException, ConfigSettingsType
+from build import BuildBackendException, ConfigSettingsType, ProjectBuilder
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 
@@ -31,7 +31,6 @@ from pyodide_build.vendor._pypabuild import (
     _DefaultIsolatedEnv,
     _error,
     _handle_build_error,
-    _ProjectBuilder,
 )
 
 # corresponding env variables for symlinks
@@ -170,7 +169,7 @@ def _build_in_isolated_env(
     installer = "uv" if uv_helper.should_use_uv() else "pip"
     with _DefaultIsolatedEnv(installer=installer) as env:
         env = cast(_DefaultIsolatedEnv, env)
-        builder = _ProjectBuilder.from_isolated_env(
+        builder = ProjectBuilder.from_isolated_env(
             env,
             srcdir,
             runner=_gen_runner(build_env, env),
@@ -221,7 +220,7 @@ def _build_in_current_env(
     skip_dependency_check: bool = False,
 ) -> str:
     with common.replace_env(build_env):
-        builder = _ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+        builder = ProjectBuilder(srcdir, runner=_gen_runner(build_env))
 
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})

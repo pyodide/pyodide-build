@@ -33,7 +33,6 @@ from build import (
     BuildBackendException,
     BuildException,
     FailedProcessError,
-    ProjectBuilder,
 )
 from build.env import DefaultIsolatedEnv
 
@@ -78,12 +77,6 @@ def _error(msg: str, code: int = 1) -> NoReturn:  # pragma: no cover
     """
     _cprint("{red}ERROR{reset} {}", msg)
     raise SystemExit(code)
-
-
-class _ProjectBuilder(ProjectBuilder):
-    @staticmethod
-    def log(message: str) -> None:
-        _cprint("{bold}* {}{reset}", message)
 
 
 class _DefaultIsolatedEnv(DefaultIsolatedEnv):
