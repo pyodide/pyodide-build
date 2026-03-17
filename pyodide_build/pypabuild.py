@@ -10,7 +10,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Literal, cast
 
-from build import BuildBackendException, ConfigSettingsType
+from build import BuildBackendException, ConfigSettingsType, ProjectBuilder
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 
@@ -27,11 +27,10 @@ from pyodide_build.build_env import (
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
-    _STYLES,
     _DefaultIsolatedEnv,
     _error,
     _handle_build_error,
-    _ProjectBuilder,
+    _styles,
 )
 
 # corresponding env variables for symlinks
@@ -170,7 +169,7 @@ def _build_in_isolated_env(
     installer = "uv" if uv_helper.should_use_uv() else "pip"
     with _DefaultIsolatedEnv(installer=installer) as env:
         env = cast(_DefaultIsolatedEnv, env)
-        builder = _ProjectBuilder.from_isolated_env(
+        builder = ProjectBuilder.from_isolated_env(
             env,
             srcdir,
             runner=_gen_runner(build_env, env),
@@ -221,7 +220,7 @@ def _build_in_current_env(
     skip_dependency_check: bool = False,
 ) -> str:
     with common.replace_env(build_env):
-        builder = _ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+        builder = ProjectBuilder(srcdir, runner=_gen_runner(build_env))
 
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})
@@ -388,10 +387,14 @@ def build(
                     config_settings,
                     skip_dependency_check,
                 )
-            print("{bold}{green}Successfully built {}{reset}".format(built, **_STYLES))
+            print(
+                "{bold}{green}Successfully built {}{reset}".format(
+                    built, **_styles.get()
+                )
+            )
             return built
     except Exception as e:  # pragma: no cover
         tb = traceback.format_exc().strip("\n")
-        print("\n{dim}{}{reset}\n".format(tb, **_STYLES))
+        print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
         _error(str(e))
         sys.exit(1)
