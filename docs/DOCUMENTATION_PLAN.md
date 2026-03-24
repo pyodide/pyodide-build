@@ -60,7 +60,7 @@ Explain the mental model before showing commands. This addresses a major user pa
 
 The "5-minute" path. Build a package with a C extension for Pyodide.
 
-- Callout: **Pure-Python packages don't need pyodide-build.** A pure-Python wheel built with `python -m build` (or any standard build frontend) is already compatible with Pyodide — no special tooling required. pyodide-build is for packages that contain C, C++, Rust, or Fortran extensions.
+- Callout: **Pure-Python packages don't need pyodide-build.** A pure-Python wheel built with `python -m build` (or any standard build frontend) is already compatible with Pyodide — no special tooling required. pyodide-build is for packages that contain C, C++, or Rust extensions.
 
 ```
 pip install pyodide-build
@@ -71,10 +71,7 @@ ls dist/   # -> your_package-1.0-cp313-cp313-pyemscripten_2025_0_wasm32.whl
 
 - Step 1: Install pyodide-build
 - Step 2: Install the cross-build environment (one sentence explanation, link to Concepts)
-- Step 3: Build — show the three source modes:
-  - From current directory (like `python -m build`)
-  - From PyPI (`pyodide build numpy==2.0`)
-  - From URL (`pyodide build https://...tar.gz`)
+- Step 3: Build from your source tree (`pyodide build .`)
 - Step 4: Inspect the output wheel — what the platform tag means
 - Callout box: "From `python -m build` to `pyodide build`" migration comparison
 
@@ -94,7 +91,7 @@ python -c "import your_package; print('works!')"
 - Running tests: `python -m pytest` inside the venv runs on Pyodide/Node.js
 - "What's weird about this venv": pip runs on host Python, but `python` invokes Pyodide/Node.js
 - Note: requires Node.js
-- Windows notes (`Scripts\activate` path, known quirks)
+
 
 ---
 
@@ -109,15 +106,18 @@ Each tutorial walks through a complete scenario from start to finish.
 - Export modes explained in context: `pyinit` (default) vs `requested` vs `whole_archive`
 - Debugging a build failure (practical example with a real error)
 
-#### 7. Tutorial: CMake/Meson Package (`tutorials/cmake-meson.md`)
+#### 7a. Tutorial: Meson Package (`tutorials/meson.md`)
 
-- How to pass the cross-compilation files:
-  - `pyodide config get meson_cross_file`
-  - `pyodide config get cmake_toolchain_file`
-- The `-C setup-args=--cross-file=...` pattern
+- `pyodide config get meson_cross_file`
+- The `-Csetup-args=--cross-file=...` pattern
+- Real-world example: NumPy
 - `--no-isolation` mode for complex build environments
-- pybind11, nanobind, and Cython examples
+
+#### 7b. Tutorial: CMake Package (`tutorials/cmake.md`)
+
+- `pyodide config get cmake_toolchain_file`
 - scikit-build-core integration
+- pybind11 and nanobind examples (via CMake and setuptools)
 
 #### 8. Tutorial: Rust Package (PyO3/Maturin) (`tutorials/rust.md`)
 
@@ -145,7 +145,7 @@ Each guide solves a specific task. Assumes the reader has basic familiarity from
 
 This is likely the **highest-value section** after the quickstart — many users encounter pyodide-build through cibuildwheel.
 
-- Why cibuildwheel: build for Linux, macOS, Windows, **and** Pyodide in one CI config
+- Why cibuildwheel: build for Linux, macOS, **and** Pyodide in one CI config
 - Pyodide support history: added in cibuildwheel v2.19.0, current at v3.4.0
 - Platform identifiers: `cp312-pyodide_wasm32`, `cp313-pyodide_wasm32`
 - Minimal `pyproject.toml` configuration:
@@ -227,8 +227,7 @@ For power users who need to tweak the build.
   - `-pthread` (threading disabled)
   - macOS-specific flags (`-bundle`, `-undefined dynamic_lookup`)
   - x86 SIMD flags (`-mpopcnt`, `-mno-sse2`, etc.)
-  - Fortran-specific flags
-- Fortran handling: `gfortran` calls are converted via f2c translation
+
 - CMake toolchain file and Meson cross-file integration
 
 #### 16. Debugging Build Failures (`how-to/debugging.md`)
@@ -353,10 +352,9 @@ For users who want to understand the internals.
 
 - The build pipeline: source -> pypa/build -> pywasmcross wrapper -> emcc -> .wasm -> wheel
 - The compiler wrapper (pywasmcross): intercepts cc/gcc/g++ calls, translates flags, redirects to emcc/em++
-- Symlinks created: `cc`, `c++`, `ld`, `ar`, `cmake`, `meson`, `cargo`, `gfortran`, etc.
+- Symlinks created: `cc`, `c++`, `ld`, `ar`, `cmake`, `meson`, `cargo`, etc.
 - Why `SIDE_MODULE` and symbol exports matter
 - Flag filtering: what gets removed and why (pthreads, macOS flags, SIMD, etc.)
-- Fortran-to-C translation pipeline (f2c)
 
 #### 24. The Pyodide Ecosystem (`explanation/ecosystem.md`)
 
@@ -385,7 +383,7 @@ Organized by error message for searchability.
 - "PIP_CONSTRAINT contains spaces" -> move project to a path without spaces
 - Build failures with C extensions -> check filtered flags, threading, SIMD
 - Wheel is too large -> compression level, `unvendor-tests`, `-Oz` vs `-O2` tradeoff
-- Windows-specific issues -> Makefile.envs parsing limitations
+
 
 #### 26. FAQ (`faq.md`)
 

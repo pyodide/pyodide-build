@@ -76,9 +76,9 @@ getting-started/testing
 :caption: Tutorials
 
 tutorials/c-extension
-tutorials/cmake-meson
+tutorials/meson
+tutorials/cmake
 tutorials/rust
-tutorials/dependencies
 ```
 
 ```{toctree}
