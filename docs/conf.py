@@ -15,6 +15,11 @@ extensions = [
     "sphinx.ext.napoleon",
     "myst_parser",
     "sphinx_autodoc_typehints",
+    "sphinx_design",
+]
+
+myst_enable_extensions = [
+    "colon_fence",
 ]
 
 intersphinx_mapping = {
