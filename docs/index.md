@@ -103,13 +103,6 @@ how-to/debugging
 reference/cli
 reference/configuration
 reference/platform
-```
-
-```{toctree}
-:maxdepth: 2
-:hidden:
-:caption: Explanation
-
 explanation/architecture
 ```
 
@@ -124,8 +117,8 @@ changelog
 
 ## Communication
 
+- Discord: [Pyodide Discord](https://dsc.gg/pyodide)
 - Blog: [blog.pyodide.org](https://blog.pyodide.org/)
 - Mailing list: [mail.python.org/mailman3/lists/pyodide.python.org/](https://mail.python.org/mailman3/lists/pyodide.python.org/)
-- Gitter: [gitter.im/pyodide/community](https://gitter.im/pyodide/community)
-- Twitter: [twitter.com/pyodide](https://twitter.com/pyodide)
+- X: [x.com/pyodide](https://x.com/pyodide)
 - Stack Overflow: [stackoverflow.com/questions/tagged/pyodide](https://stackoverflow.com/questions/tagged/pyodide)

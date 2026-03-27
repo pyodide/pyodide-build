@@ -131,5 +131,6 @@ Once your build works locally, add it to CI alongside your native builds:
 
 ## What's next?
 
+- [Tutorial: C Extension](../tutorials/c-extension.md) — detailed walkthrough for C extension packages
 - [Debugging Build Failures](debugging.md) — systematic troubleshooting
 - [Customizing Compiler Flags](compiler-flags.md) — fine-tuning the build

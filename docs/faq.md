@@ -1,5 +1,14 @@
 # FAQ
 
+## Which packages work with Pyodide?
+
+- **Pure Python** — always works. No special tooling needed.
+- **C/C++ extensions** — usually works with pyodide-build. Some packages need minor adjustments (e.g., disabling optional native dependencies, guarding platform-specific code).
+- **Rust extensions (PyO3)** — works with pyodide-build and the correct Rust nightly toolchain.
+- **Threading / multiprocessing** — not supported. Packages that require threads will not work.
+- **Networking (sockets)** — not supported. Packages that open raw sockets will not work. High-level HTTP libraries like `requests` and `httpx` have Pyodide-specific fallbacks.
+- **Subprocesses** — not supported. Packages that call `subprocess.run()` will not work.
+
 ## Do I need the full Pyodide repository?
 
 No. pyodide-build is a standalone package. Install it with `pip install pyodide-build` and you're ready to build. You don't need to clone the Pyodide repository.

@@ -43,7 +43,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: pypa/cibuildwheel@v2.22
+      - uses: pypa/cibuildwheel@v3.4.0
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pypa/cibuildwheel@v2.22
+      - uses: pypa/cibuildwheel@v3.4.0
         env:
           CIBW_PLATFORM: pyodide
       - uses: actions/upload-artifact@v4
@@ -73,10 +73,6 @@ jobs:
 ## Publishing the wheels
 
 Combine native and Pyodide wheels in a single publish step:
-
-```{important}
-Publishing Pyodide wheels are not supported yet as of 2026/03/24. We are waiting for PEP 783 to be implemented in PyPI.
-```
 
 ```yaml
   publish:
