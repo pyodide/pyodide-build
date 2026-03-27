@@ -147,7 +147,7 @@ fatal error: 'some_library.h' file not found
 This means your C code includes a header that isn't available in the Emscripten.
 
 If it's a system library, it needs to be cross-compiled for Emscripten first. pyodide-build does not allow reading headers from the host system's include paths.
-This is bacause linking the library built for the host system to the WebAssembly module will cause build time / runtime errors.
+This is because linking the library built for the host system to the WebAssembly module will cause build time / runtime errors.
 
 ### Undefined symbols at link time
 
