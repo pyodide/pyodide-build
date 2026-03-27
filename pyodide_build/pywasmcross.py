@@ -193,6 +193,8 @@ def replay_genargs_handle_linker_opts(arg: str) -> str | None:
         # macOS-specific linker flags that wasm-ld doesn't understand
         "-headerpad_max_install_names",
         "-dead_strip_dylibs",
+        # Newer clang seems to add this by default, but wasm-ld doesn't support it
+        "--enable-new-dtags",
     )
 
     excluded_linker_prefixes = (
