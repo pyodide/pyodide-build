@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This can be overridden by setting `cflags` and `cxxflags` in `pyproject.toml`.
   [#306](https://github.com/pyodide/pyodide-build/pull/306)
 
+## Fixed
+
+- `--enable-new-dtags` linker flag is now filtered out.
+  [#317](https://github.com/pyodide/pyodide-build/pull/317)
+
 ## [0.33.0] - 2026/02/26
 
 ## Changed
