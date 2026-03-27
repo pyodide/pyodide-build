@@ -28,7 +28,7 @@ intersphinx_mapping = {
 }
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".*", "DOCUMENTATION_PLAN.md"]
+exclude_patterns = ["_build", "Thumbs.db", ".*"]
 
 
 # -- Options for HTML output -------------------------------------------------

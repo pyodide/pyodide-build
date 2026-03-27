@@ -1,5 +1,5 @@
 # Changelog
 
-```{warning}
-This page is under construction.
+```{include} ../CHANGELOG.md
+:start-line: 2
 ```

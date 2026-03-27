@@ -98,20 +98,10 @@ how-to/debugging
 ```{toctree}
 :maxdepth: 2
 :hidden:
-:caption: Recipe System
-
-recipes/authoring
-recipes/building
-```
-
-```{toctree}
-:maxdepth: 2
-:hidden:
 :caption: Reference
 
 reference/cli
 reference/configuration
-reference/meta-yaml
 reference/platform
 ```
 
@@ -121,7 +111,6 @@ reference/platform
 :caption: Explanation
 
 explanation/architecture
-explanation/ecosystem
 ```
 
 ```{toctree}
@@ -129,7 +118,6 @@ explanation/ecosystem
 :hidden:
 :caption: Appendix
 
-troubleshooting
 faq
 changelog
 ```
