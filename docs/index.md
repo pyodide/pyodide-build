@@ -92,6 +92,7 @@ how-to/publishing
 how-to/migrate
 how-to/xbuildenv
 how-to/compiler-flags
+how-to/auditwheel
 how-to/debugging
 ```
 
