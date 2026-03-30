@@ -562,7 +562,13 @@ def handle_command_generate_args(  # noqa: C901
         line[0] = "emranlib"
         return line
     elif cmd == "strip":
-        line[0] = "emstrip"
+        if build_args.abi > "2026":
+            # Emscripten > 5.0.0 strips out the dylink.0 section
+            # so we skip strip to avoid the error
+            # https://github.com/emscripten-core/emscripten/issues/26563
+            line[0] = "echo"
+        else:
+            line[0] = "emstrip"
         return line
     else:
         return line
