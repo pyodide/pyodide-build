@@ -474,20 +474,20 @@ class CrossBuildEnvManager:
         logger.info("Cloning Emscripten SDK into %s", emsdk_dir)
 
         if emsdk_dir.exists():
-            logger.info("Emsdk directory already exists, pulling latest changes...")
-            subprocess.run(["git", "-C", str(emsdk_dir), "pull"], check=True)
-        else:
-            subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "--depth",
-                    "1",
-                    "https://github.com/emscripten-core/emsdk.git",
-                    str(emsdk_dir),
-                ],
-                check=True,
-            )
+            logger.info("Removing existing emsdk directory %s", emsdk_dir)
+            shutil.rmtree(emsdk_dir)
+
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "https://github.com/emscripten-core/emsdk.git",
+                str(emsdk_dir),
+            ],
+            check=True,
+        )
 
         return emsdk_dir
 
