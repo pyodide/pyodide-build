@@ -19,6 +19,7 @@ from pyodide_build.xbuildenv_releases import (
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
 PYTHON_VERSION_MARKER_FILE = ".build-python-version"
 CROSS_BUILD_PACKAGES_MARKER_FILE = ".cross-build-packages-installed"
+EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
 
 
 class CrossBuildEnvManager:
@@ -473,24 +474,26 @@ class CrossBuildEnvManager:
         logger.info("Cloning Emscripten SDK into %s", emsdk_dir)
 
         if emsdk_dir.exists():
-            logger.info("Emsdk directory already exists, pulling latest changes...")
-            subprocess.run(["git", "-C", str(emsdk_dir), "pull"], check=True)
-        else:
-            subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "--depth",
-                    "1",
-                    "https://github.com/emscripten-core/emsdk.git",
-                    str(emsdk_dir),
-                ],
-                check=True,
-            )
+            logger.info("Removing existing emsdk directory %s", emsdk_dir)
+            shutil.rmtree(emsdk_dir)
+
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "https://github.com/emscripten-core/emsdk.git",
+                str(emsdk_dir),
+            ],
+            check=True,
+        )
 
         return emsdk_dir
 
-    def install_emscripten(self, emscripten_version: str = "latest") -> Path:
+    def install_emscripten(
+        self, emscripten_version: str = "latest", *, force: bool = False
+    ) -> Path:
         """
         Install and activate Emscripten SDK inside the currently selected xbuildenv.
 
@@ -498,6 +501,8 @@ class CrossBuildEnvManager:
         ----------
         emscripten_version
             The Emscripten SDK version to install (default: 'latest').
+        force
+            If True, force reinstallation even if the same version is already installed.
 
         Returns
         -------
@@ -513,6 +518,17 @@ class CrossBuildEnvManager:
         emsdk_dir = xbuild_root / "emsdk"
         patches_dir = self.pyodide_root / "emsdk" / "patches"
         emscripten_root = emsdk_dir / "upstream" / "emscripten"
+
+        marker = xbuild_root / EMSCRIPTEN_VERSION_MARKER_FILE
+        if not force and marker.exists():
+            installed_version = marker.read_text().strip()
+            if installed_version == emscripten_version:
+                logger.debug(
+                    "Emscripten SDK (version: %s) is already installed at %s, skipping",
+                    emscripten_version,
+                    emsdk_dir,
+                )
+                return emsdk_dir
 
         logger.info(
             "Installing Emscripten SDK (version: %s) into %s",
@@ -558,6 +574,8 @@ class CrossBuildEnvManager:
             cwd=emsdk_dir,
             check=True,
         )
+
+        marker.write_text(emscripten_version)
 
         logger.info("Emscripten SDK installed successfully at %s", emsdk_dir)
         return emsdk_dir
