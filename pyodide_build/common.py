@@ -140,7 +140,6 @@ def _find_matching_wheels(
         if version and version != str(wheel_version):
             continue
         for supported_tag in supported_tags:
-            print("Tag:", supported_tag)
             if supported_tag in wheel_tags:
                 yield wheel_path
                 continue
