@@ -8,7 +8,12 @@ from typing import Any
 
 import virtualenv
 
-from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv, wheel_platform
+from pyodide_build.build_env import (
+    get_build_flag,
+    get_pyodide_root,
+    in_xbuildenv,
+    wheel_platform,
+)
 from pyodide_build.common import IS_WIN, run_command
 from pyodide_build.logger import logger
 
