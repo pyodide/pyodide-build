@@ -245,8 +245,8 @@ def platform() -> str:
 
 def wheel_platform() -> str:
     abi_version = get_build_flag("PYODIDE_ABI_VERSION")
-    lagacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
-    if lagacy_platform:
+    legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if legacy_platform:
         return f"pyodide_{abi_version}_wasm32"
     return f"pyemscripten_{abi_version}_wasm32"
 
