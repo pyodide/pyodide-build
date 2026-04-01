@@ -219,11 +219,11 @@ def test_needs_rebuild(tmpdir, is_wheel):
         dist_dir = pkg_root / "dist"
         dist_dir.mkdir()
         # Build of current version with wrong abi
-        (dist_dir / "regex-12-cp311-cp311-pyodide_2024_0_wasm32.whl").touch()
+        (dist_dir / "regex-12-cp311-cp311-pyemscripten_2024_0_wasm32.whl").touch()
         # Build of old version with current abi
-        (dist_dir / "regex-11-cp312-cp312-pyodide_2024_0_wasm32.whl").touch()
+        (dist_dir / "regex-11-cp312-cp312-pyemscripten_2024_0_wasm32.whl").touch()
         # the version we're trying to build
-        packaged = dist_dir / "regex-12-cp312-cp312-pyodide_2024_0_wasm32.whl"
+        packaged = dist_dir / "regex-12-cp312-cp312-pyemscripten_2024_0_wasm32.whl"
     else:
         packaged = buildpath / ".packaged"
 
