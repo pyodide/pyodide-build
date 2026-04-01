@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Platform name for the Pyodide wheel is now `pyemscripten` instead of `pyodide`, following the PEP 783 standard.
+  If you want to use the old platform name, you can set the `USE_LEGACY_PLATFORM` environment variable to `1`.
+  [#319](https://github.com/pyodide/pyodide-build/pull/319)
+  
 ## [0.34.0] - 2026/03/31
 
 ### Added
