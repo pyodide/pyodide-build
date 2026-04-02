@@ -117,6 +117,51 @@ class TestOutOfTree(TestInTree):
         assert "RANDOM_ENV" not in e
 
 
+class TestWheelPlatform:
+    def test_default_pyemscripten(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+        abi_version = build_env.get_build_flag("PYODIDE_ABI_VERSION")
+        assert build_env.wheel_platform() == f"pyemscripten_{abi_version}_wasm32"
+
+    def test_legacy_pyodide(
+        self, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+    ):
+        monkeypatch.setenv("USE_LEGACY_PLATFORM", "1")
+        build_env.get_host_build_environment_vars.cache_clear()
+        build_env.get_build_environment_vars.cache_clear()
+
+        abi_version = build_env.get_build_flag("PYODIDE_ABI_VERSION")
+        assert build_env.wheel_platform() == f"pyodide_{abi_version}_wasm32"
+
+    def test_pyodide_tags_include_both_platforms(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        build_env.pyodide_tags.cache_clear()
+        tags = build_env.pyodide_tags()
+        platforms = {t.platform for t in tags}
+
+        emscripten_plat = build_env.platform()
+        wheel_plat = build_env.wheel_platform()
+
+        assert emscripten_plat in platforms
+        assert wheel_plat in platforms
+        assert wheel_plat.startswith("pyemscripten_")
+
+    def test_pyodide_tags_legacy_platform(
+        self, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+    ):
+        monkeypatch.setenv("USE_LEGACY_PLATFORM", "1")
+        build_env.get_host_build_environment_vars.cache_clear()
+        build_env.get_build_environment_vars.cache_clear()
+        build_env.pyodide_tags.cache_clear()
+
+        tags = build_env.pyodide_tags()
+        platforms = {t.platform for t in tags}
+
+        wheel_plat = build_env.wheel_platform()
+        assert wheel_plat.startswith("pyodide_")
+        assert wheel_plat in platforms
+
+
 def test_wheel_paths(dummy_xbuildenv):
     from pathlib import Path
 

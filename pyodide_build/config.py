@@ -252,6 +252,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
     "dist_dir": "PYODIDE_DIST_DIR",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
+    "use_legacy_platform": "USE_LEGACY_PLATFORM",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -273,6 +274,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "default_cross_build_env_url",
     "xbuildenv_path",
     "ignored_build_requirements",
+    "use_legacy_platform",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -297,6 +299,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "xbuildenv_path": "",
     # A list of PEP508 build-time requirements to be ignored when building a wheel
     "ignored_build_requirements": " ".join(BASE_IGNORED_REQUIREMENTS),
+    "use_legacy_platform": "0",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }
