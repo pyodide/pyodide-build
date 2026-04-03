@@ -87,15 +87,8 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert "pythoninclude" in makefile_vars
 
         default_config = config_manager._load_default_config()
-        # emscripten_dir has an empty-string entry in DEFAULT_CONFIG (so that
-        # BUILD_KEY_TO_VAR remains consistent) but is also computed in
-        # _load_cross_build_envs() from pyodide_root, so it appears in both
-        # default_config and makefile_vars. All other default config keys must
-        # come only from DEFAULT_CONFIG and not be overridden at the Makefile
-        # level.
         for key in default_config:
-            if key != "emscripten_dir":
-                assert key not in makefile_vars
+            assert key not in makefile_vars
 
     def test_get_make_environment_vars(
         self, dummy_xbuildenv, reset_env_vars, reset_cache

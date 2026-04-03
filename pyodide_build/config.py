@@ -309,7 +309,6 @@ DEFAULT_CONFIG: dict[str, str] = {
     "build_dependency_index_url": "https://pypi.anaconda.org/pyodide/simple",
     "default_cross_build_env_url": "",
     "xbuildenv_path": "",
-    "emscripten_dir": "",
     # A list of PEP508 build-time requirements to be ignored when building a wheel
     "ignored_build_requirements": " ".join(BASE_IGNORED_REQUIREMENTS),
     "use_legacy_platform": "0",
