@@ -551,9 +551,10 @@ class CrossBuildEnvManager:
         # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
         try:
             for patch_file in patches_dir.glob("*.patch"):
-                subprocess.check_call(
+                subprocess.run(
                     ["git", "apply", "--verbose", str(patch_file)],
                     cwd=emscripten_root,
+                    check=True,
                 )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
