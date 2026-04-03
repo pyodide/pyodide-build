@@ -87,11 +87,14 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert "pythoninclude" in makefile_vars
 
         default_config = config_manager._load_default_config()
-        # emcc_path is intentionally computed in _load_cross_build_envs (not
-        # sourced from Makefile.envs), so it appears in both default_config and
-        # makefile_vars. All other default config keys should remain separate.
+        # emscripten_dir has an empty-string entry in DEFAULT_CONFIG (so that
+        # BUILD_KEY_TO_VAR remains consistent) but is also computed in
+        # _load_cross_build_envs() from pyodide_root, so it appears in both
+        # default_config and makefile_vars. All other default config keys must
+        # come only from DEFAULT_CONFIG and not be overridden at the Makefile
+        # level.
         for key in default_config:
-            if key != "emcc_path":
+            if key != "emscripten_dir":
                 assert key not in makefile_vars
 
     def test_get_make_environment_vars(
@@ -121,7 +124,7 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             assert makefile_vars[k] != v  # The template should have been substituted
             assert "$(" not in makefile_vars[k]
 
-    def test_emcc_path(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+    def test_emscripten_dir(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )
@@ -134,10 +137,9 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             / "emsdk"
             / "upstream"
             / "emscripten"
-            / "emcc"
         )
-        assert config_manager.config["emcc_path"] == expected
-        assert config_manager.to_env()["PYODIDE_EMCC_PATH"] == expected
+        assert config_manager.config["emscripten_dir"] == expected
+        assert config_manager.to_env()["PYODIDE_EMSCRIPTEN_DIR"] == expected
 
     def test_load_config_from_env(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
