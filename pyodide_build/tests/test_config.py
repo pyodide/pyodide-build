@@ -125,14 +125,16 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             pyodide_root=xbuildenv_manager.pyodide_root
         )
 
-        expected = str(
-            xbuildenv_manager.pyodide_root.parent.parent
-            / "emsdk"
-            / "upstream"
-            / "emscripten"
-        )
-        assert config_manager.config["emscripten_dir"] == expected
-        assert config_manager.to_env()["PYODIDE_EMSCRIPTEN_DIR"] == expected
+        emsdk_root = xbuildenv_manager.pyodide_root.parent.parent / "emsdk"
+        expected_emsdk = str(emsdk_root)
+        expected_emscripten = str(emsdk_root / "upstream" / "emscripten")
+
+        assert config_manager.config["emsdk_dir"] == expected_emsdk
+        assert config_manager.config["emscripten_dir"] == expected_emscripten
+
+        env = config_manager.to_env()
+        assert env["PYODIDE_EMSDK_DIR"] == expected_emsdk
+        assert env["PYODIDE_EMSCRIPTEN_DIR"] == expected_emscripten
 
     def test_load_config_from_env(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(

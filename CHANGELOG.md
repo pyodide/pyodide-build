@@ -11,10 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `pyodide config` exposes a variable `emscripten_dir` that points to the Emscripten installation
-  directory in the xbuildenv (this is only available after Emscripten gets installed into the
-  xbuildenv via the `pyodide xbuildenv install-emscripten` command).
-  [#321](https://github.com/pyodide/pyodide-build/pull/321)
+- `pyodide config` exposes variables `emsdk_dir` and `emscripten_dir` that point to the Emscripten SDK
+  installation directory and Emscripten installation directory respectively in the xbuildenv (these are
+  only available after Emscripten gets installed into the xbuildenv via the `pyodide xbuildenv install-emscripten` command).
+  [#321](https://github.com/pyodide/pyodide-build/pull/321), [#326](https://github.com/pyodide/pyodide-build/pull/326)
 
 ### Changed
 

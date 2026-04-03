@@ -119,9 +119,9 @@ class CrossBuildEnvConfigManager(ConfigManager):
         # that the path is always the resolved, versioned path – not the shared
         # xbuildenv symlink, because there are some issues I have noticed with
         # concurrent builds especially when being used in cibuildwheel etc.
-        computed_vars["emscripten_dir"] = str(
-            self.pyodide_root.parent.parent / "emsdk" / "upstream" / "emscripten"
-        )
+        emsdk_root = self.pyodide_root.parent.parent / "emsdk"
+        computed_vars["emsdk_dir"] = str(emsdk_root)
+        computed_vars["emscripten_dir"] = str(emsdk_root / "upstream" / "emscripten")
 
         return {
             BUILD_VAR_TO_KEY[k]: v
@@ -261,6 +261,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "emsdk_dir": "PYODIDE_EMSDK_DIR",
     "emscripten_dir": "PYODIDE_EMSCRIPTEN_DIR",
     "dist_dir": "PYODIDE_DIST_DIR",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
@@ -352,6 +353,7 @@ PYODIDE_CLI_CONFIGS = {
     "ldflags": "SIDE_MODULE_LDFLAGS",
     "meson_cross_file": "MESON_CROSS_FILE",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "emsdk_dir": "PYODIDE_EMSDK_DIR",
     "emscripten_dir": "PYODIDE_EMSCRIPTEN_DIR",
     "pyodide_abi_version": "PYODIDE_ABI_VERSION",
     "pyodide_root": "PYODIDE_ROOT",
