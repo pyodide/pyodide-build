@@ -87,8 +87,12 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert "pythoninclude" in makefile_vars
 
         default_config = config_manager._load_default_config()
+        # emcc_path is intentionally computed in _load_cross_build_envs (not
+        # sourced from Makefile.envs), so it appears in both default_config and
+        # makefile_vars. All other default config keys should remain separate.
         for key in default_config:
-            assert key not in makefile_vars
+            if key != "emcc_path":
+                assert key not in makefile_vars
 
     def test_get_make_environment_vars(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
@@ -116,6 +120,24 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             assert k in makefile_vars
             assert makefile_vars[k] != v  # The template should have been substituted
             assert "$(" not in makefile_vars[k]
+
+    def test_emcc_path(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+        xbuildenv_manager = CrossBuildEnvManager(
+            dummy_xbuildenv / common.xbuildenv_dirname()
+        )
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
+
+        expected = str(
+            xbuildenv_manager.pyodide_root.parent.parent
+            / "emsdk"
+            / "upstream"
+            / "emscripten"
+            / "emcc"
+        )
+        assert config_manager.config["emcc_path"] == expected
+        assert config_manager.to_env()["PYODIDE_EMCC_PATH"] == expected
 
     def test_load_config_from_env(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
