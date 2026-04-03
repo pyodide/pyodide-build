@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `pyodide config` exposes a variable `emcc_path` that points to the `emcc` executable in the
-  xbuildenv (this is only available after Emscripten gets installed into the xbuildenv via the
-  `pyodide xbuildenv install-emscripten` command).
+- `pyodide config` exposes a variable `emscripten_dir` that points to the Emscripten installation
+  directory in the xbuildenv (this is only available after Emscripten gets installed into the
+  xbuildenv via the `pyodide xbuildenv install-emscripten` command).
   [#321](https://github.com/pyodide/pyodide-build/pull/321)
 
 ### Changed
