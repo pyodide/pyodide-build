@@ -540,20 +540,21 @@ class CrossBuildEnvManager:
         self._clone_emscripten()
 
         # Install the specified Emscripten version
+        emsdk = shutil.which("emsdk", path=emsdk_dir)
+        assert emsdk
         subprocess.run(
-            ["./emsdk", "install", "--build=Release", emscripten_version],
+            [emsdk, "install", "--build=Release", emscripten_version],
             cwd=emsdk_dir,
             check=True,
         )
 
         # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
         try:
-            subprocess.run(
-                f"cat {patches_dir}/*.patch | patch -p1 --verbose",
-                check=True,
-                shell=True,
-                cwd=emscripten_root,
-            )
+            for patch_file in patches_dir.glob("*.patch"):
+                subprocess.check_call(
+                    ["git", "apply", "--verbose", str(patch_file)],
+                    cwd=emscripten_root,
+                )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
                 f"Failed to apply Emscripten patches. This may occur if the Emscripten version "
@@ -565,7 +566,7 @@ class CrossBuildEnvManager:
         # Activate the specified Emscripten version
         subprocess.run(
             [
-                "./emsdk",
+                emsdk,
                 "activate",
                 "--embedded",
                 "--build=Release",
