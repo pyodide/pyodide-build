@@ -153,7 +153,16 @@ lint.select = [
 
 lint.logger-objects = ["pyodide_build.logger.logger"]
 
-lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038", "PLR0912", "PLC0415"]
+lint.ignore = [
+  "E402",    # Module level import not at top of file
+  "E501",    # Line too long
+  "E731",    # Do not assign a lambda expression, use a def
+  "E741",    # Ambiguous variable name (l, O, I)
+  "PERF401", # Replace for loops that build lists with list comprehension
+  "PLW2901", # Redefined loop variable
+  "PLR0912", # Too many branches in function
+  "PLC0415"  # Import inside function or class
+]
 # line-length = 219  # E501: Recommended goal is 88 to match black
 target-version = "py312"
 
