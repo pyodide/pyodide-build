@@ -160,7 +160,6 @@ lint.ignore = [
   "E741",    # Ambiguous variable name (l, O, I)
   "PERF401", # Replace for loops that build lists with list comprehension
   "PLW2901", # Redefined loop variable
-  "UP038",   # Use | in isinstance() instead of tuple
   "PLR0912", # Too many branches in function
   "PLC0415"  # Import inside function or class
 ]
