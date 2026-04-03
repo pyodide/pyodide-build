@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.1] - 2026/04/03
+
+### Added
+
+- `pyodide config` exposes a variable `emscripten_dir` that points to the Emscripten installation
+  directory in the xbuildenv (this is only available after Emscripten gets installed into the
+  xbuildenv via the `pyodide xbuildenv install-emscripten` command).
+  [#321](https://github.com/pyodide/pyodide-build/pull/321)
+
 ### Changed
 
 - Platform name for the Pyodide wheel is now `pyemscripten` instead of `pyodide`, following the PEP 783 standard.
