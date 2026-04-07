@@ -148,8 +148,9 @@ def test_supported_virtualenv_options():
     [
         (
             [],
-            lambda path: (path / "bin" / "python").exists()
-            and (path / "bin" / "pip").exists(),
+            lambda path: (
+                (path / "bin" / "python").exists() and (path / "bin" / "pip").exists()
+            ),
         ),
         (["--clear"], lambda path: (path / "bin" / "python").exists()),
         (["--no-vcs-ignore"], lambda path: (path / "bin" / "python").exists()),
