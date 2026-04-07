@@ -245,7 +245,10 @@ def platform() -> str:
 
 def wheel_platform() -> str:
     abi_version = get_build_flag("PYODIDE_ABI_VERSION")
-    return f"pyodide_{abi_version}_wasm32"
+    legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if legacy_platform:
+        return f"pyodide_{abi_version}_wasm32"
+    return f"pyemscripten_{abi_version}_wasm32"
 
 
 def pyodide_tags_() -> Iterator[Tag]:
@@ -359,8 +362,6 @@ def ensure_emscripten(skip_install: bool = False) -> None:
     RuntimeError
         If emcc is not found and auto-install is skipped, or if version mismatch.
     """
-    from pyodide_build.logger import logger
-    from pyodide_build.xbuildenv import CrossBuildEnvManager  # avoid circular import
 
     # Check if auto-install should be skipped
     env_skip = os.environ.get("PYODIDE_SKIP_EMSCRIPTEN_INSTALL", "")
@@ -380,20 +381,8 @@ def ensure_emscripten(skip_install: bool = False) -> None:
                 f"No Emscripten compiler found. Need Emscripten version {needed_version}"
             ) from None
 
-        # Get the xbuildenv path from the already-initialized pyodide root
-        # pyodide_root is at {xbuild_root}/xbuildenv/pyodide-root
-        # so xbuild_root is pyodide_root.parent.parent
-        pyodide_root = get_pyodide_root()
-        xbuild_root = pyodide_root.parent.parent
-        emsdk_dir = xbuild_root / "emsdk"
-        emsdk_env_script = emsdk_dir / "emsdk_env.sh"
-
-        if emsdk_env_script.exists():
-            logger.info("Emscripten found but not activated, activating...")
-        else:
-            logger.info("Emscripten not found, installing...")
-            manager = CrossBuildEnvManager(xbuild_root.parent)
-            emsdk_dir = manager.install_emscripten(needed_version)
+        manager = get_current_xbuildenv_manager()
+        emsdk_dir = manager.install_emscripten(needed_version)
 
         env_vars = activate_emscripten_env(emsdk_dir)
         os.environ.update(env_vars)

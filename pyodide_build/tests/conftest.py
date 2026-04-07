@@ -32,6 +32,7 @@ def reset_cache():
         build_env.get_host_build_environment_vars.cache_clear()
         build_env.get_build_environment_vars.cache_clear()
         build_env.get_unisolated_packages.cache_clear()
+        build_env.pyodide_tags.cache_clear()
         common.default_xbuildenv_path.cache_clear()
 
     _reset()

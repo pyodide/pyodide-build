@@ -263,14 +263,25 @@ def _search(
     default=DEFAULT_PATH,
     help="Pyodide cross-env path",
 )
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="force reinstallation even if the same version is already installed.",
+)
 def _install_emscripten(
     version: str | None,
     path: Path,
+    force: bool,
 ) -> None:
     """Install Emscripten SDK into the cross-build environment.
 
     This command clones the emsdk repository, installs and activates the specified
     Emscripten version, and applies Pyodide-specific patches.
+
+    If the requested version is already installed, the command is a no-op unless
+    --force is passed.
     """
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
@@ -280,7 +291,7 @@ def _install_emscripten(
 
     print("Installing emsdk...")
 
-    emsdk_dir = manager.install_emscripten(version)
+    emsdk_dir = manager.install_emscripten(version, force=force)
 
     print("Installing emsdk complete.")
     print(f"Use `source {emsdk_dir}/emsdk_env.sh` to set up the environment.")

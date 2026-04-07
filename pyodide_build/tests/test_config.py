@@ -117,6 +117,25 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             assert makefile_vars[k] != v  # The template should have been substituted
             assert "$(" not in makefile_vars[k]
 
+    def test_emscripten_dir(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+        xbuildenv_manager = CrossBuildEnvManager(
+            dummy_xbuildenv / common.xbuildenv_dirname()
+        )
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
+
+        emsdk_root = xbuildenv_manager.pyodide_root.parent.parent / "emsdk"
+        expected_emsdk = str(emsdk_root)
+        expected_emscripten = str(emsdk_root / "upstream" / "emscripten")
+
+        assert config_manager.config["emsdk_dir"] == expected_emsdk
+        assert config_manager.config["emscripten_dir"] == expected_emscripten
+
+        env = config_manager.to_env()
+        assert env["PYODIDE_EMSDK_DIR"] == expected_emsdk
+        assert env["PYODIDE_EMSCRIPTEN_DIR"] == expected_emscripten
+
     def test_load_config_from_env(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()

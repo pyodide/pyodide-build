@@ -8,7 +8,12 @@ from typing import Any
 
 import virtualenv
 
-from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
+from pyodide_build.build_env import (
+    get_build_flag,
+    get_pyodide_root,
+    in_xbuildenv,
+    wheel_platform,
+)
 from pyodide_build.common import IS_WIN, run_command
 from pyodide_build.logger import logger
 
@@ -311,7 +316,7 @@ class PyodideVenv(ABC):
         sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
         pip_patched_name = self.pip_patched_path.name
         exe_suffix = self.exe_suffix
-        pyodide_platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
+        pyodide_platform = wheel_platform()
         return dedent(
             """\
             import os
@@ -343,6 +348,7 @@ class PyodideVenv(ABC):
             def _emscripten_platforms():
                 pyodide_abi_version = sysconfig.get_config_var("PYODIDE_ABI_VERSION")
                 if pyodide_abi_version:
+                    yield f"pyemscripten_{pyodide_abi_version}_wasm32"
                     yield f"pyodide_{pyodide_abi_version}_wasm32"
                 yield from tags._generic_platforms()
 
