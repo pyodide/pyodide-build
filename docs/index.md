@@ -18,7 +18,7 @@ This produces a `.whl` file tagged for the Emscripten platform (e.g., `your_pack
 ## Who is this for?
 
 ```{note}
-**Pure-Python packages do not need pyodide-build.** A standard wheel built with `python -m build`, `hatch`, `flit`, or any PEP 517 build frontend is already compatible with Pyodide. pyodide-build is for packages that contain compiled extensions.
+**Pure Python packages do not need pyodide-build.** A standard wheel built with `python -m build`, `hatch`, `flit`, or any PEP 517 build frontend is already compatible with Pyodide. pyodide-build is for packages that contain compiled extensions.
 ```
 
 pyodide-build is for **Python package maintainers** who want their package to work in WebAssembly environments — the browser, Node.js, or any Emscripten-based Python runtime. Typical users include:

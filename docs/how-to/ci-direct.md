@@ -103,6 +103,8 @@ Add a publish job that runs on tags:
       - uses: pypa/gh-action-pypi-publish@release/v1
 ```
 
+See also [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/) for more information on publishing packages.
+
 ## What's next?
 
 - [Publishing Wasm Wheels](publishing.md) — more details on distribution

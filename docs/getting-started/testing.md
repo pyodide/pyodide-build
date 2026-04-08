@@ -26,6 +26,8 @@ Once activated, `python` runs on Pyodide/Node.js:
 
 ```bash
 python -c "import your_package; print('it works!')"
+python -c "import sys; print(sys.platform)"
+# emscripten
 ```
 
 Run your test suite (install pytest first — it's not pre-installed in the venv):
@@ -46,7 +48,7 @@ The Pyodide venv looks like a normal virtualenv, but there are important differe
 | | Standard venv | Pyodide venv |
 |---|---|---|
 | `python` | Runs CPython natively | Runs Pyodide on Node.js |
-| Package compatibility | Any wheel for your platform | Only pure-Python wheels or `pyemscripten_*_wasm32` wheels |
+| Package compatibility | Any wheel for your platform | Only pure Python wheels or `pyemscripten_*_wasm32` wheels |
 
 Key things to know:
 

@@ -2,18 +2,19 @@
 
 ## Which packages work with Pyodide?
 
-- **Pure Python** — does not need a separate build. Usually works out of the box, though may need changes if they use subprocesses, threads, or other unsupported features.
-- **C/C++ extensions** — usually works with pyodide-build. Some packages need adjustments (e.g., disabling optional native dependencies, guarding platform-specific code). Some need more substantial changes.
-- **Rust extensions (PyO3)** — generally easier to port than C/C++ packages.
-- **Threading / multiprocessing** — not supported. Packages that require threads will not work.
-- **Networking (sockets)** — not supported. Packages that open raw sockets will not work. High-level HTTP libraries like `requests` and `httpx` have Pyodide-specific fallbacks.
-- **Subprocesses** — not supported. Packages that call `subprocess.run()` will not work.
+- **Pure Python** — does not need a separate build. Usually work out of the box, though may need changes if they use subprocesses, threads, or other unsupported features.
+    - **Threading / multiprocessing** — not supported. Packages that require threads will not work.
+    - **Networking (sockets)** — not supported. Packages that open raw sockets will not work. High-level HTTP libraries like `requests` and `httpx` have Pyodide-specific fallbacks.
+    - **Subprocesses** — not supported. Packages that call `subprocess.run()` will not work.
+- **C/C++ extensions** — usually work with pyodide-build. Some packages need adjustments (e.g., disabling optional native dependencies, guarding platform-specific code). Some need more substantial changes.
+- **Rust extensions (PyO3)** — generally easier to port than C/C++ packages (note that the `wasm32-unknown-emscripten` needs to be enabled).
+
 
 ## Do I need the full Pyodide repository?
 
 No. pyodide-build is a standalone package. Install it with `pip install pyodide-build` and you're ready to build. You don't need to clone the Pyodide repository.
 
-## Do I need pyodide-build for pure-Python packages?
+## Do I need pyodide-build for pure Python packages?
 
 No. A pure Python wheel built with `python -m build`, `hatch`, `flit`, or any standard build frontend is already compatible with Pyodide. pyodide-build is only needed for packages with compiled extensions (C, C++, Rust).
 

@@ -3,7 +3,7 @@
 This guide walks you through building a Python package with C extensions for WebAssembly using pyodide-build. Make sure you've [installed pyodide-build](installation.md) first.
 
 ```{note}
-**Pure-Python packages do not need pyodide-build.** If your package has no C, C++, or Rust extensions, a standard wheel built with `python -m build` already works with Pyodide.
+**Pure Python packages do not need pyodide-build.** If your package has no C, C++, or Rust extensions, a standard wheel built with `python -m build` already works with Pyodide.
 ```
 
 ## Build from your source tree

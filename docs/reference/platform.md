@@ -27,18 +27,19 @@ Each platform version is tied to a specific Python version and Emscripten SDK ve
 
 | Platform tag | Python | Emscripten | Notes |
 |---|---|---|---|
+| `emscripten_3_1_32_wasm32` | 3.11 | 3.1.32 | Legacy tag name |
 | `pyodide_2024_0_wasm32` | 3.12 | 3.1.58 | Legacy tag name |
 | `pyodide_2025_0_wasm32` | 3.13 | 4.0.9 | Legacy tag name |
 | `pyemscripten_2026_0_wasm32` | 3.14 | 5.0.3 | PEP 783 standardized name |
 
 ```{note}
-Older Pyodide versions used the tag `pyodide_{year}_{patch}_wasm32`. The `pyemscripten_*` tag is the standardized form going forward per PEP 783.
+Older Pyodide versions used the tag `pyodide_{year}_{patch}_wasm32` or `emscripten_{version}_wasm32`. The `pyemscripten_*` tag is the standardized form going forward per PEP 783.
 ```
 
 ## ABI compatibility rules
 
 - Wheels are **not cross-version compatible** — a wheel built for `pyemscripten_2025_0_wasm32` will not work with `pyemscripten_2024_0_wasm32` or `pyemscripten_2026_0_wasm32`.
-- Pure-Python wheels (`py3-none-any`) work on all versions.
+- Pure Python wheels (`py3-none-any`) work on all versions.
 - The ABI version determines which Emscripten SDK and CPython build are used. Mixing versions will cause load-time or runtime errors.
 
 ## cibuildwheel identifiers

@@ -66,9 +66,9 @@ When the compiler wrapper is invoked:
 
 1. Detects which tool it's impersonating
 2. Rewrites the command line for Emscripten
-3. Filters out native flags that emcc cannot handle
-4. Adds WebAssembly-specific flags
-5. Executes the real Emscripten tool
+   - Filters out native flags that emcc cannot handle
+   - Adds WebAssembly-specific flags
+3. Executes the real Emscripten tool
 
 When `pyodide build` runs:
 
@@ -92,3 +92,5 @@ The `--no-isolation` flag skips this and uses the current environment, which is 
 
 - [Emscripten documentation](https://emscripten.org/docs/) — the underlying compiler toolchain
 - [PEP 517](https://peps.python.org/pep-0517/) — Python build system interface
+- [PEP 783](https://peps.python.org/pep-0783/) — Emscripten Packaging
+- [PEP 776](https://peps.python.org/pep-0776/) — Emscripten Support for Python
