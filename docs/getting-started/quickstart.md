@@ -34,7 +34,7 @@ Use `-C` / `--config-setting` to pass options to your build backend, just like w
 
 ```bash
 # Meson project: pass the cross-compilation file
-pyodide build . -C setup-args=-Dblas=none -C setup-args=-Dlapack=none
+pyodide build . -C setup-args="--cross-file=your-emscripten-cross-file.txt"
 
 # setuptools project: pass extra compile args
 pyodide build . -C "--build-option=--some-flag"

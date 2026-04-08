@@ -54,7 +54,7 @@ Key things to know:
 
 - **`pip` runs on host Python** — it uses your system Python to resolve and download packages, but only installs wheels compatible with WebAssembly. This means `pip install` is fast (no cross-compilation at install time).
 - **`python` runs on Pyodide/Node.js** — when you run `python` or `python -c "..."`, it launches Node.js with the Pyodide runtime. This is the real WebAssembly environment.
-- **Only binary-compatible wheels are installable** — `pip install` is configured with `only-binary=:all:`, so it won't attempt to build packages from source. If a WebAssembly wheel isn't available, the install will fail.
+- **Only binary-compatible wheels are installable** — `pip install` is configured with `only-binary=:all:`, so it won't attempt to build packages from source distributions (sdists). If a WebAssembly wheel isn't available, the installation will fail.
 
 ## Limitations
 

@@ -1,6 +1,6 @@
 # How pyodide-build Works
 
-This page explains the internals of pyodide-build — how it turns a regular Python package into a WebAssembly wheel.
+This page explains how pyodide-build cross compiles normal Linux-compatible Python packages into wheels that can be used with Pyodide.
 
 ## The build pipeline
 
@@ -49,9 +49,9 @@ The core of pyodide-build is `pywasmcross` — a compiler wrapper that transpare
 
 ### How it works
 
-When pyodide-build sets up the build environment, it creates symlinks named after common compiler tools:
+When pyodide-build sets up the build environment, it adds overrides for `gcc` and other compiler toolchain tools to the beginning of the path.
 
-| Symlink | Redirects to |
+| Tool | override |
 |---|---|
 | `cc`, `gcc` | `emcc` |
 | `c++`, `g++` | `em++` |
@@ -64,9 +64,9 @@ When pyodide-build sets up the build environment, it creates symlinks named afte
 
 These symlinks all point to `pywasmcross.py`. When invoked, pywasmcross:
 
-1. Detects which tool it's impersonating (from the symlink name)
+1. Detects which tool it's impersonating from the symlink name
 2. Rewrites the command line for Emscripten
-3. Filters out incompatible flags
+3. Filters out native flags that emcc cannot handle
 4. Adds WebAssembly-specific flags
 5. Executes the real Emscripten tool
 

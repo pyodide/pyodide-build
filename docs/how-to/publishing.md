@@ -14,7 +14,7 @@ Upload with [twine](https://twine.readthedocs.io/) or any standard publishing to
 twine upload dist/your_package-*.whl
 ```
 
-Or use [trusted publishing](https://docs.pypi.org/trusted-publishers/) in GitHub Actions (no API tokens needed):
+Recommended: or use [trusted publishing](https://docs.pypi.org/trusted-publishers/) in GitHub Actions (no API tokens needed):
 
 ```yaml
   publish:

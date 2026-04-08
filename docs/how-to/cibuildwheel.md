@@ -53,11 +53,11 @@ jobs:
     name: Build Pyodide wheels
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pypa/cibuildwheel@v3.4.0
         env:
           CIBW_PLATFORM: pyodide
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-pyodide
           path: wheelhouse/*.whl

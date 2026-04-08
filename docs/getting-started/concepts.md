@@ -68,12 +68,12 @@ The Emscripten platform tag, standardized by [PEP 783](https://peps.python.org/p
 pyemscripten_{year}_{patch}_wasm32
 ```
 
-Where `{year}_{patch}` is the platform ABI version (e.g., `2025_0`). This version determines which Emscripten SDK version and CPython build are used. Wheels built for one ABI version are **not** compatible with another.
+Where `{year}_{patch}` is the platform ABI version (e.g., `2026_0`). This version determines which Emscripten SDK version and CPython build are used. Wheels built for one ABI version are **not** compatible with another.
 
 A complete wheel filename looks like:
 
 ```
-numpy-2.2.0-cp313-cp313-pyemscripten_2025_0_wasm32.whl
+numpy-2.2.0-cp313-cp313-pyemscripten_2026_0_wasm32.whl
        │      │     │           │
        │      │     │           └── platform tag
        │      │     └── Python ABI tag

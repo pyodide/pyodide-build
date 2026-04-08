@@ -41,7 +41,7 @@ jobs:
           pip install pytest
           python -m pytest tests/ -x
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pyodide-wheel
           path: dist/*.whl
