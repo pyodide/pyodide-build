@@ -6,6 +6,7 @@ import contextlib
 import hashlib
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import textwrap
@@ -665,3 +666,13 @@ def retrying_rmtree(d):
             else:
                 raise
     raise RuntimeError(f"shutil.rmtree('{d}') failed with ENOTEMPTY three times")
+
+
+def remove_readonly(func, path, _):
+    """Clear the readonly bit and reattempt removal.
+
+    Needed on Windows to remove read-only files like `git` objects.
+    Use with: `shutil.rmtree(path, onexc=remove_readonly)`
+    """
+    os.chmod(path, stat.S_IWRITE)
+    func(path)

@@ -7,7 +7,7 @@ from pathlib import Path
 from pyodide_lock import PyodideLockSpec
 
 from pyodide_build import build_env, uv_helper
-from pyodide_build.common import download_and_unpack_archive
+from pyodide_build.common import download_and_unpack_archive, remove_readonly
 from pyodide_build.create_package_index import create_package_index
 from pyodide_build.logger import logger
 from pyodide_build.xbuildenv_releases import (
@@ -475,7 +475,7 @@ class CrossBuildEnvManager:
 
         if emsdk_dir.exists():
             logger.info("Removing existing emsdk directory %s", emsdk_dir)
-            shutil.rmtree(emsdk_dir)
+            shutil.rmtree(emsdk_dir, onexc=remove_readonly)
 
         subprocess.run(
             [
