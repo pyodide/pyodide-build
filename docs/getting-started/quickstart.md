@@ -17,7 +17,7 @@ pyodide build .
 The output wheel is placed in `./dist/` by default:
 
 ```
-dist/your_package-1.0.0-cp313-cp313-pyemscripten_2025_0_wasm32.whl
+dist/your_package-1.0.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl
 ```
 
 On the first run, pyodide-build automatically downloads and sets up the cross-build environment and Emscripten SDK. This may take a minute — subsequent builds are fast.
@@ -52,7 +52,7 @@ The wheel should contain `.so` files (compiled extensions) alongside your Python
 
 ## Test the wheel
 
-Create a [Pyodide virtual environment](testing.md) to test the wheel:
+Create a Pyodide virtual environment to test the wheel:
 
 ```bash
 pyodide venv .venv-pyodide

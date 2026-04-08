@@ -17,11 +17,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - uses: actions/setup-node@v4
         with:
@@ -49,15 +49,20 @@ jobs:
 
 ## Caching the cross-build environment
 
-The cross-build environment and Emscripten SDK are downloaded on first use and can be large. Cache them to speed up subsequent runs:
+The cross-build environment and Emscripten SDK are downloaded on first use and can be large.
+
+You can set the path where the cross-build environment and Emscripten SDK are stored using the `PYODIDE_XBUILDENV_PATH` environment variable.
+
+Cache them to speed up subsequent runs:
 
 ```yaml
+      - name: Setup PYODIDE_XBUILDENV_PATH
+        run: echo "PYODIDE_XBUILDENV_PATH=/somewhere-you-want-to-store-xbuildenv" >> $GITHUB_ENV
       - name: Cache xbuildenv
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cache/pyodide
-            ~/.cache/emsdk
+            ${{ env.PYODIDE_XBUILDENV_PATH }}
           key: pyodide-xbuildenv-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             pyodide-xbuildenv-

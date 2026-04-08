@@ -8,8 +8,8 @@ Add Pyodide to your `pyproject.toml`:
 
 ```toml
 [tool.cibuildwheel]
-# Build for CPython 3.13 on all platforms
-build = "cp313-*"
+# Build for CPython 3.14 on all platforms
+build = "cp314-*"
 
 [tool.cibuildwheel.pyodide]
 # Test inside a Pyodide venv
@@ -42,9 +42,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pypa/cibuildwheel@v3.4.0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -82,7 +82,7 @@ Combine native and Pyodide wheels in a single publish step:
     permissions:
       id-token: write  # trusted publishing
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: wheels-*
           merge-multiple: true

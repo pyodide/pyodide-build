@@ -10,15 +10,14 @@ Rust support in pyodide-build requires some manual setup compared to C/C++ packa
 
 ### 1. Install Rust
 
-If you don't have Rust installed, use [rustup](https://rustup.rs/):
+If you don't have Rust installed, use [rustup](https://rustup.rs/) to install it.
 
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
+### 2. Install the correct Rust toolchain (optional)
 
-### 2. Install the correct Rust toolchain
+Depending on the Pyodide/Python version you're targeting, you may need a specific Rust toolchain version.
+This might not be necessary in all cases for Python 3.14 or later, but if you encounter issues, you can try installing the correct toolchain.
 
-pyodide-build requires a specific minimum Rust toolchain version. Query it with:
+Query it with:
 
 ```bash
 pyodide config get rust_toolchain
@@ -66,7 +65,7 @@ You don't need to set these manually — they come from the cross-build environm
 Use `pyodide config` to inspect the Rust-related build settings:
 
 ```bash
-pyodide config get rust_toolchain              # e.g., nightly-2025-02-01
+pyodide config get rust_toolchain              # e.g., 1.93.0
 pyodide config get rustflags                   # e.g., -C link-arg=-sSIDE_MODULE=2 ...
 ```
 

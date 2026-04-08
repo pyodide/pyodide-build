@@ -62,7 +62,7 @@ pyodide build .
 pyodide auditwheel show dist/your_package-*.whl
 
 # 3. Vendor shared libraries into the wheel
-pyodide auditwheel repair dist/your_package-*.whl -w dist/
+pyodide auditwheel repair dist/your_package-*.whl --libdir /path/to/libdir
 
 # 4. Test the repaired wheel
 pyodide venv .venv-pyodide

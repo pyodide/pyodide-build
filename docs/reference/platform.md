@@ -13,7 +13,7 @@ pyemscripten_{year}_{patch}_wasm32
 A complete wheel filename:
 
 ```
-numpy-2.2.0-cp313-cp313-pyemscripten_2025_0_wasm32.whl
+numpy-2.2.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl
        │      │     │           │
        │      │     │           └── platform tag
        │      │     └── Python ABI tag
@@ -28,8 +28,8 @@ Each platform version is tied to a specific Python version and Emscripten SDK ve
 | Platform tag | Python | Emscripten | Notes |
 |---|---|---|---|
 | `pyodide_2024_0_wasm32` | 3.12 | 3.1.58 | Legacy tag name |
-| `pyemscripten_2025_0_wasm32` | 3.13 | 4.0.9 | PEP 783 standardized name |
-| `pyemscripten_2026_0_wasm32` | 3.14 | TBD | Under development |
+| `pyodide_2025_0_wasm32` | 3.13 | 4.0.9 | Legacy tag name |
+| `pyemscripten_2026_0_wasm32` | 3.14 | 5.0.3 | PEP 783 standardized name |
 
 ```{note}
 Older Pyodide versions used the tag `pyodide_{year}_{patch}_wasm32`. The `pyemscripten_*` tag is the standardized form going forward per PEP 783.
@@ -45,10 +45,11 @@ Older Pyodide versions used the tag `pyodide_{year}_{patch}_wasm32`. The `pyemsc
 
 When using [cibuildwheel](../how-to/cibuildwheel.md), the platform identifiers are:
 
-| cibuildwheel identifier | Platform tag |
-|---|---|
-| `cp312-pyodide_wasm32` | `pyodide_2024_0_wasm32` |
-| `cp313-pyodide_wasm32` | `pyemscripten_2025_0_wasm32` |
+| cibuildwheel identifier |
+|---|
+| `cp312-pyodide_wasm32` |
+| `cp313-pyodide_wasm32` |
+| `cp314-pyodide_wasm32` |
 
 ## Checking your platform version
 

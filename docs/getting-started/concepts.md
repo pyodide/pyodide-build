@@ -6,7 +6,7 @@ This page explains the key ideas behind pyodide-build. Understanding these conce
 
 When you run `python -m build` on your laptop, your C extensions are compiled for your machine's architecture — x86_64 on most desktops, arm64 on Apple Silicon. The resulting wheel only works on that platform.
 
-Pyodide runs Python inside WebAssembly, which is a completely different compilation target. You can't run `gcc` or `clang` and get a `.so` that works in WebAssembly — you need [Emscripten](https://emscripten.org/), a compiler toolchain that produces WebAssembly output from C/C++ source code.
+Pyodide runs Python inside WebAssembly, which is a completely different compilation target. You can't run `gcc` or `clang` and get a binary that works in WebAssembly — you need [Emscripten](https://emscripten.org/), a compiler toolchain that produces WebAssembly output from C/C++ source code.
 
 pyodide-build automates this cross-compilation. When you run `pyodide build`, it:
 
@@ -22,7 +22,6 @@ Your build scripts don't need to change — pyodide-build handles the translatio
 Cross-compilation needs more than just a compiler. Your package's build system needs to find Python headers, link against the right libraries, and query Python's `sysconfig` for the target platform — not the host. The **cross-build environment** (xbuildenv) provides all of this:
 
 - **CPython headers and sysconfig data** compiled for Emscripten/WebAssembly
-- **Pre-built package stubs** for packages like NumPy and SciPy that other packages link against at build time
 - **Emscripten SDK** — the compiler toolchain itself (installed automatically)
 
 When you run `pyodide build`, pyodide-build automatically downloads and sets up the cross-build environment if one isn't already installed. It's cached in your platform's user cache directory so subsequent builds are fast.
@@ -31,7 +30,7 @@ You can also manage the cross-build environment explicitly:
 
 ```bash
 pyodide xbuildenv install          # install (or update) the cross-build environment
-pyodide xbuildenv install 0.27.0   # install a specific Pyodide version
+pyodide xbuildenv install 0.29.3   # install a specific Pyodide version
 pyodide xbuildenv versions         # list installed versions
 ```
 
@@ -51,7 +50,7 @@ See [Managing Cross-Build Environments](../how-to/xbuildenv.md) for more details
 pyodide-build manages Emscripten automatically — it installs the correct version as part of the cross-build environment and handles all compiler redirection. You don't need to install or configure Emscripten yourself.
 
 ```{important}
-Each Pyodide version requires a **specific** Emscripten version. pyodide-build enforces this to ensure ABI compatibility. You can check the required version with `pyodide config get emscripten_version`.
+Each Pyodide version requires a **specific** Emscripten version. pyodide-build enforces this to ensure binary compatibility. You can check the required version with `pyodide config get emscripten_version`.
 ```
 
 ## Platform tags
@@ -60,7 +59,7 @@ Python wheels include a [platform tag](https://packaging.python.org/en/latest/sp
 
 - `manylinux_2_17_x86_64` — Linux on x86_64
 - `macosx_14_0_arm64` — macOS on Apple Silicon
-- `pyemscripten_2025_0_wasm32` — Emscripten/WebAssembly
+- `pyemscripten_2026_0_wasm32` — Emscripten/WebAssembly
 
 The Emscripten platform tag, standardized by [PEP 783](https://peps.python.org/pep-0783/), has the format:
 
@@ -73,7 +72,7 @@ Where `{year}_{patch}` is the platform ABI version (e.g., `2026_0`). This versio
 A complete wheel filename looks like:
 
 ```
-numpy-2.2.0-cp313-cp313-pyemscripten_2026_0_wasm32.whl
+numpy-2.2.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl
        │      │     │           │
        │      │     │           └── platform tag
        │      │     └── Python ABI tag
@@ -100,7 +99,6 @@ Older Pyodide versions (before PEP 783) used the tag `pyodide_{year}_{patch}_was
 - Compiler calls are intercepted and redirected to Emscripten
 - Some compiler flags are filtered out (e.g., `-pthread`, x86 SIMD flags) because they don't apply to WebAssembly
 - The output wheel has an Emscripten platform tag instead of a native one
-- A cross-build environment must be available (installed automatically on first use)
 
 ## What's next?
 

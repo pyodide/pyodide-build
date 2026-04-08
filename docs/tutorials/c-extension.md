@@ -86,7 +86,7 @@ That's it. pyodide-build:
 Output:
 
 ```
-dist/fastcount-1.0.0-cp313-cp313-pyemscripten_2025_0_wasm32.whl
+dist/fastcount-1.0.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl
 ```
 
 ## Test it
@@ -156,7 +156,7 @@ wasm-ld: error: undefined symbol: some_function
 ```
 
 This usually means your extension depends on a C library that hasn't been compiled for WebAssembly. Check:
-- Is the library available in the Emscripten sysroot?
+- Is the library available in the Emscripten by default?
 - Does the library need to be cross-compiled for WebAssembly first?
 - Try `--exports whole_archive` if the symbol should be coming from your own code.
 
@@ -165,6 +165,9 @@ This usually means your extension depends on a C library that hasn't been compil
 ```
 error: unsupported option '-pthread'
 ```
+
+This means Emscripten does not support the flag you are passing to the compiler.
+Since WASM is a different architecture from native systems, some compiler flags are not supported.
 
 pyodide-build filters out most incompatible flags automatically, but some may slip through.
 You may need to conditionally disable them:
@@ -192,7 +195,7 @@ RuntimeError: function signature mismatch
 WebAssembly enforces strict function pointer typing. If your C code casts function pointers to incompatible types (common in older C code), you'll get this error at runtime, not at build time. The fix is to ensure function pointer types match exactly.
 
 ```{Tip}
-This error is very common but often very tricky to debug by human eyes. Usually LLMs are quite helpful in identifying and fixing this issue.
+This error is very common but often very tricky to debug by human eyes. Usually coding agents are quite helpful in identifying and fixing this issue.
 ```
 
 ## Using Cython

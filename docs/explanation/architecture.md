@@ -8,13 +8,13 @@ When you run `pyodide build .`, the following happens:
 
 ```
 ┌────────────────┐
-│ pyodide build  │  CLI entry point
+│ pyodide-build  │  CLI entry point
 └───────┬────────┘
         │
         ▼
 ┌────────────────┐
-│  Environment   │  Install xbuildenv + Emscripten SDK (if needed)
-│    setup       │  Set up sysconfig, headers, env vars
+│  Environment   │  Install cross-build environment (if needed)
+│    setup       │  Set up headers, env vars
 └───────┬────────┘
         │
         ▼
@@ -43,9 +43,9 @@ When you run `pyodide build .`, the following happens:
 └────────────────┘
 ```
 
-## The compiler wrapper (pywasmcross)
+## The compiler wrapper
 
-The core of pyodide-build is `pywasmcross` — a compiler wrapper that transparently redirects native compiler calls to Emscripten.
+The core of pyodide-build is a compiler wrapper that transparently redirects native compiler calls to Emscripten.
 
 ### How it works
 
@@ -62,9 +62,9 @@ When pyodide-build sets up the build environment, it adds overrides for `gcc` an
 | `meson` | `meson` (with cross file injected) |
 | `cargo` | `cargo` (with Emscripten target) |
 
-These symlinks all point to `pywasmcross.py`. When invoked, pywasmcross:
+When the compiler wrapper is invoked:
 
-1. Detects which tool it's impersonating from the symlink name
+1. Detects which tool it's impersonating
 2. Rewrites the command line for Emscripten
 3. Filters out native flags that emcc cannot handle
 4. Adds WebAssembly-specific flags
@@ -72,10 +72,10 @@ These symlinks all point to `pywasmcross.py`. When invoked, pywasmcross:
 
 When `pyodide build` runs:
 
-1. `Makefile.envs` is parsed to set compiler flags, paths, and environment variables
+1. Set compiler flags, paths, and environment variables
 2. The `sysconfig` module is patched to return target-platform values instead of host values
-3. `PATH` is modified so pywasmcross symlinks take priority over native compilers
-4. Environment variables (`SIDE_MODULE_CFLAGS`, `CMAKE_TOOLCHAIN_FILE`, `MESON_CROSS_FILE`, etc.) are set
+3. `PATH` is modified so compiler wrappers take priority over native compilers
+4. Environment variables (`CMAKE_TOOLCHAIN_FILE`, `MESON_CROSS_FILE`, etc.) are set
 
 ## Build isolation
 

@@ -20,7 +20,6 @@ The CMake toolchain that pyodide-build injects:
 
 - Inherits from Emscripten's own CMake toolchain
 - It sets the compiler and linkers
-- Sets up library search paths for the cross-build environment
 
 ```{tip}
 If automatic toolchain injection doesn't work for your setup, you can pass it explicitly:

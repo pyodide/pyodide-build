@@ -17,7 +17,7 @@ We recommend using `uv` or `pyenv` to manage your Python versions.
 pyodide xbuildenv install
 
 # Install a specific Pyodide version
-pyodide xbuildenv install 0.27.0
+pyodide xbuildenv install 0.29.3
 
 # Install from a custom URL
 pyodide xbuildenv install --url https://example.com/xbuildenv-0.27.0.tar
@@ -36,14 +36,14 @@ pyodide xbuildenv versions
 Output:
 
 ```
-* 0.27.0
-  0.26.4
+* 0.29.3
+  314.0.0
 ```
 
 ## Switching between versions
 
 ```bash
-pyodide xbuildenv use 0.26.4
+pyodide xbuildenv use 0.29.3
 ```
 
 ## Checking the current version
@@ -59,7 +59,7 @@ pyodide xbuildenv version
 pyodide xbuildenv uninstall
 
 # Uninstall a specific version
-pyodide xbuildenv uninstall 0.26.4
+pyodide xbuildenv uninstall 0.29.3
 ```
 
 ## Searching for available versions
@@ -73,17 +73,6 @@ pyodide xbuildenv search --all
 
 # Output as JSON (useful for scripting)
 pyodide xbuildenv search --json
-```
-
-The search output shows version compatibility information:
-
-```
-┌────────────┬────────────┬────────────┬───────────────────────────┬────────────┐
-│ Version    │ Python     │ Emscripten │ pyodide-build             │ Compatible │
-├────────────┼────────────┼────────────┼───────────────────────────┼────────────┤
-│ 0.27.7     │ 3.12.7     │ 3.1.58     │ 0.26.0 -                  │ Yes        │
-│ 0.27.6     │ 3.12.7     │ 3.1.58     │ 0.26.0 -                  │ Yes        │
-└────────────┴────────────┴────────────┴───────────────────────────┴────────────┘
 ```
 
 ## Where the xbuildenv is stored

@@ -12,7 +12,6 @@ This creates a virtual environment at `.venv-pyodide/`. Under the hood, it:
 
 1. Creates a virtualenv using the Pyodide interpreter (which runs on Node.js)
 2. Configures `pip` to only accept WebAssembly-compatible wheels
-3. Installs the Pyodide standard library and [micropip](https://micropip.pyodide.org/)
 
 ## Activate and install your wheel
 
@@ -47,13 +46,11 @@ The Pyodide venv looks like a normal virtualenv, but there are important differe
 | | Standard venv | Pyodide venv |
 |---|---|---|
 | `python` | Runs CPython natively | Runs Pyodide on Node.js |
-| `pip` | Runs on host Python | Runs on **host Python**, but installs WebAssembly-compatible packages |
 | Package compatibility | Any wheel for your platform | Only pure-Python wheels or `pyemscripten_*_wasm32` wheels |
 
 Key things to know:
 
-- **`pip` runs on host Python** — it uses your system Python to resolve and download packages, but only installs wheels compatible with WebAssembly. This means `pip install` is fast (no cross-compilation at install time).
-- **`python` runs on Pyodide/Node.js** — when you run `python` or `python -c "..."`, it launches Node.js with the Pyodide runtime. This is the real WebAssembly environment.
+- **`python` runs on Pyodide/Node.js** — when you run `python` or `python -c "..."`, it launches Node.js with the Pyodide runtime.
 - **Only binary-compatible wheels are installable** — `pip install` is configured with `only-binary=:all:`, so it won't attempt to build packages from source distributions (sdists). If a WebAssembly wheel isn't available, the installation will fail.
 
 ## Limitations

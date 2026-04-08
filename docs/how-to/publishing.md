@@ -2,8 +2,8 @@
 
 WebAssembly wheels built by pyodide-build are standard Python wheels — they follow the same packaging format and can be published to PyPI like any other wheel.
 
-```{admonition} PEP 783
-The Emscripten/WebAssembly platform tags are standardized by [PEP 783](https://peps.python.org/pep-0783/), which defines how Python supports the Emscripten platform. This means PyPI and standard Python tooling recognize these wheels as valid platform-specific distributions.
+```{note} PEP 783
+The Emscripten/WebAssembly platform tags are standardized by [PEP 783](https://peps.python.org/pep-0783/).
 ```
 
 ## Publishing to PyPI
@@ -14,7 +14,7 @@ Upload with [twine](https://twine.readthedocs.io/) or any standard publishing to
 twine upload dist/your_package-*.whl
 ```
 
-Recommended: or use [trusted publishing](https://docs.pypi.org/trusted-publishers/) in GitHub Actions (no API tokens needed):
+__Recommended__: or use [trusted publishing](https://docs.pypi.org/trusted-publishers/) in GitHub Actions (no API tokens needed):
 
 ```yaml
   publish:

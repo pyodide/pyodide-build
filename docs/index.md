@@ -2,9 +2,9 @@
 
 **Build Python packages for WebAssembly.**
 
-pyodide-build is the build toolchain for compiling Python packages to [WebAssembly](https://webassembly.org/) via [Emscripten](https://emscripten.org/). It is the reference implementation of the build toolchain for the [Emscripten/WebAssembly Python platform](https://peps.python.org/pep-0783/).
+pyodide-build is the build toolchain for compiling Python packages to [WebAssembly](https://webassembly.org/) via [Emscripten](https://emscripten.org/). It is the reference implementation of the build toolchain for the Emscripten/WebAssembly Python platform.
 
-This tool is designed to be used with [Pyodide](https://pyodide.org/), but it can also be used with other Emscripten-based Python runtimes that support the same platform tags.
+This tool is designed to be used with [Pyodide](https://pyodide.org/), but it can also be used with other Emscripten-based Python runtimes that support the same platform tags that follows [PEP 783](https://peps.python.org/pep-0783/).
 
 If you're familiar with `python -m build`, pyodide-build works the same way — just replace it with `pyodide build`:
 
@@ -13,7 +13,7 @@ pip install pyodide-build
 pyodide build .
 ```
 
-This produces a `.whl` file tagged for the Emscripten platform (e.g., `your_package-1.0-cp313-cp313-pyemscripten_2025_0_wasm32.whl`) that can be published to PyPI and installed in [Pyodide](https://pyodide.org/).
+This produces a `.whl` file tagged for the Emscripten platform (e.g., `your_package-1.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl`) that can be published to PyPI and installed in Pyodide.
 
 ## Who is this for?
 
@@ -30,12 +30,12 @@ pyodide-build is for **Python package maintainers** who want their package to wo
 
 pyodide-build wraps [pypa/build](https://build.pypa.io/) with a cross-compilation layer. When you run `pyodide build`, it:
 
-1. Sets up a cross-build environment with Emscripten-compiled CPython headers and sysconfig data
+1. Sets up a cross-build environment with Emscripten-compiled CPython headers
 2. Intercepts compiler calls (`gcc`, `g++`, `ld`, etc.) and redirects them to Emscripten (`emcc`, `em++`)
 3. Translates compiler flags for WebAssembly compatibility
 4. Produces a standard wheel with the appropriate platform tag
 
-Your existing `setup.py`, `pyproject.toml`, CMakeLists.txt, or `meson.build` works as-is — pyodide-build handles the cross-compilation transparently.
+Your existing `setup.py`, `pyproject.toml`, `CMakeLists.txt`, or `meson.build` works as-is — pyodide-build handles the cross-compilation transparently.
 
 ## Where to start
 
@@ -43,17 +43,17 @@ Your existing `setup.py`, `pyproject.toml`, CMakeLists.txt, or `meson.build` wor
 :gutter: 2
 
 :::{grid-item-card} Quick Start
-:link: getting-started/quickstart
+:link: getting-started/quickstart.html
 Build your first WebAssembly wheel in 5 minutes.
 :::
 
 :::{grid-item-card} CI with cibuildwheel
-:link: how-to/cibuildwheel
+:link: how-to/cibuildwheel.html
 Add Pyodide to your existing cibuildwheel CI pipeline.
 :::
 
 :::{grid-item-card} Testing with `pyodide venv`
-:link: getting-started/testing
+:link: getting-started/testing.html
 Verify your wheel works in a Pyodide environment.
 :::
 
