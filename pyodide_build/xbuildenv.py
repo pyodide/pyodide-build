@@ -611,4 +611,5 @@ class CrossBuildEnvManager:
 
 
 def _url_to_version(url: str) -> str:
-    return url.replace("://", "_").replace(".", "_").replace("/", "_")
+    # ; - invalid character on Windows.
+    return url.replace("://", "_").replace(".", "_").replace("/", "_").replace(":", "_")
