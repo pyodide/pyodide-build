@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from pyodide_build.common import (
+    IS_WIN,
     check_wasm_magic_number,
     default_xbuildenv_path,
     environment_substitute_args,
@@ -240,8 +241,18 @@ def test_default_xbuildenv_path_env_var(tmp_path, reset_cache, monkeypatch):
     monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", "")
     assert default_xbuildenv_path() == baseline_path
 
-    # non-writable path; should fall back to default
-    reset_cache()
+
+@pytest.mark.skipif(
+    IS_WIN, reason="Permission-based fallback is not reliable on Windows"
+)
+def test_default_xbuildenv_path_env_var_non_writable(
+    tmp_path, reset_cache, monkeypatch
+):
+    import platformdirs
+
+    dirname = xbuildenv_dirname()
+    baseline_path = Path(platformdirs.user_cache_dir()) / dirname
+
     non_writable_path = tmp_path / "non_writable"
     non_writable_path.mkdir(exist_ok=True)
     non_writable_path.chmod(0o444)
