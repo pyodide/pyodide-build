@@ -65,12 +65,15 @@ def test_environment_var_substitution(monkeypatch):
             "ldflags": '"-l$(PYODIDE_BASE)"',
             "cxxflags": "$(BOB)",
             "cflags": "$(FRED)",
+            "test_var": "$(BOB)$(UNDEFINED_VAR)",
         }
     )
     assert (
         args["cflags"] == "Frederick F. Freddertson Esq."
         and args["cxxflags"] == "Robert Mc Roberts"
         and args["ldflags"] == '"-lpyodide_build_dir"'
+        # Emulate expanding undefined variables to empty strings.
+        and args["test_var"] == "Robert Mc Roberts"
     )
 
 
