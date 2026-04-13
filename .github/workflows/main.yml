@@ -57,7 +57,7 @@ jobs:
             -m "not integration"
 
       - name: Upload coverage
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-no-integration-${{ matrix.os }}
           path: .coverage
@@ -182,7 +182,7 @@ jobs:
           make ${{ matrix.task.name }}
 
       - name: Upload coverage for tests marked with integration
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: matrix.task.name == 'test-integration-marker'
         with:
           name: coverage-from-integration-${{ matrix.os }}
