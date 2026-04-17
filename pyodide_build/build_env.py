@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Iterator, Sequence
@@ -14,7 +15,12 @@ from pathlib import Path
 from packaging.tags import Tag, compatible_tags, cpython_tags
 
 from pyodide_build import __version__
-from pyodide_build.common import default_xbuildenv_path, search_pyproject_toml, to_bool
+from pyodide_build.common import (
+    IS_WIN,
+    default_xbuildenv_path,
+    search_pyproject_toml,
+    to_bool,
+)
 
 RUST_BUILD_PRELUDE = """
 rustup default ${RUST_TOOLCHAIN}
@@ -292,8 +298,11 @@ def emscripten_version() -> str:
 
 def get_emscripten_version_info() -> str:
     """Extracted for testing purposes."""
+    emcc = shutil.which("emcc")
+    if not emcc:
+        raise FileNotFoundError
     return subprocess.run(
-        ["emcc", "-v"], capture_output=True, encoding="utf8", check=True
+        [emcc, "-v"], capture_output=True, encoding="utf8", check=True
     ).stderr
 
 
@@ -321,23 +330,38 @@ def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
     dict[str, str]
         Dictionary of environment variables set by emsdk_env.sh
     """
-    emsdk_env_script = emsdk_dir / "emsdk_env.sh"
+    emsdk_env_script_filename = "emsdk_env.bat" if IS_WIN else "emsdk_env.sh"
+    emsdk_env_script = emsdk_dir / emsdk_env_script_filename
     if not emsdk_env_script.exists():
-        raise FileNotFoundError(f"emsdk_env.sh not found at {emsdk_env_script}")
+        raise FileNotFoundError(
+            f"{emsdk_env_script_filename} not found at {emsdk_env_script}"
+        )
 
     # Source emsdk_env.sh and capture the resulting environment
-    result = subprocess.run(
-        ["bash", "-c", f"source {emsdk_env_script} > /dev/null 2>&1 && env"],
-        capture_output=True,
-        encoding="utf8",
-        check=True,
-    )
+    if IS_WIN:
+        # Passing args as a string, as otherwise shell is misinterpreting the command with quotes,
+        # resulting in no output.
+        result = subprocess.run(
+            f'cmd /c call "{emsdk_env_script}" > nul 2>&1 && set',
+            capture_output=True,
+            encoding="utf8",
+            check=True,
+        )
+    else:
+        result = subprocess.run(
+            ["bash", "-c", f'source "{emsdk_env_script}" > /dev/null 2>&1 && env'],
+            capture_output=True,
+            encoding="utf8",
+            check=True,
+        )
 
     # Parse the environment variables from output
     env_vars: dict[str, str] = {}
     for line in result.stdout.splitlines():
         if "=" in line:
             key, _, value = line.partition("=")
+            # On Windows it's 'Path'.
+            key = key.upper()
             if key in EMSDK_ENV_VARS:
                 env_vars[key] = value
 
