@@ -92,14 +92,20 @@ def _gen_runner(
     return _runner
 
 
-def symlink_unisolated_packages(
-    env: DefaultIsolatedEnv, reqs: set[str] | None = None
-) -> None:
-    from pyodide_build.build_env import get_build_flag, get_unisolated_packages
-
+def _env_site_packages(env: DefaultIsolatedEnv) -> Path:
     pyversion = get_pyversion()
-    site_packages_path = f"lib/{pyversion}/site-packages"
-    env_site_packages = Path(env.path) / site_packages_path
+    return Path(env.path) / f"lib/{pyversion}/site-packages"
+
+
+def install_cross_build_sysconfigdata(env: DefaultIsolatedEnv) -> None:
+    """Install the cross-build sysconfigdata into the isolated environment.
+
+    This must be done before installing any build dependencies so that
+    pip/setuptools can detect the cross-compilation target platform.
+    """
+    from pyodide_build.build_env import get_build_flag
+
+    env_site_packages = _env_site_packages(env)
     sysconfigdata_name = get_build_flag("SYSCONFIG_NAME")
     sysconfigdata_path = (
         Path(get_build_flag("TARGETINSTALLDIR"))
@@ -108,6 +114,15 @@ def symlink_unisolated_packages(
 
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
+
+
+def symlink_unisolated_packages(
+    env: DefaultIsolatedEnv, reqs: set[str] | None = None
+) -> None:
+    from pyodide_build.build_env import get_unisolated_packages
+
+    env_site_packages = _env_site_packages(env)
+    env_site_packages.mkdir(parents=True, exist_ok=True)
     host_site_packages = Path(get_hostsitepackages())
     unisolated_packages = set(get_unisolated_packages())
 
@@ -122,8 +137,14 @@ def symlink_unisolated_packages(
         for path in chain(
             host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
         ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
+            target = env_site_packages / path.name
+            if target.is_symlink():
+                target.unlink()
+            elif target.is_dir():
+                shutil.rmtree(target)
+            elif target.exists():
+                target.unlink()
+            target.symlink_to(path)
 
 
 def remove_avoided_requirements(
@@ -175,9 +196,11 @@ def _build_in_isolated_env(
             runner=_gen_runner(build_env, env),
         )
 
-        # first install the build dependencies
-        symlink_unisolated_packages(env, builder.build_system_requires)
+        # Install sysconfigdata so pip can detect the cross-compilation
+        # target during dependency installation.
+        install_cross_build_sysconfigdata(env)
         install_reqs(build_env, env, builder.build_system_requires)
+
         build_reqs: set[str] | None = None
         try:
             build_reqs = builder.get_requires_for_build(
@@ -202,6 +225,10 @@ def _build_in_isolated_env(
                 )
 
         install_reqs(build_env, env, build_reqs)
+
+        # Symlink cross-compiled packages to the isolated environment
+        # to make sure the correct packages are used during building
+        symlink_unisolated_packages(env)
 
         with common.replace_env(build_env):
             return builder.build(

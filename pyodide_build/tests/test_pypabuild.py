@@ -121,3 +121,61 @@ def test_symlink_unisolated_packages_triggers_lazy_install(
 
     pypabuild.symlink_unisolated_packages(DummyEnv(), reqs={"numpy>=1.0"})
     assert called["count"] == 1
+
+
+def test_symlink_unisolated_packages_restores_overwritten_symlinks(
+    tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+):
+    from pathlib import Path
+
+    from pyodide_build.build_env import (
+        get_build_flag,
+        get_hostsitepackages,
+        get_pyversion,
+    )
+
+    monkeypatch.setattr(
+        "pyodide_build.build_env.get_unisolated_packages",
+        lambda: ["numpy"],
+    )
+
+    host_site_packages = Path(get_hostsitepackages())
+    host_site_packages.mkdir(parents=True, exist_ok=True)
+
+    fake_numpy = host_site_packages / "numpy"
+    fake_numpy.mkdir(parents=True, exist_ok=True)
+    (fake_numpy / "marker.txt").write_text("wasm")
+
+    fake_dist = host_site_packages / "numpy-1.0.dist-info"
+    fake_dist.mkdir(parents=True, exist_ok=True)
+
+    venv_path = tmp_path / "venv"
+    pyversion = get_pyversion()
+    env_site_packages = venv_path / f"lib/{pyversion}/site-packages"
+    env_site_packages.mkdir(parents=True, exist_ok=True)
+
+    sysconfigdata_name = get_build_flag("SYSCONFIG_NAME")
+    sysconfigdata_path = (
+        Path(get_build_flag("TARGETINSTALLDIR"))
+        / f"sysconfigdata/{sysconfigdata_name}.py"
+    )
+    sysconfigdata_path.parent.mkdir(parents=True, exist_ok=True)
+    sysconfigdata_path.write_text("")
+
+    class DummyEnv:
+        path = str(venv_path)
+
+    pypabuild.symlink_unisolated_packages(DummyEnv())
+
+    numpy_link = env_site_packages / "numpy"
+    assert numpy_link.is_symlink()
+    assert numpy_link.resolve() == fake_numpy.resolve()
+
+    numpy_link.unlink()
+    numpy_link.mkdir()
+    (numpy_link / "marker.txt").write_text("native")
+
+    pypabuild.symlink_unisolated_packages(DummyEnv())
+
+    assert numpy_link.is_symlink()
+    assert (numpy_link / "marker.txt").read_text() == "wasm"
