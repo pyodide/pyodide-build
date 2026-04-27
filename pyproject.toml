@@ -23,7 +23,7 @@ dependencies = [
     "ruamel.yaml",
     "packaging",
     "virtualenv",
-    "requests", 
+    "requests",
     "click",
     "rich",
     "platformdirs",
