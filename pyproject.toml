@@ -68,6 +68,9 @@ test = [
     "pytest-httpserver",
     "pytest-cov",
     "types-requests",
+    # click 8.3.3 has a regression where
+    # pytest giving OSError: [Errno 29] Illegal seek error
+    "click>=8.0,<8.3.3",
 ]
 docs = [
     "sphinx>=5.3.0",
