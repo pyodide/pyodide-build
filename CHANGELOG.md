@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed regression after pypa/build 1.4.4 update where packages depending on numpy/scipy failed to build.
+  [#336](https://github.com/pyodide/pyodide-build/pull/336)
+
 ## [0.34.1] - 2026/04/03
 
 ### Added
