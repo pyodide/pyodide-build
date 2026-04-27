@@ -24,7 +24,7 @@ dependencies = [
     "packaging",
     "virtualenv",
     "requests",
-    "click>=8.0,<8.3.3",
+    "click",
     "rich",
     "platformdirs",
 ]
