@@ -176,8 +176,8 @@ def _build_in_isolated_env(
         )
 
         # first install the build dependencies
-        symlink_unisolated_packages(env, builder.build_system_requires)
         install_reqs(build_env, env, builder.build_system_requires)
+
         build_reqs: set[str] | None = None
         try:
             build_reqs = builder.get_requires_for_build(
@@ -202,6 +202,10 @@ def _build_in_isolated_env(
                 )
 
         install_reqs(build_env, env, build_reqs)
+
+        # Symlink cross-compiled packages to the isolated environment
+        # to make sure the correct packages are used during building
+        symlink_unisolated_packages(env, builder.build_system_requires)
 
         with common.replace_env(build_env):
             return builder.build(
