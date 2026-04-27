@@ -122,8 +122,14 @@ def symlink_unisolated_packages(
         for path in chain(
             host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
         ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
+            target = env_site_packages / path.name
+            if target.is_symlink():
+                target.unlink()
+            elif target.is_dir():
+                shutil.rmtree(target)
+            elif target.exists():
+                target.unlink()
+            target.symlink_to(path)
 
 
 def remove_avoided_requirements(
