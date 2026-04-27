@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="2.2.5"
+VERSION="2.4.3"
 URL="https://files.pythonhosted.org/packages/source/n/numpy/numpy-${VERSION}.tar.gz"
 
 wget $URL
