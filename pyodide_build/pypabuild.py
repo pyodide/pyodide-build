@@ -199,6 +199,11 @@ def _build_in_isolated_env(
         # Install sysconfigdata so pip can detect the cross-compilation
         # target during dependency installation.
         install_cross_build_sysconfigdata(env)
+
+        # Symlink cross-compiled packages to the isolated environment
+        # to make sure the cross-compiled packages are used during building
+        symlink_unisolated_packages(env, builder.build_system_requires)
+
         install_reqs(build_env, env, builder.build_system_requires)
 
         build_reqs: set[str] | None = None
@@ -226,8 +231,10 @@ def _build_in_isolated_env(
 
         install_reqs(build_env, env, build_reqs)
 
-        # Symlink cross-compiled packages to the isolated environment
+        # From pypa/build 1.4.4, build overwrites the already installed
+        # build_system_requires, so we need to symlink the packages again
         # to make sure the correct packages are used during building
+        # TODO: This is a workaround, we should find a better way to handle this
         symlink_unisolated_packages(env, builder.build_system_requires)
 
         with common.replace_env(build_env):
