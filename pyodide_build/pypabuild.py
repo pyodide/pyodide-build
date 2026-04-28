@@ -169,8 +169,6 @@ def install_reqs(
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
     ):
-        for k, v in os.environ.items():
-            print(f"  {k}={v}", file=sys.stderr)
         env.install(
             remove_avoided_requirements(
                 reqs,
