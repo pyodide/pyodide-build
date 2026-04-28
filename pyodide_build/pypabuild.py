@@ -116,7 +116,7 @@ def install_cross_build_sysconfigdata(env: DefaultIsolatedEnv) -> None:
     shutil.copy(sysconfigdata_path, env_site_packages)
 
 
-def symlink_unisolated_packages(
+def copy_unisolated_packages(
     env: DefaultIsolatedEnv, reqs: set[str] | None = None
 ) -> None:
     from pyodide_build.build_env import get_unisolated_packages
@@ -144,7 +144,7 @@ def symlink_unisolated_packages(
                 shutil.rmtree(target)
             elif target.exists():
                 target.unlink()
-            target.symlink_to(path)
+            shutil.copytree(path, target)
 
 
 def remove_avoided_requirements(
@@ -168,10 +168,12 @@ def install_reqs(
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
     ):
+        for k, v in os.environ.items():
+            print(f"  {k}={v}", file=sys.stderr)
         env.install(
             remove_avoided_requirements(
                 reqs,
-                get_unisolated_packages() + IGNORED_BUILD_REQUIREMENTS,
+                IGNORED_BUILD_REQUIREMENTS,
             )
         )
 
@@ -199,11 +201,6 @@ def _build_in_isolated_env(
         # Install sysconfigdata so pip can detect the cross-compilation
         # target during dependency installation.
         install_cross_build_sysconfigdata(env)
-
-        # Symlink cross-compiled packages to the isolated environment
-        # to make sure the cross-compiled packages are used during building
-        symlink_unisolated_packages(env, builder.build_system_requires)
-
         install_reqs(build_env, env, builder.build_system_requires)
 
         build_reqs: set[str] | None = None
@@ -231,11 +228,12 @@ def _build_in_isolated_env(
 
         install_reqs(build_env, env, build_reqs)
 
-        # From pypa/build 1.4.4, build overwrites the already installed
-        # build_system_requires, so we need to symlink the packages again
-        # to make sure the correct packages are used during building
-        # TODO: This is a workaround, we should find a better way to handle this
-        symlink_unisolated_packages(env, builder.build_system_requires)
+        # Copy unisolated packages to the isolated environment.
+        # This allows cross-compiled headers to be found during the build.
+        # Originally, we symlinked the packages before installing the build requirements,
+        # but from pypa/build 1.4.4, build overwrites the packages installed in the isolated environment,
+        # so we need to copy the packages again after installing the build requirements.
+        copy_unisolated_packages(env, builder.build_system_requires)
 
         with common.replace_env(build_env):
             return builder.build(

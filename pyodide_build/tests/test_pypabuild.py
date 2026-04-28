@@ -99,7 +99,7 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "exports" in wasmcross_args
 
 
-def test_symlink_unisolated_packages_triggers_lazy_install(
+def test_copy_unisolated_packages_triggers_lazy_install(
     tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
 ):
     called = {"count": 0}
@@ -119,11 +119,11 @@ def test_symlink_unisolated_packages_triggers_lazy_install(
     class DummyEnv:
         path = str(tmp_path / "venv")
 
-    pypabuild.symlink_unisolated_packages(DummyEnv(), reqs={"numpy>=1.0"})
+    pypabuild.copy_unisolated_packages(DummyEnv(), reqs={"numpy>=1.0"})
     assert called["count"] == 1
 
 
-def test_symlink_unisolated_packages_restores_overwritten_symlinks(
+def test_copy_unisolated_packages_restores_overwritten_symlinks(
     tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
 ):
     from pathlib import Path
@@ -165,7 +165,7 @@ def test_symlink_unisolated_packages_restores_overwritten_symlinks(
     class DummyEnv:
         path = str(venv_path)
 
-    pypabuild.symlink_unisolated_packages(DummyEnv())
+    pypabuild.copy_unisolated_packages(DummyEnv())
 
     numpy_link = env_site_packages / "numpy"
     assert numpy_link.is_symlink()
@@ -175,7 +175,7 @@ def test_symlink_unisolated_packages_restores_overwritten_symlinks(
     numpy_link.mkdir()
     (numpy_link / "marker.txt").write_text("native")
 
-    pypabuild.symlink_unisolated_packages(DummyEnv())
+    pypabuild.copy_unisolated_packages(DummyEnv())
 
     assert numpy_link.is_symlink()
     assert (numpy_link / "marker.txt").read_text() == "wasm"
