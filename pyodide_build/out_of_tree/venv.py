@@ -397,8 +397,6 @@ class PyodideVenv(ABC):
                         sys.argv.extend(["--platform", "{pyodide_platform}"])
                     if "--only-binary" not in sys.argv:
                         sys.argv.extend(["--only-binary", ":all:"])
-            else:
-                sys.platform = sys_platform
             """
             # Handle pip updates.
             #
