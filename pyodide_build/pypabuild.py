@@ -228,7 +228,7 @@ def _build_in_isolated_env(
 
         # Symlink cross-compiled packages to the isolated environment
         # to make sure the correct packages are used during building
-        symlink_unisolated_packages(env)
+        symlink_unisolated_packages(env, builder.build_system_requires)
 
         with common.replace_env(build_env):
             return builder.build(
