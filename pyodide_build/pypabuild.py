@@ -119,7 +119,6 @@ def install_cross_build_sysconfigdata(env: DefaultIsolatedEnv) -> None:
 def copy_unisolated_packages(
     env: DefaultIsolatedEnv, reqs: set[str] | None = None
 ) -> None:
-    from pyodide_build.build_env import get_unisolated_packages
 
     env_site_packages = _env_site_packages(env)
     env_site_packages.mkdir(parents=True, exist_ok=True)
