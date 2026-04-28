@@ -137,13 +137,15 @@ def copy_unisolated_packages(
             host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
         ):
             target = env_site_packages / path.name
-            if target.is_symlink():
-                target.unlink()
-            elif target.is_dir():
+            if target.is_dir():
                 shutil.rmtree(target)
             elif target.exists():
                 target.unlink()
-            shutil.copytree(path, target)
+            
+            if path.is_dir():
+                shutil.copytree(path, target)
+            else:
+                shutil.copy2(path, target)
 
 
 def remove_avoided_requirements(
