@@ -141,7 +141,7 @@ def copy_unisolated_packages(
                 shutil.rmtree(target)
             elif target.exists():
                 target.unlink()
-            
+
             if path.is_dir():
                 shutil.copytree(path, target)
             else:
