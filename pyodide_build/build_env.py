@@ -245,10 +245,15 @@ def platform() -> str:
 
 def wheel_platform() -> str:
     abi_version = get_build_flag("PYODIDE_ABI_VERSION")
-    legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
-    if legacy_platform:
+    use_legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if use_legacy_platform:
         return f"pyodide_{abi_version}_wasm32"
     return f"pyemscripten_{abi_version}_wasm32"
+
+
+def legacy_platform() -> str:
+    abi_version = get_build_flag("PYODIDE_ABI_VERSION")
+    return f"pyodide_{abi_version}_wasm32"
 
 
 def pyodide_tags_() -> Iterator[Tag]:
@@ -260,6 +265,9 @@ def pyodide_tags_() -> Iterator[Tag]:
     PYMAJOR = get_pyversion_major()
     PYMINOR = get_pyversion_minor()
     PLATFORMS = [platform(), wheel_platform()]
+    use_legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if not use_legacy_platform:
+        PLATFORMS.append(legacy_platform())
     python_version = (int(PYMAJOR), int(PYMINOR))
     yield from cpython_tags(platforms=PLATFORMS, python_version=python_version)
     yield from compatible_tags(platforms=PLATFORMS, python_version=python_version)
