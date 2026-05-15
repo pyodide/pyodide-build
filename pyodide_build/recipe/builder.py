@@ -558,6 +558,32 @@ class RecipeBuilder:
             str(self.library_install_prefix),
         )
 
+    def _create_library_archive(self) -> Path | None:
+        """Create a .tar.gz archive of the library artifacts in dist_dir.
+
+        The archive contains the FHS-structured contents of the per-package
+        dist directory (include/, lib/, etc.) and can be distributed
+        independently for downstream consumption.
+
+        Returns the path to the created archive, or None if dist_dir is empty.
+        """
+        if not self.dist_dir.exists() or not any(self.dist_dir.iterdir()):
+            return None
+
+        archive_name = f"{self.fullname}-wasm32"
+        archive_base = self.dist_dir / archive_name
+
+        archive_path = Path(
+            shutil.make_archive(
+                str(archive_base),
+                "gztar",
+                root_dir=self.dist_dir,
+                base_dir=".",
+            )
+        )
+        logger.info("Created library archive: %s", str(archive_path))
+        return archive_path
+
     def _get_helper_vars(self) -> dict[str, str]:
         """
         Get the helper variables for the build script.
@@ -566,10 +592,7 @@ class RecipeBuilder:
             "PKGDIR": str(self.pkg_root),
             "PKG_VERSION": self.version,
             "PKG_BUILD_DIR": str(self.src_extract_dir),
-            # deprecated
             "DISTDIR": str(self.src_dist_dir),
-            # tells Makefile to install to this directory
-            "DESTDIR": str(self.src_dist_dir),
             # TODO: rename this to something more compatible with Makefile or CMake conventions
             "WASM_LIBRARY_DIR": str(self.library_install_prefix),
             # Emscripten will use this variable to configure pkg-config in emconfigure
@@ -720,13 +743,11 @@ class RecipeBuilderStaticLibrary(RecipeBuilder):
             cwd=self.src_extract_dir,
         )
 
-        # Copy artifacts from DISTDIR to WASM_LIBRARY_DIR so other packages
-        # can find headers and libraries during their builds.
         self._install_to_library_dir()
 
-        # Also copy artifacts to dist_dir for per-package release.
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         shutil.copytree(self.src_dist_dir, self.dist_dir, dirs_exist_ok=True)
+        self._create_library_archive()
 
 
 class RecipeBuilderSharedLibrary(RecipeBuilder):
@@ -741,21 +762,20 @@ class RecipeBuilderSharedLibrary(RecipeBuilder):
             cwd=self.src_extract_dir,
         )
 
-        # Copy artifacts from DISTDIR to WASM_LIBRARY_DIR so other packages
-        # can find headers and libraries during their builds.
         self._install_to_library_dir()
-        # Copy the full artifact tree to dist_dir for per-package release.
+
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         shutil.copytree(self.src_dist_dir, self.dist_dir, dirs_exist_ok=True)
 
-        # Additionally, create a zip archive of all .so files (flattened)
-        # This will be included in the Pyodide distribution and loaded at runtime.
+        # Create a zip of .so files (flattened) for Pyodide runtime loading
         so_files = list(self.src_dist_dir.rglob("*.so"))
         if so_files:
             zip_path = self.dist_dir / f"{self.fullname}.zip"
             with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
                 for so_file in so_files:
                     zf.write(so_file, so_file.name)
+
+        self._create_library_archive()
 
 
 @cache
