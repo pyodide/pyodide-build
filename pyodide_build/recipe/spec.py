@@ -89,7 +89,7 @@ class _BuildSpec(BaseModel):
     post: str | None = None
     unvendor_tests: bool = Field(True, alias="unvendor-tests")
     retain_test_patterns: list[str] = Field([], alias="_retain-test-patterns")
-    vendor_sharedlib: bool = Field(False, alias="vendor-sharedlib")
+    vendor_sharedlib: bool = Field(True, alias="vendor-sharedlib")
     cross_build_env: bool = Field(False, alias="cross-build-env")
     cross_build_files: list[str] = Field([], alias="cross-build-files")
     model_config = ConfigDict(extra="forbid")
@@ -219,12 +219,22 @@ class MetaConfig(BaseModel):
                 "unvendor_tests",
                 "retain_test_patterns",
                 "package_type",
+                "vendor_sharedlib",
             }
             for key in self.build.model_fields_set:
                 if key not in allowed_keys:
                     raise ValueError(
                         f"If source is a wheel, 'build/{key}' key is not allowed"
                     )
+
+            if (
+                "vendor_sharedlib" in self.build.model_fields_set
+                and self.build.vendor_sharedlib
+            ):
+                raise ValueError(
+                    "If source is a wheel, build/vendor_sharedlib cannot be set to True"
+                )
+            self.build.vendor_sharedlib = False
 
         return self
 

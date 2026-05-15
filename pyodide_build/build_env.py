@@ -102,6 +102,15 @@ def get_pyodide_root() -> Path:
     return Path(os.environ["PYODIDE_ROOT"])
 
 
+def get_current_xbuildenv_manager():
+    from pyodide_build.xbuildenv import CrossBuildEnvManager
+
+    pyodide_root = get_pyodide_root()
+
+    xbuild_version_dir = pyodide_root.parent.parent
+    return CrossBuildEnvManager(xbuild_version_dir.parent)
+
+
 def search_pyodide_root(curdir: str | Path, *, max_depth: int = 10) -> Path | None:
     """
     Recursively search for the root of the Pyodide repository,
@@ -236,6 +245,14 @@ def platform() -> str:
 
 def wheel_platform() -> str:
     abi_version = get_build_flag("PYODIDE_ABI_VERSION")
+    use_legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if use_legacy_platform:
+        return f"pyodide_{abi_version}_wasm32"
+    return f"pyemscripten_{abi_version}_wasm32"
+
+
+def legacy_platform() -> str:
+    abi_version = get_build_flag("PYODIDE_ABI_VERSION")
     return f"pyodide_{abi_version}_wasm32"
 
 
@@ -248,6 +265,9 @@ def pyodide_tags_() -> Iterator[Tag]:
     PYMAJOR = get_pyversion_major()
     PYMINOR = get_pyversion_minor()
     PLATFORMS = [platform(), wheel_platform()]
+    use_legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if not use_legacy_platform:
+        PLATFORMS.append(legacy_platform())
     python_version = (int(PYMAJOR), int(PYMINOR))
     yield from cpython_tags(platforms=PLATFORMS, python_version=python_version)
     yield from compatible_tags(platforms=PLATFORMS, python_version=python_version)
@@ -285,18 +305,105 @@ def get_emscripten_version_info() -> str:
     ).stderr
 
 
-def check_emscripten_version() -> None:
+# Env variables that are set by emsdk_env.sh
+EMSDK_ENV_VARS = {
+    "PATH",
+    "EMSDK",
+    "EMSDK_NODE",
+    "EMSDK_PYTHON",
+    "SSL_CERT_FILE",
+}
+
+
+def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
+    """
+    Source emsdk_env.sh and return the resulting environment variables.
+
+    Parameters
+    ----------
+    emsdk_dir
+        Path to the emsdk directory containing emsdk_env.sh
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary of environment variables set by emsdk_env.sh
+    """
+    emsdk_env_script = emsdk_dir / "emsdk_env.sh"
+    if not emsdk_env_script.exists():
+        raise FileNotFoundError(f"emsdk_env.sh not found at {emsdk_env_script}")
+
+    # Source emsdk_env.sh and capture the resulting environment
+    result = subprocess.run(
+        ["bash", "-c", f"source {emsdk_env_script} > /dev/null 2>&1 && env"],
+        capture_output=True,
+        encoding="utf8",
+        check=True,
+    )
+
+    # Parse the environment variables from output
+    env_vars: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        if "=" in line:
+            key, _, value = line.partition("=")
+            if key in EMSDK_ENV_VARS:
+                env_vars[key] = value
+
+    return env_vars
+
+
+def ensure_emscripten(skip_install: bool = False) -> None:
+    """
+    Ensure Emscripten is available and correctly versioned.
+
+    If emcc is not found and auto-install is not skipped, this function will
+    automatically install Emscripten using CrossBuildEnvManager and activate it.
+
+    Parameters
+    ----------
+    skip_install
+        If True, skip auto-installation when emcc is not found.
+        Also controlled by PYODIDE_SKIP_EMSCRIPTEN_INSTALL env var.
+
+    Raises
+    ------
+    RuntimeError
+        If emcc is not found and auto-install is skipped, or if version mismatch.
+    """
+
+    # Check if auto-install should be skipped
+    env_skip = os.environ.get("PYODIDE_SKIP_EMSCRIPTEN_INSTALL", "")
+    should_skip_install = skip_install or to_bool(env_skip)
+
     skip = get_build_flag("SKIP_EMSCRIPTEN_VERSION_CHECK")
     if to_bool(skip):
         return
 
     needed_version = emscripten_version()
+
     try:
         version_info = get_emscripten_version_info()
     except FileNotFoundError:
-        raise RuntimeError(
-            f"No Emscripten compiler found. Need Emscripten version {needed_version}"
-        ) from None
+        if should_skip_install:
+            raise RuntimeError(
+                f"No Emscripten compiler found. Need Emscripten version {needed_version}"
+            ) from None
+
+        manager = get_current_xbuildenv_manager()
+        emsdk_dir = manager.install_emscripten(needed_version)
+
+        env_vars = activate_emscripten_env(emsdk_dir)
+        os.environ.update(env_vars)
+
+        try:
+            version_info = get_emscripten_version_info()
+        except FileNotFoundError:
+            raise RuntimeError(
+                f"Emscripten activation failed. emcc not found after setup. "
+                f"Need Emscripten version {needed_version}"
+            ) from None
+
+    # Parse and check version
     installed_version = None
     try:
         for x in reversed(version_info.partition("\n")[0].split(" ")):
@@ -307,8 +414,10 @@ def check_emscripten_version() -> None:
                 break
     except Exception:
         raise RuntimeError("Failed to determine Emscripten version.") from None
+
     if installed_version is None:
         raise RuntimeError("Failed to determine Emscripten version.")
+
     if installed_version != needed_version:
         raise RuntimeError(
             f"Incorrect Emscripten version {installed_version}. Need Emscripten version {needed_version}"

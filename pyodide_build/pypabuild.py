@@ -10,26 +10,27 @@ from itertools import chain
 from pathlib import Path
 from typing import Literal, cast
 
-from build import BuildBackendException, ConfigSettingsType
+from build import BuildBackendException, ConfigSettingsType, ProjectBuilder
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_current_xbuildenv_manager,
     get_host_build_flag,
     get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
+    in_xbuildenv,
     platform,
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
-    _STYLES,
     _DefaultIsolatedEnv,
     _error,
     _handle_build_error,
-    _ProjectBuilder,
+    _styles,
 )
 
 # corresponding env variables for symlinks
@@ -91,7 +92,9 @@ def _gen_runner(
     return _runner
 
 
-def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
+def symlink_unisolated_packages(
+    env: DefaultIsolatedEnv, reqs: set[str] | None = None
+) -> None:
     from pyodide_build.build_env import get_build_flag, get_unisolated_packages
 
     pyversion = get_pyversion()
@@ -106,6 +109,15 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
     host_site_packages = Path(get_hostsitepackages())
+    unisolated_packages = set(get_unisolated_packages())
+
+    required = {Requirement(req).name.lower() for req in (reqs or set())}
+
+    needs_cross_build_install = bool(unisolated_packages & required)
+
+    if in_xbuildenv() and needs_cross_build_install:
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+
     for name in get_unisolated_packages():
         for path in chain(
             host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
@@ -157,14 +169,14 @@ def _build_in_isolated_env(
     installer = "uv" if uv_helper.should_use_uv() else "pip"
     with _DefaultIsolatedEnv(installer=installer) as env:
         env = cast(_DefaultIsolatedEnv, env)
-        builder = _ProjectBuilder.from_isolated_env(
+        builder = ProjectBuilder.from_isolated_env(
             env,
             srcdir,
             runner=_gen_runner(build_env, env),
         )
 
         # first install the build dependencies
-        symlink_unisolated_packages(env)
+        symlink_unisolated_packages(env, builder.build_system_requires)
         install_reqs(build_env, env, builder.build_system_requires)
         build_reqs: set[str] | None = None
         try:
@@ -208,7 +220,7 @@ def _build_in_current_env(
     skip_dependency_check: bool = False,
 ) -> str:
     with common.replace_env(build_env):
-        builder = _ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+        builder = ProjectBuilder(srcdir, runner=_gen_runner(build_env))
 
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})
@@ -375,10 +387,14 @@ def build(
                     config_settings,
                     skip_dependency_check,
                 )
-            print("{bold}{green}Successfully built {}{reset}".format(built, **_STYLES))
+            print(
+                "{bold}{green}Successfully built {}{reset}".format(
+                    built, **_styles.get()
+                )
+            )
             return built
     except Exception as e:  # pragma: no cover
         tb = traceback.format_exc().strip("\n")
-        print("\n{dim}{}{reset}\n".format(tb, **_STYLES))
+        print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
         _error(str(e))
         sys.exit(1)

@@ -7,7 +7,7 @@ from pathlib import Path
 from pyodide_lock import PyodideLockSpec
 
 from pyodide_build import build_env, uv_helper
-from pyodide_build.common import download_and_unpack_archive
+from pyodide_build.common import download_and_unpack_archive, remove_readonly
 from pyodide_build.create_package_index import create_package_index
 from pyodide_build.logger import logger
 from pyodide_build.xbuildenv_releases import (
@@ -18,6 +18,8 @@ from pyodide_build.xbuildenv_releases import (
 
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
 PYTHON_VERSION_MARKER_FILE = ".build-python-version"
+CROSS_BUILD_PACKAGES_MARKER_FILE = ".cross-build-packages-installed"
+EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
 
 
 class CrossBuildEnvManager:
@@ -80,6 +82,44 @@ class CrossBuildEnvManager:
         """Returns the path to the xbuildenv for the given version."""
         return self.env_dir / version
 
+    def _cross_build_packages_marker_path(self, version_path: Path) -> Path:
+        """
+        Return the marker file path used to record cross-build package installation.
+
+        Parameters
+        ----------
+        version_path
+            Path to a concrete xbuildenv version directory (for example, `.../<version>`).
+        """
+        return version_path / CROSS_BUILD_PACKAGES_MARKER_FILE
+
+    def ensure_cross_build_packages_installed(self) -> None:
+        """
+        Install cross-build packages for the active xbuildenv only when needed.
+
+        This method is idempotent: if the marker file is already present, it does
+        nothing. Otherwise it installs packages into HOSTSITEPACKAGES and writes
+        the marker on success.
+
+        Raises
+        ------
+        ValueError
+            If no active xbuildenv is selected.
+        RuntimeError
+            If package installation fails.
+        """
+        version_path = self.symlink_dir.resolve()
+        marker = self._cross_build_packages_marker_path(version_path)
+        if marker.exists():
+            return
+
+        xbuildenv_root = version_path / "xbuildenv"
+        xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
+
+        logger.info("Installing cross-build packages for %s", version_path.name)
+        self._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
+        marker.touch()
+
     def list_versions(self) -> list[str]:
         """
         List the downloaded xbuildenv versions.
@@ -135,7 +175,7 @@ class CrossBuildEnvManager:
         version: str | None = None,
         *,
         url: str | None = None,
-        skip_install_cross_build_packages: bool = False,
+        skip_install_cross_build_packages: bool = True,
         force_install: bool = False,
     ) -> Path:
         """
@@ -216,6 +256,7 @@ class CrossBuildEnvManager:
                     self._install_cross_build_packages(
                         xbuildenv_root, xbuildenv_pyodide_root
                     )
+                    self._cross_build_packages_marker_path(download_path).touch()
 
                 if not url:
                     # If installed from url, skip creating the PyPI index (version is not known)
@@ -433,24 +474,26 @@ class CrossBuildEnvManager:
         logger.info("Cloning Emscripten SDK into %s", emsdk_dir)
 
         if emsdk_dir.exists():
-            logger.info("Emsdk directory already exists, pulling latest changes...")
-            subprocess.run(["git", "-C", str(emsdk_dir), "pull"], check=True)
-        else:
-            subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "--depth",
-                    "1",
-                    "https://github.com/emscripten-core/emsdk.git",
-                    str(emsdk_dir),
-                ],
-                check=True,
-            )
+            logger.info("Removing existing emsdk directory %s", emsdk_dir)
+            shutil.rmtree(emsdk_dir, onexc=remove_readonly)
+
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "https://github.com/emscripten-core/emsdk.git",
+                str(emsdk_dir),
+            ],
+            check=True,
+        )
 
         return emsdk_dir
 
-    def install_emscripten(self, emscripten_version: str = "latest") -> Path:
+    def install_emscripten(
+        self, emscripten_version: str = "latest", *, force: bool = False
+    ) -> Path:
         """
         Install and activate Emscripten SDK inside the currently selected xbuildenv.
 
@@ -458,6 +501,8 @@ class CrossBuildEnvManager:
         ----------
         emscripten_version
             The Emscripten SDK version to install (default: 'latest').
+        force
+            If True, force reinstallation even if the same version is already installed.
 
         Returns
         -------
@@ -473,6 +518,17 @@ class CrossBuildEnvManager:
         emsdk_dir = xbuild_root / "emsdk"
         patches_dir = self.pyodide_root / "emsdk" / "patches"
         emscripten_root = emsdk_dir / "upstream" / "emscripten"
+
+        marker = xbuild_root / EMSCRIPTEN_VERSION_MARKER_FILE
+        if not force and marker.exists():
+            installed_version = marker.read_text().strip()
+            if installed_version == emscripten_version:
+                logger.debug(
+                    "Emscripten SDK (version: %s) is already installed at %s, skipping",
+                    emscripten_version,
+                    emsdk_dir,
+                )
+                return emsdk_dir
 
         logger.info(
             "Installing Emscripten SDK (version: %s) into %s",
@@ -519,6 +575,8 @@ class CrossBuildEnvManager:
             check=True,
         )
 
+        marker.write_text(emscripten_version)
+
         logger.info("Emscripten SDK installed successfully at %s", emsdk_dir)
         return emsdk_dir
 
@@ -553,4 +611,5 @@ class CrossBuildEnvManager:
 
 
 def _url_to_version(url: str) -> str:
-    return url.replace("://", "_").replace(".", "_").replace("/", "_")
+    # : - invalid character on Windows.
+    return url.replace("://", "_").replace(".", "_").replace("/", "_").replace(":", "_")

@@ -452,7 +452,7 @@ def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
     )
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
@@ -524,7 +524,7 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
         nonlocal exports_
         exports_ = exports
 
-    monkeypatch.setattr(build, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build, "_download_url", download_url_shim)
     monkeypatch.setattr(shutil, "unpack_archive", unpack_archive_shim)
     monkeypatch.setattr(out_of_tree_build, "run", run_shim)
@@ -579,7 +579,7 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         nonlocal config_settings_passed
         config_settings_passed = config_settings
 
-    monkeypatch.setattr(build, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(out_of_tree_build, "run", run)
 
     result = runner.invoke(
@@ -659,7 +659,7 @@ def test_build_cpython_module(tmp_path, dummy_xbuildenv, mock_emscripten):
     results = list(dist_dir.glob("*.whl"))
     assert len(results) == 1
     result = results[0]
-    assert result.name == "pydecimal-1.0.0-cp312-cp312-pyodide_2024_0_wasm32.whl"
+    assert result.name == "pydecimal-1.0.0-cp312-cp312-pyemscripten_2024_0_wasm32.whl"
 
 
 def test_wheel_download_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten):
@@ -765,7 +765,7 @@ def test_build_isolation_flags(
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
@@ -827,7 +827,7 @@ def test_build_skip_dependency_check(
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
@@ -890,7 +890,7 @@ def test_build_combined_flags(
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)

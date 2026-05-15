@@ -112,6 +112,17 @@ class CrossBuildEnvConfigManager(ConfigManager):
             for k, v in DEFAULT_CONFIG_COMPUTED.items()
         }
 
+        # Compute the Emscripten directory from pyodide_root. The emsdk directory
+        # is a sibling of the xbuildenv directory, both living under the versioned
+        # xbuildenv root (pyodide_root/../../emsdk/upstream/emscripten).
+        # We compute this here rather than via Makefile.envs or DEFAULT_CONFIG so
+        # that the path is always the resolved, versioned path – not the shared
+        # xbuildenv symlink, because there are some issues I have noticed with
+        # concurrent builds especially when being used in cibuildwheel etc.
+        emsdk_root = self.pyodide_root.parent.parent / "emsdk"
+        computed_vars["emsdk_dir"] = str(emsdk_root)
+        computed_vars["emscripten_dir"] = str(emsdk_root / "upstream" / "emscripten")
+
         return {
             BUILD_VAR_TO_KEY[k]: v
             for k, v in makefile_vars.items()
@@ -245,15 +256,16 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "cflags_base": "CFLAGS_BASE",
     "cxxflags_base": "CXXFLAGS_BASE",
     "ldflags_base": "LDFLAGS_BASE",
-    "home": "HOME",
-    "path": "PATH",
     "zip_compression_level": "PYODIDE_ZIP_COMPRESSION_LEVEL",
     "skip_emscripten_version_check": "SKIP_EMSCRIPTEN_VERSION_CHECK",
     "build_dependency_index_url": "BUILD_DEPENDENCY_INDEX_URL",
     "default_cross_build_env_url": "DEFAULT_CROSS_BUILD_ENV_URL",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "emsdk_dir": "PYODIDE_EMSDK_DIR",
+    "emscripten_dir": "PYODIDE_EMSCRIPTEN_DIR",
     "dist_dir": "PYODIDE_DIST_DIR",
     "ignored_build_requirements": "IGNORED_BUILD_REQUIREMENTS",
+    "use_legacy_platform": "USE_LEGACY_PLATFORM",
     # maintainer only
     "_f2c_fixes_wrapper": "_F2C_FIXES_WRAPPER",
 }
@@ -275,6 +287,7 @@ OVERRIDABLE_BUILD_KEYS = {
     "default_cross_build_env_url",
     "xbuildenv_path",
     "ignored_build_requirements",
+    "use_legacy_platform",
     # maintainer only
     "_f2c_fixes_wrapper",
 }
@@ -299,6 +312,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "xbuildenv_path": "",
     # A list of PEP508 build-time requirements to be ignored when building a wheel
     "ignored_build_requirements": " ".join(BASE_IGNORED_REQUIREMENTS),
+    "use_legacy_platform": "0",
     # maintainer only
     "_f2c_fixes_wrapper": "",
 }
@@ -307,9 +321,9 @@ DEFAULT_CONFIG: dict[str, str] = {
 # TODO: Remove dependency on Makefile.envs
 DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
     # Compiler flags
-    "cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE)",
-    "cxxflags": "$(CFLAGS_BASE)",
-    "ldflags": "$(LDFLAGS_BASE) -s SIDE_MODULE=1",
+    "cflags": "$(CFLAGS_BASE) -I$(PYTHONINCLUDE) -Oz",
+    "cxxflags": "$(CFLAGS_BASE) -Oz",
+    "ldflags": "$(LDFLAGS_BASE) -s SIDE_MODULE=1 -Oz",
     # Rust-specific configuration
     "pyo3_cross_lib_dir": "$(CPYTHONINSTALL)/sysconfigdata",  # FIXME: pyodide xbuildenv stores sysconfigdata here
     "pyo3_cross_include_dir": "$(PYTHONINCLUDE)",
@@ -339,6 +353,8 @@ PYODIDE_CLI_CONFIGS = {
     "ldflags": "SIDE_MODULE_LDFLAGS",
     "meson_cross_file": "MESON_CROSS_FILE",
     "xbuildenv_path": "PYODIDE_XBUILDENV_PATH",
+    "emsdk_dir": "PYODIDE_EMSDK_DIR",
+    "emscripten_dir": "PYODIDE_EMSCRIPTEN_DIR",
     "pyodide_abi_version": "PYODIDE_ABI_VERSION",
     "pyodide_root": "PYODIDE_ROOT",
     "dist_dir": "PYODIDE_DIST_DIR",

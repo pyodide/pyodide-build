@@ -7,9 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.32.2] - 2026/02/20
+## [0.34.1] - 2026/04/03
 
-### Fixed
+### Added
+
+- `pyodide config` exposes variables `emsdk_dir` and `emscripten_dir` that point to the Emscripten SDK
+  installation directory and Emscripten installation directory respectively in the xbuildenv (these are
+  only available after Emscripten gets installed into the xbuildenv via the `pyodide xbuildenv install-emscripten` command).
+  [#321](https://github.com/pyodide/pyodide-build/pull/321), [#326](https://github.com/pyodide/pyodide-build/pull/326)
+
+### Changed
+
+- Platform name for the Pyodide wheel is now `pyemscripten` instead of `pyodide`, following the PEP 783 standard.
+  If you want to use the old platform name, you can set the `USE_LEGACY_PLATFORM` environment variable to `1`.
+  [#319](https://github.com/pyodide/pyodide-build/pull/319)
+
+## [0.34.0] - 2026/03/31
+
+### Added
+
+- pyodide xbuildenv install can skip eager installation, and cross-build packages are installed on first build-time use.
+
+## Changed
+
+- `vendor_sharedlib` option is now enabled by default.
+  [#304](https://github.com/pyodide/pyodide-build/pull/304)
+
+- By default, `-Oz` flag is used for C/C++ compilation instead of `-O2`, to reduce binary size.
+  This can be overridden by setting `cflags` and `cxxflags` in `pyproject.toml`.
+  [#306](https://github.com/pyodide/pyodide-build/pull/306)
+
+## Fixed
+
+- `--enable-new-dtags` linker flag is now filtered out.
+  [#317](https://github.com/pyodide/pyodide-build/pull/317)
+
+## [0.33.0] - 2026/02/26
+
+## Changed
+
+- Emscripten will now be auto installed when running `pyodide build` and `pyodide build-recipes` if
+  the host system does not have emscripten installed.
+  [#293](https://github.com/pyodide/pyodide-build/pull/293)
+
+## Fixed
 
 - Fixed `pyodide venv` not working in Windows + Python 3.14.
   [#299](https://github.com/pyodide/pyodide-build/pull/299)
