@@ -85,30 +85,50 @@ class _DefaultIsolatedEnv(DefaultIsolatedEnv):
         return self._env_backend.scripts_dir
 
 
+def _log_subprocess_output(error: subprocess.CalledProcessError) -> None:
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(error, stream_name, None)
+        if stream:
+            decoded = stream.decode() if isinstance(stream, bytes) else stream
+            _cprint("{bold}{red}" + stream_name + ":{reset}\n{dim}{}{reset}", decoded)
+
+
+def _find_called_process_error(
+    exc: Exception,
+) -> subprocess.CalledProcessError | None:
+    if isinstance(exc, subprocess.CalledProcessError):
+        return exc
+    inner = getattr(exc, "exception", None)
+    if isinstance(inner, subprocess.CalledProcessError):
+        return inner
+    return None
+
+
 @contextlib.contextmanager
 def _handle_build_error() -> Iterator[None]:
     try:
         yield
-    except (BuildException, FailedProcessError) as e:
-        _error(str(e))
-    except BuildBackendException as e:
-        if isinstance(e.exception, subprocess.CalledProcessError):
-            _cprint()
-            _error(str(e))
+    except Exception as e:
+        if isinstance(e, BuildBackendException) and not isinstance(
+            e.exception, subprocess.CalledProcessError
+        ):
+            if e.exc_info:
+                tb_lines = traceback.format_exception(
+                    e.exc_info[0],
+                    e.exc_info[1],
+                    e.exc_info[2],
+                    limit=-1,
+                )
+                tb = "".join(tb_lines)
+            else:
+                tb = traceback.format_exc(-1)  # type: ignore[unreachable]
+            _cprint("\n{dim}{}{reset}\n", tb.strip("\n"))
+        elif not isinstance(e, (BuildException, FailedProcessError)):
+            tb = traceback.format_exc().strip("\n")
+            _cprint("\n{dim}{}{reset}\n", tb)
 
-        if e.exc_info:
-            tb_lines = traceback.format_exception(
-                e.exc_info[0],
-                e.exc_info[1],
-                e.exc_info[2],
-                limit=-1,
-            )
-            tb = "".join(tb_lines)
-        else:
-            tb = traceback.format_exc(-1)  # type: ignore[unreachable]
-        _cprint("\n{dim}{}{reset}\n", tb.strip("\n"))
-        _error(str(e))
-    except Exception as e:  # pragma: no cover
-        tb = traceback.format_exc().strip("\n")
-        _cprint("\n{dim}{}{reset}\n", tb)
+        cpe = _find_called_process_error(e)
+        if cpe is not None:
+            _log_subprocess_output(cpe)
+
         _error(str(e))
