@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.4] - 2026/05/15
+
+### Added
+
+- We now show better error message when `pyodide build` fails to install build dependencies.
+  [#346](https://github.com/pyodide/pyodide-build/pull/346)
+
+## [0.34.3] - 2026/04/30
+
+### Fixed
+
+- Fixed compatibility issue with newer pypa/build >= 1.4.4
+  [#345](https://github.com/pyodide/pyodide-build/pull/345)
+
+## [0.34.2] - 2026/04/29
+
+### Fixed
+
+- Fixed error when undefined environment variables are used in `meta.yaml`.
+  [#331](https://github.com/pyodide/pyodide-build/pull/331)
+
+- `pyodide venv` now works with new pip 26.1.
+  [#341](https://github.com/pyodide/pyodide-build/pull/341)
+
 ## [0.34.1] - 2026/04/03
 
 ### Added
