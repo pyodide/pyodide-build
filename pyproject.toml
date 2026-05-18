@@ -14,7 +14,7 @@ classifiers = [
 license = {text = "MPL-2.0"}
 requires-python = ">=3.12"
 dependencies = [
-    "build~=1.4.0",
+    "build>=1.4,<1.6,!=1.4.4",
     "pyodide-cli>=0.4.1",
     "pyodide-lock~=0.1.0",
     "auditwheel-emscripten~=0.2.0",
@@ -68,6 +68,9 @@ test = [
     "pytest-httpserver",
     "pytest-cov",
     "types-requests",
+    # click 8.3.3 has a regression where
+    # pytest giving OSError: [Errno 29] Illegal seek error
+    "click>=8.0,<8.3.3",
 ]
 docs = [
     "sphinx>=5.3.0",
@@ -153,7 +156,16 @@ lint.select = [
 
 lint.logger-objects = ["pyodide_build.logger.logger"]
 
-lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038", "PLR0912", "PLC0415"]
+lint.ignore = [
+  "E402",    # Module level import not at top of file
+  "E501",    # Line too long
+  "E731",    # Do not assign a lambda expression, use a def
+  "E741",    # Ambiguous variable name (l, O, I)
+  "PERF401", # Replace for loops that build lists with list comprehension
+  "PLW2901", # Redefined loop variable
+  "PLR0912", # Too many branches in function
+  "PLC0415"  # Import inside function or class
+]
 # line-length = 219  # E501: Recommended goal is 88 to match black
 target-version = "py312"
 

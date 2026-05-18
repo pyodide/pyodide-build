@@ -398,6 +398,13 @@ class PyodideVenv(ABC):
                     if "--only-binary" not in sys.argv:
                         sys.argv.extend(["--only-binary", ":all:"])
             else:
+            """
+            # Newer versions of pip vendor Emscripten-supporting urllib3, so
+            # import urllib3 before patching sys.platform to make sure we don't
+            # run the Emscripten-compatibility path. It won't work because we
+            # are really in a native Python.
+            """
+                import pip._vendor.urllib3
                 sys.platform = sys_platform
             """
             # Handle pip updates.

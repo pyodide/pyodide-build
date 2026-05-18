@@ -15,6 +15,11 @@ extensions = [
     "sphinx.ext.napoleon",
     "myst_parser",
     "sphinx_autodoc_typehints",
+    "sphinx_design",
+]
+
+myst_enable_extensions = [
+    "colon_fence",
 ]
 
 intersphinx_mapping = {
@@ -37,6 +42,12 @@ html_css_files = [
 html_theme = "sphinx_book_theme"
 html_logo = "_static/img/pyodide-logo.png"
 html_static_path = ["_static"]
+
+html_theme_options = {
+    "show_toc_level": 2,
+    "show_navbar_depth": 2,
+    "home_page_in_toc": True,
+}
 
 
 sys.path.append(Path(__file__).parent.parent.as_posix())

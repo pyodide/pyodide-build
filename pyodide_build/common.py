@@ -5,7 +5,9 @@
 import contextlib
 import hashlib
 import os
+import re
 import shutil
+import stat
 import subprocess
 import sys
 import textwrap
@@ -239,10 +241,11 @@ def _environment_substitute_str(
     if env is None:
         env = dict(os.environ)
 
-    for e_name, e_value in env.items():
-        string = string.replace(f"$({e_name})", e_value)
+    def repl(match_: re.Match[str]) -> str:
+        name = match_.group(1)
+        return env.get(name, "")
 
-    return string
+    return re.sub(r"\$\(([^)]+)\)", repl, string)
 
 
 def environment_substitute_args(
@@ -665,3 +668,13 @@ def retrying_rmtree(d):
             else:
                 raise
     raise RuntimeError(f"shutil.rmtree('{d}') failed with ENOTEMPTY three times")
+
+
+def remove_readonly(func, path, _):
+    """Clear the readonly bit and reattempt removal.
+
+    Needed on Windows to remove read-only files like `git` objects.
+    Use with: `shutil.rmtree(path, onexc=remove_readonly)`
+    """
+    os.chmod(path, stat.S_IWRITE)
+    func(path)

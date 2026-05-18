@@ -71,7 +71,7 @@ except shutil.RegistryError:
 
 
 def _extract_tarballname(url: str, headers: dict) -> str:
-    tarballname = url.split("/")[-1]
+    tarballname = url.rsplit("/", 1)[-1]
 
     if "Content-Disposition" in headers:
         msg = Message()
