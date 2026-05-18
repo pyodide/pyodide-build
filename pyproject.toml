@@ -8,13 +8,13 @@ authors = [{name = "Pyodide developers"}]
 description = '"Tools for building Pyodide"'
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Operating System :: OS Independent",
 ]
-license = {text = "MPL-2.0"}
+license = "MPL-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-    "build>=1.4,<1.6,!=1.4.4",
+    "build>=1.4,<1.6,!=1.4.4", # keep in sync with uv extra
     "pyodide-cli>=0.4.1",
     "pyodide-lock~=0.1.0",
     "auditwheel-emscripten~=0.2.0",
@@ -59,7 +59,7 @@ resolve = [
     "unearth~=0.6",
 ]
 uv = [
-  "build[uv]~=1.4.0",
+  "build[uv]>=1.4,<1.6,!=1.4.4",
 ]
 
 [dependency-groups]
