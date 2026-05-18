@@ -66,6 +66,8 @@ jobs:
 
   windows-integration-test:
     runs-on: windows-latest
+    needs: [check-integration-test-trigger]
+    if: needs.check-integration-test-trigger.outputs.run-integration-test
     defaults:
       run:
         shell: powershell
