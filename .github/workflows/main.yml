@@ -79,6 +79,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "20"
+
       - name: Install package
         run: |
           python -m pip install --upgrade pip
@@ -88,6 +93,22 @@ jobs:
         run: |
           pyodide xbuildenv install
           pyodide xbuildenv install-emscripten
+
+      - name: Test emcc
+        run: |
+          $EMSDK_DIR = pyodide config get emsdk_dir
+          . "$EMSDK_DIR\emsdk_env.ps1"
+          $code = @"
+          #include <stdio.h>
+          int main() {
+            printf("emcc works\n");
+            return 0;
+          }
+          "@
+          # Use ASCII encoding; PowerShell's default UTF-16 BOM is not supported by emcc
+          $code | Out-File -Encoding ASCII test.c
+          emcc test.c -o test.js
+          node test.js
 
   check-integration-test-trigger:
     name: test-integration-test-trigger
