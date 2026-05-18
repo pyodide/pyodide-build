@@ -643,6 +643,8 @@ class RecipeBuilderPackage(RecipeBuilder):
             if self.build_metadata.cross_build_env:
                 subprocess.run(
                     [
+                        sys.executable,
+                        "-m",
                         "pip",
                         "install",
                         # Upgrade the package in the host environment if there is a
@@ -666,6 +668,8 @@ class RecipeBuilderPackage(RecipeBuilder):
                 # overwriting the dependencies in the host environment.
                 subprocess.run(
                     [
+                        sys.executable,
+                        "-m",
                         "pip",
                         "install",
                         "-t",

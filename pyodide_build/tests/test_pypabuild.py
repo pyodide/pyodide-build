@@ -1,4 +1,5 @@
 import subprocess
+import sys
 
 import pytest
 from build import BuildBackendException, BuildException, FailedProcessError
@@ -136,7 +137,9 @@ def test_symlink_unisolated_packages_triggers_lazy_install(
 def _make_cpe(
     stdout: str | bytes | None = None, stderr: str | bytes | None = None
 ) -> subprocess.CalledProcessError:
-    exc = subprocess.CalledProcessError(1, ["pip", "install", "bad-pkg"])
+    exc = subprocess.CalledProcessError(
+        1, [sys.executable, "-m", "pip", "install", "bad-pkg"]
+    )
     exc.stdout = stdout
     exc.stderr = stderr
     return exc
