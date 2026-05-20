@@ -28,7 +28,7 @@ class CrossBuildEnvReleaseSpec(BaseModel):
     # Minimum and maximum pyodide-build versions that are compatible with this release
     min_pyodide_build_version: str | None = None
     max_pyodide_build_version: str | None = None
-    model_config = ConfigDict(extra="forbid", title="CrossBuildEnvReleasesSpec")
+    model_config = ConfigDict(extra="ignore", title="CrossBuildEnvReleasesSpec")
 
     @property
     def python_version_tuple(self) -> tuple[int, int, int]:
