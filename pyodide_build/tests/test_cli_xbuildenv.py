@@ -352,11 +352,12 @@ def test_xbuildenv_search(
         "Python",
         "Emscripten",
         "pyodide-build",
+        "Published",
         "Compatible",
     ]
 
     row1 = lines[3].strip().split("│")[1:-1]
-    assert [col.strip() for col in row1] == ["0.1.0", "4.5.6", "1.39.8", "-", "No"]
+    assert [col.strip() for col in row1] == ["0.1.0", "4.5.6", "1.39.8", "-", "", "No"]
 
 
 def test_xbuildenv_search_json(tmp_path, fake_xbuildenv_releases_compatible):
@@ -390,6 +391,7 @@ def test_xbuildenv_search_json(tmp_path, fake_xbuildenv_releases_compatible):
             "python",
             "emscripten",
             "pyodide_build",
+            "published_at",
             "compatible",
         }, f"Environment {environment} has unexpected keys: {environment.keys()}"
 

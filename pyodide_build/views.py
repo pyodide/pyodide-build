@@ -13,6 +13,7 @@ class MetadataView:
     emscripten: str
     pyodide_build: dict[str, str | None]
     compatible: bool
+    published_at: str | None = None
 
     @classmethod
     def to_table(cls, views: list["MetadataView"]) -> str:
@@ -21,6 +22,7 @@ class MetadataView:
             ("Python", 10),
             ("Emscripten", 10),
             ("pyodide-build", 25),
+            ("Published", 10),
             ("Compatible", 10),
         ]
 
@@ -59,12 +61,14 @@ class MetadataView:
             pyodide_build_range = (
                 f"{view.pyodide_build['min'] or ''} - {view.pyodide_build['max'] or ''}"
             )
+            published = (view.published_at or "")[:10]
             row = [
                 f"{view.version:<{columns[0][1]}}",
                 f"{view.python:<{columns[1][1]}}",
                 f"{view.emscripten:<{columns[2][1]}}",
                 f"{pyodide_build_range:<{columns[3][1]}}",
-                f"{'Yes' if view.compatible else 'No':<{columns[4][1]}}",
+                f"{published:<{columns[4][1]}}",
+                f"{'Yes' if view.compatible else 'No':<{columns[5][1]}}",
             ]
             table.append(
                 vertical + vertical.join(f" {cell} " for cell in row) + vertical
@@ -82,6 +86,7 @@ class MetadataView:
                         "python": view.python,
                         "emscripten": view.emscripten,
                         "pyodide_build": view.pyodide_build,
+                        "published_at": view.published_at,
                         "compatible": view.compatible,
                     }
                     for view in views
