@@ -237,6 +237,7 @@ def _search(
                 "min": release.min_pyodide_build_version,
                 "max": release.max_pyodide_build_version,
             },
+            published_at=release.published_at,
             compatible=release.is_compatible(
                 python_version=local["python"],
                 pyodide_build_version=local["pyodide-build"],

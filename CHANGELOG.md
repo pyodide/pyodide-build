@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.34.5] - 2026/05/20
+
+### Added
+
+- `CrossBuildEnvReleaseSpec` now has a `published_at` field containing the UTC timestamp
+  when the release was published on GitHub (ISO 8601 format). This is exposed in
+  `pyodide xbuildenv search --all` and `pyodide xbuildenv search --all --json`.
+  [#349](https://github.com/pyodide/pyodide-build/pull/349)
 
 ## [0.34.4] - 2026/05/15
 

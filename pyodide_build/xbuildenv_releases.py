@@ -7,7 +7,7 @@ from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
 DEFAULT_CROSS_BUILD_ENV_METADATA_URL = (
-    "https://pyodide.github.io/pyodide/api/pyodide-cross-build-environments.json"
+    "https://pyodide.github.io/pyodide/api/v2/pyodide-cross-build-environments.json"
 )
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
 
@@ -23,10 +23,12 @@ class CrossBuildEnvReleaseSpec(BaseModel):
     python_version: str
     # The version of the Emscripten SDK
     emscripten_version: str
+    # The UTC timestamp when the release was published on GitHub (ISO 8601)
+    published_at: str = ""
     # Minimum and maximum pyodide-build versions that are compatible with this release
     min_pyodide_build_version: str | None = None
     max_pyodide_build_version: str | None = None
-    model_config = ConfigDict(extra="forbid", title="CrossBuildEnvReleasesSpec")
+    model_config = ConfigDict(extra="ignore", title="CrossBuildEnvReleasesSpec")
 
     @property
     def python_version_tuple(self) -> tuple[int, int, int]:
