@@ -6,8 +6,17 @@ from functools import cache
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
+# TODO: update to v2 when https://github.com/pyodide/pyodide/pull/6248 is merged
+# and makes it to the github pages deployment. this will start showing the publish
+# date for stable releases as well, via the v2 published_at field which isn't in v1.
 DEFAULT_CROSS_BUILD_ENV_METADATA_URL = (
     "https://pyodide.github.io/pyodide/api/v2/pyodide-cross-build-environments.json"
+)
+NIGHTLY_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide-build-environment-nightly/api/v2/release.json"
+)
+NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide-build-environment-nightly/api/v2/debug.json"
 )
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
 
