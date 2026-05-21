@@ -13,7 +13,7 @@ class MetadataView:
     emscripten: str
     pyodide_build: dict[str, str | None]
     compatible: bool
-    published_at: str | None = None
+    published_at: str = ""
     source: str = field(
         default="stable"
     )  # "stable", "nightly", or "nightly-debug" # TODO: add stable-debug builds?
@@ -35,7 +35,7 @@ class MetadataView:
                 view.python,
                 view.emscripten,
                 pyodide_build_range,
-                (view.published_at or "")[:10],
+                view.published_at[:10],
                 "Yes" if view.compatible else "No",
             ]
             if show_source:
