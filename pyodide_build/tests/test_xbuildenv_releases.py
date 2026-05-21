@@ -261,11 +261,11 @@ def test_published_at():
         python_version="3.8.0",
         emscripten_version="1.39.8",
     )
-    assert release_no_date.published_at is None
+    assert release_no_date.published_at == ""
 
     metadata = CrossBuildEnvMetaSpec(**FAKE_METADATA)
     for release in metadata.releases.values():
-        assert release.published_at is None
+        assert release.published_at == ""
 
 
 def test_is_compatible_without_pyodide_build_range():
