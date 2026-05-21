@@ -13,7 +13,7 @@ class MetadataView:
     emscripten: str
     pyodide_build: dict[str, str | None]
     compatible: bool
-    published_at: str | None = None
+    published_at: str = ""
 
     @classmethod
     def to_table(cls, views: list["MetadataView"]) -> str:
@@ -61,7 +61,7 @@ class MetadataView:
             pyodide_build_range = (
                 f"{view.pyodide_build['min'] or ''} - {view.pyodide_build['max'] or ''}"
             )
-            published = (view.published_at or "")[:10]
+            published = view.published_at[:10]
             row = [
                 f"{view.version:<{columns[0][1]}}",
                 f"{view.python:<{columns[1][1]}}",

@@ -24,7 +24,7 @@ class CrossBuildEnvReleaseSpec(BaseModel):
     # The version of the Emscripten SDK
     emscripten_version: str
     # The UTC timestamp when the release was published on GitHub (ISO 8601)
-    published_at: str | None = None
+    published_at: str = ""
     # Minimum and maximum pyodide-build versions that are compatible with this release
     min_pyodide_build_version: str | None = None
     max_pyodide_build_version: str | None = None
