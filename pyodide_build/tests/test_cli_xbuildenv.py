@@ -421,3 +421,181 @@ def test_xbuildenv_search_json(tmp_path, fake_xbuildenv_releases_compatible):
     assert any(env["compatible"] for env in output["environments"]), (
         "There should be at least one compatible environment"
     )
+
+
+@pytest.fixture
+def fake_nightly_release_metadata(tmp_path):
+    """Fake nightly release metadata (non-debug), two entries: one compatible, one not."""
+    from pyodide_build import build_env
+
+    local = build_env.local_versions()
+    data = {
+        "releases": {
+            "20260520": {
+                "version": "20260520",
+                "url": "https://example.com/20260520/xbuildenv.tar.bz2",
+                "sha256": "abc123",
+                "python_version": f"{local['python']}.0",
+                "emscripten_version": "5.0.3",
+                "published_at": "2026-05-20T04:40:12Z",
+                "min_pyodide_build_version": "0.26.0",
+                "max_pyodide_build_version": None,
+            },
+            "20250101": {
+                "version": "20250101",
+                "url": "https://example.com/20250101/xbuildenv.tar.bz2",
+                "sha256": "def456",
+                "python_version": "3.12.0",
+                "emscripten_version": "3.1.58",
+                "published_at": "2025-01-01T02:53:30Z",
+                "min_pyodide_build_version": "0.26.0",
+                "max_pyodide_build_version": None,
+            },
+        }
+    }
+    path = tmp_path / "nightly-release.json"
+    path.write_text(json.dumps(data))
+    return path
+
+
+@pytest.fixture
+def fake_nightly_debug_metadata(tmp_path):
+    """Fake nightly debug metadata — only entries that have a debug build."""
+    from pyodide_build import build_env
+
+    local = build_env.local_versions()
+    data = {
+        "releases": {
+            "20260520": {
+                "version": "20260520",
+                "url": "https://example.com/20260520/xbuildenv-debug.tar.bz2",
+                "sha256": "debug_abc123",
+                "python_version": f"{local['python']}.0",
+                "emscripten_version": "5.0.3",
+                "published_at": "2026-05-20T04:40:12Z",
+                "min_pyodide_build_version": "0.26.0",
+                "max_pyodide_build_version": None,
+            },
+        }
+    }
+    path = tmp_path / "nightly-debug.json"
+    path.write_text(json.dumps(data))
+    return path
+
+
+def test_xbuildenv_search_nightly(
+    tmp_path,
+    fake_xbuildenv_releases_compatible,
+    fake_nightly_release_metadata,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.NIGHTLY_CROSS_BUILD_ENV_METADATA_URL",
+        str(fake_nightly_release_metadata),
+    )
+
+    result = runner.invoke(
+        xbuildenv.app,
+        [
+            "search",
+            "--metadata",
+            str(fake_xbuildenv_releases_compatible),
+            "--nightly",
+            "--all",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    lines = result.output.splitlines()
+    header = lines[1].strip().split("│")[1:-1]
+    assert [col.strip() for col in header] == [
+        "Version",
+        "Python",
+        "Emscripten",
+        "pyodide-build",
+        "Published",
+        "Compatible",
+        "Source",
+    ]
+
+    # All entries should be present: stable 0.1.0, 0.2.0 and nightly 20260520, 20250101
+    assert "0.1.0" in result.output
+    assert "0.2.0" in result.output
+    assert "20260520" in result.output
+    assert "20250101" in result.output
+    assert "stable" in result.output
+    assert "nightly" in result.output
+
+
+def test_xbuildenv_search_debug(
+    tmp_path,
+    fake_xbuildenv_releases_compatible,
+    fake_nightly_debug_metadata,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL",
+        str(fake_nightly_debug_metadata),
+    )
+
+    result = runner.invoke(
+        xbuildenv.app,
+        [
+            "search",
+            "--metadata",
+            str(fake_xbuildenv_releases_compatible),
+            "--debug",
+            "--all",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    # Stable entries present, nightly-debug entry for 20260520 present.
+    # 20250101 is absent because it has no debug build (not in the debug metadata file).
+    assert "stable" in result.output
+    assert "nightly-debug" in result.output
+    assert "20260520" in result.output
+    assert "20250101" not in result.output
+
+
+def test_xbuildenv_search_nightly_json(
+    tmp_path,
+    fake_xbuildenv_releases_compatible,
+    fake_nightly_release_metadata,
+    fake_nightly_debug_metadata,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.NIGHTLY_CROSS_BUILD_ENV_METADATA_URL",
+        str(fake_nightly_release_metadata),
+    )
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL",
+        str(fake_nightly_debug_metadata),
+    )
+
+    result = runner.invoke(
+        xbuildenv.app,
+        [
+            "search",
+            "--metadata",
+            str(fake_xbuildenv_releases_compatible),
+            "--nightly",
+            "--debug",
+            "--all",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert is_valid_json(result.output)
+
+    output = json.loads(result.output)
+    sources = {env["source"] for env in output["environments"]}
+    assert sources == {"stable", "nightly", "nightly-debug"}
+
+    for env in output["environments"]:
+        assert "debug_url" not in env
+        assert "debug_sha256" not in env
