@@ -326,17 +326,18 @@ EMSDK_ENV_VARS = {
 
 def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
     """
-    Source emsdk_env.sh and return the resulting environment variables.
+    Source the emsdk_env script (emsdk_env.sh on Unix, emsdk_env.bat on Windows)
+    and return the resulting environment variables.
 
     Parameters
     ----------
     emsdk_dir
-        Path to the emsdk directory containing emsdk_env.sh
+        Path to the emsdk directory containing the emsdk_env script
 
     Returns
     -------
     dict[str, str]
-        Dictionary of environment variables set by emsdk_env.sh
+        Dictionary of environment variables set by the emsdk_env script
     """
     emsdk_env_script_filename = "emsdk_env.bat" if IS_WIN else "emsdk_env.sh"
     emsdk_env_script = emsdk_dir / emsdk_env_script_filename
@@ -345,7 +346,7 @@ def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
             f"{emsdk_env_script_filename} not found at {emsdk_env_script}"
         )
 
-    # Source emsdk_env.sh and capture the resulting environment
+    # Source the emsdk_env script and capture the resulting environment
     if IS_WIN:
         # Passing args as a string, as otherwise shell is misinterpreting the command with quotes,
         # resulting in no output.

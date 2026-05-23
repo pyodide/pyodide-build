@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 
 from pyodide_build.build_env import get_build_flag, local_versions
-from pyodide_build.common import default_xbuildenv_path
+from pyodide_build.common import IS_WIN, default_xbuildenv_path
 from pyodide_build.views import MetadataView
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
@@ -294,4 +294,8 @@ def _install_emscripten(
     emsdk_dir = manager.install_emscripten(version, force=force)
 
     print("Installing emsdk complete.")
-    print(f"Use `source {emsdk_dir}/emsdk_env.sh` to set up the environment.")
+    if IS_WIN:
+        cmd = f"{emsdk_dir}/emsdk_env.bat"
+    else:
+        cmd = f"source {emsdk_dir}/emsdk_env.sh"
+    print(f"Use `{cmd}` to set up the environment.")
