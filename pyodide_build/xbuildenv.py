@@ -555,7 +555,7 @@ class CrossBuildEnvManager:
         # and skipping them silently.
         try:
             patch_env = os.environ.copy() | {"GIT_DIR": "."}
-            for patch_file in patches_dir.glob("*.patch"):
+            for patch_file in sorted(patches_dir.glob("*.patch")):
                 subprocess.run(
                     ["git", "apply", "--verbose", str(patch_file)],
                     cwd=emscripten_root,
