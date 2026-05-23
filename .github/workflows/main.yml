@@ -70,7 +70,7 @@ jobs:
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     defaults:
       run:
-        shell: powershell
+        shell: pwsh
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -107,8 +107,7 @@ jobs:
             return 0;
           }
           "@
-          # Use ASCII encoding; PowerShell's default UTF-16 BOM is not supported by emcc
-          $code | Out-File -Encoding ASCII test.c
+          $code | Out-File test.c
           emcc test.c -o test.js
           node test.js
 
