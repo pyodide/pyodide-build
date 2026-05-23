@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -549,11 +550,16 @@ class CrossBuildEnvManager:
         )
 
         # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
+        # `GIT_DIR=.` prevents `git apply` from finding the parent emsdk git repo
+        # and applying patches relative to it instead of the current emscripten directory
+        # and skipping them silently.
         try:
+            patch_env = os.environ.copy() | {"GIT_DIR": "."}
             for patch_file in patches_dir.glob("*.patch"):
                 subprocess.run(
                     ["git", "apply", "--verbose", str(patch_file)],
                     cwd=emscripten_root,
+                    env=patch_env,
                     check=True,
                 )
         except subprocess.CalledProcessError as e:

@@ -160,6 +160,7 @@ def test_install_emscripten_fresh_install(tmp_path, monkeypatch):
     assert str(patch_path) in patch_cmd
     assert calls[2][1]["check"] is True
     assert calls[2][1]["cwd"] == upstream_emscripten
+    assert calls[2][1]["env"]["GIT_DIR"] == "."
 
     # 4. Activate emsdk
     assert calls[3] == call(
@@ -217,6 +218,7 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     # Verify patch command (call 2)
     patch_cmd = calls[2][0][0]
     assert patch_cmd[:3] == ["git", "apply", "--verbose"]
+    assert calls[2][1]["env"]["GIT_DIR"] == "."
     # Verify version is passed correctly to activate (call 3)
     assert calls[3] == call(
         [
@@ -285,6 +287,7 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     assert patch_cmd[:3] == ["git", "apply", "--verbose"]
     assert calls[2][1]["check"] is True
     assert calls[2][1]["cwd"] == upstream_emscripten
+    assert calls[2][1]["env"]["GIT_DIR"] == "."
 
     assert calls[3] == call(
         ["./emsdk", "activate", "--embedded", "--build=Release", "latest"],
