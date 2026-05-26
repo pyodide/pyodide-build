@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -540,20 +541,27 @@ class CrossBuildEnvManager:
         self._clone_emscripten()
 
         # Install the specified Emscripten version
+        emsdk = shutil.which("emsdk", path=emsdk_dir)
+        assert emsdk
         subprocess.run(
-            ["./emsdk", "install", "--build=Release", emscripten_version],
+            [emsdk, "install", "--build=Release", emscripten_version],
             cwd=emsdk_dir,
             check=True,
         )
 
         # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
+        # `GIT_DIR=.` prevents `git apply` from finding the parent emsdk git repo
+        # and applying patches relative to it instead of the current emscripten directory
+        # and skipping them silently.
         try:
-            subprocess.run(
-                f"cat {patches_dir}/*.patch | patch -p1 --verbose",
-                check=True,
-                shell=True,
-                cwd=emscripten_root,
-            )
+            patch_env = os.environ.copy() | {"GIT_DIR": "."}
+            for patch_file in sorted(patches_dir.glob("*.patch")):
+                subprocess.run(
+                    ["git", "apply", "--verbose", str(patch_file)],
+                    cwd=emscripten_root,
+                    env=patch_env,
+                    check=True,
+                )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
                 f"Failed to apply Emscripten patches. This may occur if the Emscripten version "
@@ -565,7 +573,7 @@ class CrossBuildEnvManager:
         # Activate the specified Emscripten version
         subprocess.run(
             [
-                "./emsdk",
+                emsdk,
                 "activate",
                 "--embedded",
                 "--build=Release",
