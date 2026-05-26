@@ -519,12 +519,12 @@ def test_xbuildenv_search_nightly(
         "Source",
     ]
 
-    # All entries should be present: stable 0.1.0, 0.2.0 and nightly 20260520, 20250101
-    assert "0.1.0" in result.output
-    assert "0.2.0" in result.output
+    # Only nightly entries should be present. Stable versions are not mixed in.
+    assert "0.1.0" not in result.output
+    assert "0.2.0" not in result.output
     assert "20260520" in result.output
     assert "20250101" in result.output
-    assert "stable" in result.output
+    assert "stable" not in result.output
     assert "nightly" in result.output
 
 
@@ -552,9 +552,10 @@ def test_xbuildenv_search_debug(
 
     assert result.exit_code == 0, result.output
 
-    # Stable entries present, nightly-debug entry for 20260520 present.
-    # 20250101 is absent because it has no debug build (not in the debug metadata file).
-    assert "stable" in result.output
+    # Only nightly-debug entries should be present. Stable and nightly-release versions
+    # are not mixed in. 20250101 is absent because it has no debug build (not in the
+    # debug metadata file).
+    assert "stable" not in result.output
     assert "nightly-debug" in result.output
     assert "20260520" in result.output
     assert "20250101" not in result.output
@@ -594,7 +595,7 @@ def test_xbuildenv_search_nightly_json(
 
     output = json.loads(result.output)
     sources = {env["source"] for env in output["environments"]}
-    assert sources == {"stable", "nightly", "nightly-debug"}
+    assert sources == {"nightly", "nightly-debug"}
 
     for env in output["environments"]:
         assert "debug_url" not in env
