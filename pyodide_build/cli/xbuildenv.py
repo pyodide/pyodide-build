@@ -94,26 +94,19 @@ def _install(
     Arguments:
         VERSION: version of cross-build environment to install (optional)
     """
-    manager = CrossBuildEnvManager(path)
-
-    if url:
-        manager.install(url=url, force_install=force_install)
-    elif nightly or debug:
-        nightly_url = (
+    if nightly or debug:
+        metadata_url = (
             NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
             if debug
             else NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
         )
-        metadata = load_cross_build_env_metadata(nightly_url)
-        if version:
-            release = metadata.get_release(version)
-        else:
-            releases = list(metadata.releases.values())
-            if not releases:
-                click.echo(f"No {'debug ' if debug else ''}nightly releases found.")
-                raise SystemExit(1)
-            release = releases[0]  # sorted newest-first
-        manager.install(url=release.url, force_install=force_install)
+    else:
+        metadata_url = None
+
+    manager = CrossBuildEnvManager(path, metadata_url=metadata_url)
+
+    if url:
+        manager.install(url=url, force_install=force_install)
     else:
         manager.install(version=version, force_install=force_install)
 
@@ -277,16 +270,19 @@ def _search(
             ),
         )
 
-    # Stable releases (always included)
-    stable_metadata = load_cross_build_env_metadata(
-        metadata_path or cross_build_env_metadata_url()
-    )
-    views = [
-        _make_view(r, "stable")
-        for r in stable_metadata.list_compatible_releases(**_compat_kwargs())
-    ]
+    views = []
 
-    # Nightly and/or debug releases (additive)
+    # Stable releases (only when neither --nightly nor --debug is passed)
+    if not (nightly or debug):
+        stable_metadata = load_cross_build_env_metadata(
+            metadata_path or cross_build_env_metadata_url()
+        )
+        views = [
+            _make_view(r, "stable")
+            for r in stable_metadata.list_compatible_releases(**_compat_kwargs())
+        ]
+
+    # Nightly and/or debug releases
     extra_sources = []
     if nightly:
         extra_sources.append(("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL))
