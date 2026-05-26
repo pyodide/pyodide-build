@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pyodide xbuildenv search --all` and `pyodide xbuildenv search --all --json`.
   [#349](https://github.com/pyodide/pyodide-build/pull/349)
 
+- `pyodide xbuildenv search` now supports `--nightly` and `--debug` flags to search
+  nightly and nightly-debug cross-build environments respectively, and `pyodide xbuildenv
+  install` supports `--nightly` and `--debug` flags to install them.
+  [#350](https://github.com/pyodide/pyodide-build/pull/350)
+
 ## [0.34.4] - 2026/05/15
 
 ### Added
