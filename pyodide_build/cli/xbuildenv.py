@@ -279,11 +279,19 @@ def _search(
             sources.append(
                 ("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)
             )
+        compat = _compat_kwargs()
         views = [
-            _make_view(r, source)
+            _make_view(release, source)
             for source, url in sources
-            for r in load_cross_build_env_metadata(url).releases.values()
-            if show_all or r.is_compatible(**_compat_kwargs())
+            for release in sorted(
+                (
+                    release
+                    for release in load_cross_build_env_metadata(url).releases.values()
+                    if release.is_compatible(**compat)
+                ),
+                key=lambda release: release.published_at,
+                reverse=True,
+            )
         ]
     else:
         # Stable releases
