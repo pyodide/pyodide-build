@@ -3,6 +3,9 @@ import sys
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 
+from docutils import nodes, statemachine
+from sphinx.util.docutils import SphinxDirective
+
 project = "pyodide-build"
 copyright = "2019-2026, Pyodide contributors"
 
@@ -61,3 +64,44 @@ except importlib_metadata.PackageNotFoundError:
     release = "0.0.0"
 
 version = release
+
+
+# -- Auto-generated CLI reference --------------------------------------------
+
+
+class PyodideCLIReference(SphinxDirective):
+    """
+    Emit a sphinx-click block for a ``pyodide.cli`` entry point if it belongs
+    to pyodide-build, to automatically generate CLI reference documentation.
+    """
+
+    def run(self) -> list[nodes.Node]:
+        entry_points = sorted(
+            (
+                entry_point
+                for entry_point in importlib_metadata.entry_points(group="pyodide.cli")
+                if entry_point.dist is not None
+                and entry_point.dist.name == "pyodide-build"
+            ),
+            key=lambda ep: ep.name,
+        )
+
+        rst: list[str] = []
+        for ep in entry_points:
+            obj = ep.load()
+            rst.append(f".. click:: {ep.value}")
+            rst.append(f"   :prog: pyodide {ep.name}")
+            if hasattr(
+                obj, "commands"
+            ):  # If it's a click group? Then let's recurse into subcommands
+                rst.append("   :nested: full")
+            rst.append("")
+
+        result = statemachine.ViewList(rst, source="<pyodide-cli-reference>")
+        node: nodes.Node = nodes.section()
+        self.state.nested_parse(result, self.content_offset, node)
+        return node.children
+
+
+def setup(app):
+    app.add_directive("pyodide-cli-reference", PyodideCLIReference)
