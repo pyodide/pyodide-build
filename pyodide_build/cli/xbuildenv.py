@@ -217,13 +217,13 @@ def _use(version: str, path: Path) -> None:
     "--nightly",
     is_flag=True,
     default=False,
-    help="include nightly releases alongside stable ones.",
+    help="search nightly releases instead of stable ones.",
 )
 @click.option(
     "--debug",
     is_flag=True,
     default=False,
-    help="include nightly debug releases alongside stable ones.",
+    help="search nightly debug releases instead of stable ones.",
 )
 @click.option(
     "--json",
