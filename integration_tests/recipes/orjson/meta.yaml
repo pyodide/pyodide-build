@@ -1,18 +1,19 @@
 package:
   name: orjson
-  version: 3.10.13
+  version: 3.11.8
+  tag:
+    - rust
   top-level:
     - orjson
 source:
-  url: https://files.pythonhosted.org/packages/source/o/orjson/orjson-3.10.13.tar.gz
-  sha256: eb9bfb14ab8f68d9d9492d4817ae497788a15fd7da72e14dfabc289c3bb088ec
+  url: https://files.pythonhosted.org/packages/source/o/orjson/orjson-3.11.8.tar.gz
+  sha256: 96163d9cdc5a202703e9ad1b9ae757d5f0ca62f4fa0cc93d1f27b0e180cc404e
 requirements:
   executable:
     - rustup
 about:
   home: https://github.com/ijl/orjson
   PyPI: https://pypi.org/project/orjson
-  summary:
-    Fast, correct Python JSON library supporting dataclasses, datetimes, and
-    numpy
+  summary: Fast, correct Python JSON library supporting dataclasses, datetimes,
+    and numpy
   license: Apache-2.0 OR MIT
