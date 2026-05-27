@@ -61,4 +61,4 @@ pyodide config get pyodide_abi_version
 ## Further reading
 
 - [PEP 783 — The Emscripten Platform](https://peps.python.org/pep-0783/) — formal specification
-- [Concepts — Platform Tags](../getting-started/concepts.md) — introductory explanation
+- [Concepts — Platform Tags](../explanation/concepts.md) — introductory explanation

@@ -131,6 +131,6 @@ pyodide config get emscripten_version
 
 ## What's next?
 
-- [Concepts](../getting-started/concepts.md) — understand what the cross-build environment provides
+- [Concepts](../explanation/concepts.md) — understand what the cross-build environment provides
 - [Customizing Compiler Flags](compiler-flags.md) — fine-tuning build flags
 - [Configuration Reference](../reference/configuration.md) — all configuration options

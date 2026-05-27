@@ -103,6 +103,6 @@ Older Pyodide versions (before PEP 783) used the tag `pyodide_{year}_{patch}_was
 
 ## What's next?
 
-- [Quick Start](quickstart.md) — build your first WebAssembly wheel
+- [Quick Start](../tutorials/quickstart.md) — build your first WebAssembly wheel
 - [Managing Cross-Build Environments](../how-to/xbuildenv.md) — advanced xbuildenv management
 - [Platform Tags & Compatibility](../reference/platform.md) — full compatibility matrix

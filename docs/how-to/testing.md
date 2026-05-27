@@ -72,6 +72,6 @@ pyodide venv --clear .venv-pyodide
 
 ## What's next?
 
-- [CI with cibuildwheel](../how-to/cibuildwheel.md) — automate building and testing in CI
-- [CI without cibuildwheel](../how-to/ci-direct.md) — set up GitHub Actions directly
-- [Debugging Build Failures](../how-to/debugging.md) — troubleshooting when things go wrong
+- [CI with cibuildwheel](cibuildwheel.md) — automate building and testing in CI
+- [CI without cibuildwheel](ci-direct.md) — set up GitHub Actions directly
+- [Debugging Build Failures](debugging.md) — troubleshooting when things go wrong
