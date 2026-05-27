@@ -16,6 +16,7 @@ extensions = [
     "myst_parser",
     "sphinx_autodoc_typehints",
     "sphinx_design",
+    "sphinx_click",
 ]
 
 myst_enable_extensions = [
