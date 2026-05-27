@@ -243,6 +243,10 @@ def _search(
 
     # TODO: cache the metadata file somewhere to avoid downloading it every time
 
+    if metadata_path and (nightly or debug):
+        click.echo("--metadata cannot be combined with --nightly or --debug")
+        raise SystemExit(1)
+
     local = local_versions()
 
     def _compat_kwargs() -> dict:
