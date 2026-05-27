@@ -9,6 +9,12 @@ from pydantic import BaseModel, ConfigDict
 DEFAULT_CROSS_BUILD_ENV_METADATA_URL = (
     "https://pyodide.github.io/pyodide/api/v2/pyodide-cross-build-environments.json"
 )
+NIGHTLY_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide-build-environment-nightly/api/v2/release.json"
+)
+NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide-build-environment-nightly/api/v2/debug.json"
+)
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
 
 

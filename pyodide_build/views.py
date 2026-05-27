@@ -3,7 +3,7 @@
 
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -14,16 +14,49 @@ class MetadataView:
     pyodide_build: dict[str, str | None]
     compatible: bool
     published_at: str = ""
+    source: str = field(
+        default="stable"
+    )  # "stable", "nightly", or "nightly-debug" # TODO: add stable-debug builds?
 
     @classmethod
-    def to_table(cls, views: list["MetadataView"]) -> str:
-        columns = [
-            ("Version", 10),
-            ("Python", 10),
-            ("Emscripten", 10),
-            ("pyodide-build", 25),
-            ("Published", 10),
-            ("Compatible", 10),
+    def to_table(cls, views: list["MetadataView"], show_source: bool = False) -> str:
+        # Build cell values first so we can measure them for column widths
+        rows: list[list[str]] = []
+        for view in views:
+            mn, mx = view.pyodide_build["min"], view.pyodide_build["max"]
+            if mn and mx:
+                pyodide_build_range = f"{mn} - {mx}"
+            elif mn:
+                pyodide_build_range = f"{mn} and later"
+            else:
+                pyodide_build_range = "-"
+            row = [
+                view.version,
+                view.python,
+                view.emscripten,
+                pyodide_build_range,
+                view.published_at[:10],
+                "Yes" if view.compatible else "No",
+            ]
+            if show_source:
+                row.append(view.source)
+            rows.append(row)
+
+        headers = [
+            "Version",
+            "Python",
+            "Emscripten",
+            "pyodide-build",
+            "Published",
+            "Compatible",
+        ]
+        if show_source:
+            headers.append("Source")
+
+        # Column width = max of header width and widest cell value
+        widths = [
+            max(len(headers[i]), *(len(row[i]) for row in rows) if rows else [0])
+            for i in range(len(headers))
         ]
 
         # Unicode box-drawing characters
@@ -33,51 +66,32 @@ class MetadataView:
         t_down, t_up, t_right, t_left = "┬", "┴", "├", "┤"
         cross = "┼"
 
-        # Table elements
-        top_border = (
-            top_left
-            + t_down.join(horizontal * (width + 2) for _, width in columns)
-            + top_right
-        )
-        header = (
+        def _border(left: str, mid: str, right: str) -> str:
+            return left + mid.join(horizontal * (w + 2) for w in widths) + right
+
+        top_border = _border(top_left, t_down, top_right)
+        header_row = (
             vertical
-            + vertical.join(f" {name:<{width}} " for name, width in columns)
+            + vertical.join(f" {h:<{w}} " for h, w in zip(headers, widths, strict=True))
             + vertical
         )
-        separator = (
-            t_right
-            + cross.join(horizontal * (width + 2) for _, width in columns)
-            + t_left
-        )
-        bottom_border = (
-            bottom_left
-            + t_up.join(horizontal * (width + 2) for _, width in columns)
-            + bottom_right
-        )
+        separator = _border(t_right, cross, t_left)
+        bottom_border = _border(bottom_left, t_up, bottom_right)
 
-        ### Printing
-        table = [top_border, header, separator]
-        for view in views:
-            pyodide_build_range = (
-                f"{view.pyodide_build['min'] or ''} - {view.pyodide_build['max'] or ''}"
-            )
-            published = view.published_at[:10]
-            row = [
-                f"{view.version:<{columns[0][1]}}",
-                f"{view.python:<{columns[1][1]}}",
-                f"{view.emscripten:<{columns[2][1]}}",
-                f"{pyodide_build_range:<{columns[3][1]}}",
-                f"{published:<{columns[4][1]}}",
-                f"{'Yes' if view.compatible else 'No':<{columns[5][1]}}",
-            ]
+        table = [top_border, header_row, separator]
+        for row in rows:
             table.append(
-                vertical + vertical.join(f" {cell} " for cell in row) + vertical
+                vertical
+                + vertical.join(
+                    f" {cell:<{w}} " for cell, w in zip(row, widths, strict=True)
+                )
+                + vertical
             )
         table.append(bottom_border)
         return "\n".join(table)
 
     @classmethod
-    def to_json(cls, views: list["MetadataView"]) -> str:
+    def to_json(cls, views: list["MetadataView"], show_source: bool = False) -> str:
         result = json.dumps(
             {
                 "environments": [
@@ -87,6 +101,7 @@ class MetadataView:
                         "emscripten": view.emscripten,
                         "pyodide_build": view.pyodide_build,
                         "published_at": view.published_at,
+                        **({"source": view.source} if show_source else {}),
                         "compatible": view.compatible,
                     }
                     for view in views

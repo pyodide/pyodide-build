@@ -29,9 +29,10 @@ When you run `pyodide build`, pyodide-build automatically downloads and sets up 
 You can also manage the cross-build environment explicitly:
 
 ```bash
-pyodide xbuildenv install          # install (or update) the cross-build environment
-pyodide xbuildenv install 0.29.3   # install a specific Pyodide version
-pyodide xbuildenv versions         # list installed versions
+pyodide xbuildenv install           # install (or update) the cross-build environment
+pyodide xbuildenv install 0.29.3    # install a specific Pyodide version
+pyodide xbuildenv install --nightly # install the latest nightly release
+pyodide xbuildenv versions          # list installed versions
 ```
 
 See [Managing Cross-Build Environments](../how-to/xbuildenv.md) for more details.

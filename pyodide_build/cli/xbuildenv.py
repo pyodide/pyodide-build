@@ -7,6 +7,8 @@ from pyodide_build.common import IS_WIN, default_xbuildenv_path
 from pyodide_build.views import MetadataView
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
+    NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
+    NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
@@ -52,6 +54,18 @@ def check_xbuildenv_root(path: Path) -> None:
     help="force installation even if the version is not compatible.",
 )
 @click.option(
+    "--nightly",
+    is_flag=True,
+    default=False,
+    help="install a nightly cross-build environment instead of a stable release.",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="install the debug variant of the cross-build environment (nightly only).",
+)
+@click.option(
     "--skip-cross-build-packages",
     is_flag=True,
     default=False,
@@ -65,6 +79,8 @@ def _install(
     path: Path,
     url: str | None,
     force_install: bool,
+    nightly: bool,
+    debug: bool,
     skip_cross_build_packages: bool,
 ) -> None:
     """Install cross-build environment.
@@ -78,18 +94,21 @@ def _install(
     Arguments:
         VERSION: version of cross-build environment to install (optional)
     """
-    manager = CrossBuildEnvManager(path)
-
-    if url:
-        manager.install(
-            url=url,
-            force_install=force_install,
+    if nightly or debug:
+        metadata_url = (
+            NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
+            if debug
+            else NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
         )
     else:
-        manager.install(
-            version=version,
-            force_install=force_install,
-        )
+        metadata_url = None
+
+    manager = CrossBuildEnvManager(path, metadata_url=metadata_url)
+
+    if url:
+        manager.install(url=url, force_install=force_install)
+    else:
+        manager.install(version=version, force_install=force_install)
 
     click.echo(f"Pyodide cross-build environment installed at {path.resolve()}")
 
@@ -195,6 +214,18 @@ def _use(version: str, path: Path) -> None:
     help="search all versions, without filtering out incompatible ones.",
 )
 @click.option(
+    "--nightly",
+    is_flag=True,
+    default=False,
+    help="search nightly releases instead of stable ones.",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="search nightly debug releases instead of stable ones.",
+)
+@click.option(
     "--json",
     "json_output",
     is_flag=True,
@@ -204,32 +235,30 @@ def _use(version: str, path: Path) -> None:
 def _search(
     metadata_path: str | None,
     show_all: bool,
+    nightly: bool,
+    debug: bool,
     json_output: bool,
 ) -> None:
     """Search for available versions of cross-build environment."""
 
     # TODO: cache the metadata file somewhere to avoid downloading it every time
 
-    metadata_path = metadata_path or cross_build_env_metadata_url()
-    metadata = load_cross_build_env_metadata(metadata_path)
-    local = local_versions()
-
-    if show_all:
-        releases = metadata.list_compatible_releases()
-    else:
-        releases = metadata.list_compatible_releases(
-            python_version=local["python"],
-            pyodide_build_version=local["pyodide-build"],
-        )
-
-    if not releases:
-        click.echo(
-            "No compatible cross-build environment found for your system. Try using --all to see all versions."
-        )
+    if metadata_path and (nightly or debug):
+        click.echo("--metadata cannot be combined with --nightly or --debug")
         raise SystemExit(1)
 
-    views = [
-        MetadataView(
+    local = local_versions()
+
+    def _compat_kwargs() -> dict:
+        if show_all:
+            return {}
+        return {
+            "python_version": local["python"],
+            "pyodide_build_version": local["pyodide-build"],
+        }
+
+    def _make_view(release, source: str = "stable") -> MetadataView:
+        return MetadataView(
             version=release.version,
             python=release.python_version,
             emscripten=release.emscripten_version,
@@ -238,18 +267,57 @@ def _search(
                 "max": release.max_pyodide_build_version,
             },
             published_at=release.published_at,
+            source=source,
             compatible=release.is_compatible(
                 python_version=local["python"],
                 pyodide_build_version=local["pyodide-build"],
             ),
         )
-        for release in releases
-    ]
 
-    if json_output:
-        print(MetadataView.to_json(views))
+    if nightly or debug:
+        # Nightly and/or debug releases (mutually exclusive with stable)
+        sources = []
+        if nightly:
+            sources.append(("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL))
+        if debug:
+            sources.append(
+                ("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)
+            )
+        compat = _compat_kwargs()
+        views = [
+            _make_view(release, source)
+            for source, url in sources
+            for release in sorted(
+                (
+                    release
+                    for release in load_cross_build_env_metadata(url).releases.values()
+                    if release.is_compatible(**compat)
+                ),
+                key=lambda release: release.published_at,
+                reverse=True,
+            )
+        ]
     else:
-        print(MetadataView.to_table(views))
+        # Stable releases
+        stable_metadata = load_cross_build_env_metadata(
+            metadata_path or cross_build_env_metadata_url()
+        )
+        views = [
+            _make_view(r, "stable")
+            for r in stable_metadata.list_compatible_releases(**_compat_kwargs())
+        ]
+
+    if not views:
+        click.echo(
+            "No compatible cross-build environment found for your system. Try using --all to see all versions."
+        )
+        raise SystemExit(1)
+
+    show_source = nightly or debug
+    if json_output:
+        print(MetadataView.to_json(views, show_source=show_source))
+    else:
+        print(MetadataView.to_table(views, show_source=show_source))
 
 
 @app.command("install-emscripten")
