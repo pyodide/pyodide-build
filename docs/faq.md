@@ -44,4 +44,4 @@ pyodide-build requires Python 3.12 or later. The Python version must match the t
 
 ## What's the difference between `pyodide build` and `python -m build`?
 
-`python -m build` is commonly used to invoke [pypa/build](https://build.pypa.io/). `pyodide build` wraps `python -m build`, i.e., `pypa/build`, with a cross-compilation layer. Your build configuration stays the same — pyodide-build intercepts compiler calls and redirects them to Emscripten. See [Concepts](getting-started/concepts.md) for a detailed comparison.
+`python -m build` is commonly used to invoke [pypa/build](https://build.pypa.io/). `pyodide build` wraps `python -m build`, i.e., `pypa/build`, with a cross-compilation layer. Your build configuration stays the same — pyodide-build intercepts compiler calls and redirects them to Emscripten. See [Concepts](explanation/concepts.md) for a detailed comparison.

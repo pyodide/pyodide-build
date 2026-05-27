@@ -43,7 +43,7 @@ Your existing `setup.py`, `pyproject.toml`, `CMakeLists.txt`, or `meson.build` w
 :gutter: 2
 
 :::{grid-item-card} Quick Start
-:link: getting-started/quickstart.html
+:link: tutorials/quickstart.html
 Build your first WebAssembly wheel in 5 minutes.
 :::
 
@@ -53,7 +53,7 @@ Add Pyodide to your existing cibuildwheel CI pipeline.
 :::
 
 :::{grid-item-card} Testing with `pyodide venv`
-:link: getting-started/testing.html
+:link: how-to/testing.html
 Verify your wheel works in a Pyodide environment.
 :::
 
@@ -62,19 +62,10 @@ Verify your wheel works in a Pyodide environment.
 ```{toctree}
 :maxdepth: 2
 :hidden:
-:caption: Getting Started
-
-getting-started/installation
-getting-started/concepts
-getting-started/quickstart
-getting-started/testing
-```
-
-```{toctree}
-:maxdepth: 2
-:hidden:
 :caption: Tutorials
 
+tutorials/installation
+tutorials/quickstart
 tutorials/c-extension
 tutorials/meson
 tutorials/cmake
@@ -88,6 +79,7 @@ tutorials/rust
 
 how-to/cibuildwheel
 how-to/ci-direct
+how-to/testing
 how-to/publishing
 how-to/migrate
 how-to/xbuildenv
@@ -104,6 +96,14 @@ how-to/debugging
 reference/cli
 reference/configuration
 reference/platform
+```
+
+```{toctree}
+:maxdepth: 2
+:hidden:
+:caption: Explanation
+
+explanation/concepts
 explanation/architecture
 ```
 
