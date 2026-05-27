@@ -77,6 +77,8 @@ docs = [
     "sphinx_book_theme>=0.4.0rc1",
     "myst-parser",
     "sphinx-autodoc-typehints>=1.21.7",
+    "sphinx-design",
+    "sphinx-click",
 ]
 
 [tool.hatch.version]
