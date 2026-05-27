@@ -24,6 +24,15 @@ pyodide xbuildenv install --url https://example.com/xbuildenv-0.27.0.tar
 
 # Force install even if version compatibility check fails
 pyodide xbuildenv install --force
+
+# Install the latest nightly release
+pyodide xbuildenv install --nightly
+
+# Install a specific nightly version
+pyodide xbuildenv install 20260520 --nightly
+
+# Install the debug variant of the latest nightly release
+pyodide xbuildenv install --debug
 ```
 
 ## Listing installed versions
@@ -68,8 +77,17 @@ pyodide xbuildenv uninstall 0.29.3
 # Show versions compatible with your Python and pyodide-build
 pyodide xbuildenv search
 
-# Show all available versions
+# Show all available versions (including incompatible ones)
 pyodide xbuildenv search --all
+
+# Search nightly releases
+pyodide xbuildenv search --nightly
+
+# Search nightly debug releases
+pyodide xbuildenv search --debug
+
+# Combine flags: show all nightly and debug releases
+pyodide xbuildenv search --nightly --debug --all
 
 # Output as JSON (useful for scripting)
 pyodide xbuildenv search --json
