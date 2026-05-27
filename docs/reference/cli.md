@@ -28,6 +28,22 @@ pyodide build [OPTIONS] [SOURCE_LOCATION]
 | `--compression-level` | `6` | Zip compression level for the wheel |
 | `--xbuildenv-path` | platform cache | Path to the cross-build environment, inferred from platform cache if not specified |
 
+### Export modes
+
+The `--exports` flag controls which symbols are made visible to the Python runtime when linking a `.so` file:
+
+| Mode | What it exports | When to use |
+|---|---|---|
+| `pyinit` | Only `PyInit_*` functions | Minimal exports; works for standard C extensions that don't need to share symbols. |
+| `requested` | All public symbols from object files | **Default.** Use when other extensions may need to link against your symbols at runtime. |
+| `whole_archive` | Everything, without filtering | Use for shared libraries or when `requested` causes missing symbol errors. Produces larger files. |
+
+You can also pass a comma-separated list of specific symbol names:
+
+```bash
+pyodide build . --exports "my_func1,my_func2"
+```
+
 ## pyodide venv
 
 Create a Pyodide virtual environment for testing.

@@ -62,28 +62,7 @@ Python wheels include a [platform tag](https://packaging.python.org/en/latest/sp
 - `macosx_14_0_arm64` — macOS on Apple Silicon
 - `pyemscripten_2026_0_wasm32` — Emscripten/WebAssembly
 
-The Emscripten platform tag, standardized by [PEP 783](https://peps.python.org/pep-0783/), has the format:
-
-```
-pyemscripten_{year}_{patch}_wasm32
-```
-
-Where `{year}_{patch}` is the platform ABI version (e.g., `2026_0`). This version determines which Emscripten SDK version and CPython build are used. Wheels built for one ABI version are **not** compatible with another.
-
-A complete wheel filename looks like:
-
-```
-numpy-2.2.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl
-       │      │     │           │
-       │      │     │           └── platform tag
-       │      │     └── Python ABI tag
-       │      └── Python version tag
-       └── package version
-```
-
-```{note}
-Older Pyodide versions (before PEP 783) used the tag `pyodide_{year}_{patch}_wasm32`. The `pyemscripten_*` tag is the standardized form going forward.
-```
+The Emscripten platform tag, standardized by [PEP 783](https://peps.python.org/pep-0783/), encodes the platform ABI version, which determines which Emscripten SDK and CPython build are used. Wheels built for one ABI version are **not** compatible with another. See the [Platform Reference](../reference/platform.md) for the tag format, wheel filename structure, and the full compatibility matrix.
 
 ## `pyodide build` vs `python -m build`
 
