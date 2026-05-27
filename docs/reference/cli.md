@@ -103,6 +103,8 @@ pyodide xbuildenv install [OPTIONS] [VERSION]
 | `--path` | `PYODIDE_XBUILDENV_PATH` | Destination directory |
 | `--url` | | Download from a custom URL |
 | `-f`, `--force` | | Force install even if version is incompatible |
+| `--nightly` | | Install a nightly release instead of a stable one |
+| `--debug` | | Install the debug variant of a nightly or stable release, as available |
 
 ### pyodide xbuildenv version
 
@@ -144,6 +146,8 @@ pyodide xbuildenv search [OPTIONS]
 
 | Option | Description |
 |---|---|
-| `--metadata` | Custom metadata file URL or path |
+| `--metadata` | Custom metadata file URL or path (cannot be combined with `--nightly`/`--debug`) |
 | `-a`, `--all` | Show all versions, including incompatible ones |
+| `--nightly` | Search nightly releases instead of stable ones |
+| `--debug` | Search nightly debug releases instead of stable ones |
 | `--json` | Output as JSON |
