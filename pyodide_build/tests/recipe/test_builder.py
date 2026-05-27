@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import tarfile
 import time
 from pathlib import Path
 from typing import Self
@@ -339,3 +340,167 @@ def test_extract_tarballname():
 
     for header, tarballname in zip(headers, tarballnames, strict=True):
         assert _builder._extract_tarballname(url, header) == tarballname
+
+
+class TestInstallToLibraryDir:
+    """Tests for _install_to_library_dir method."""
+
+    def test_copies_distdir_to_library_install_prefix(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+
+        # Create fake artifacts in src_dist_dir
+        builder.src_dist_dir.mkdir(parents=True, exist_ok=True)
+        lib_dir = builder.src_dist_dir / "lib"
+        include_dir = builder.src_dist_dir / "include"
+        lib_dir.mkdir()
+        include_dir.mkdir()
+        (lib_dir / "libtest.a").write_text("fake static lib")
+        (include_dir / "test.h").write_text("fake header")
+
+        builder._install_to_library_dir()
+
+        # Verify artifacts were copied to library_install_prefix
+        assert (builder.library_install_prefix / "lib" / "libtest.a").exists()
+        assert (
+            builder.library_install_prefix / "lib" / "libtest.a"
+        ).read_text() == "fake static lib"
+        assert (builder.library_install_prefix / "include" / "test.h").exists()
+        assert (
+            builder.library_install_prefix / "include" / "test.h"
+        ).read_text() == "fake header"
+
+    def test_noop_when_distdir_missing(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+
+        # src_dist_dir does not exist, should not raise
+        assert not builder.src_dist_dir.exists()
+        builder._install_to_library_dir()
+        assert not builder.library_install_prefix.exists()
+
+    def test_merges_with_existing_library_dir(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+
+        # Pre-populate library_install_prefix with existing artifacts
+        lib_dir = builder.library_install_prefix / "lib"
+        lib_dir.mkdir(parents=True)
+        (lib_dir / "libexisting.a").write_text("existing lib")
+
+        # Create new artifacts in src_dist_dir
+        builder.src_dist_dir.mkdir(parents=True, exist_ok=True)
+        dist_lib_dir = builder.src_dist_dir / "lib"
+        dist_lib_dir.mkdir()
+        (dist_lib_dir / "libtest.a").write_text("new lib")
+
+        builder._install_to_library_dir()
+
+        # Both old and new artifacts should exist
+        assert (
+            builder.library_install_prefix / "lib" / "libexisting.a"
+        ).read_text() == "existing lib"
+        assert (
+            builder.library_install_prefix / "lib" / "libtest.a"
+        ).read_text() == "new lib"
+
+
+class TestCreateLibraryArchive:
+    """Tests for _create_library_archive method."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup_dist_dir(self):
+        dist_dir = RECIPE_DIR / "libtest" / "dist"
+        yield
+        shutil.rmtree(dist_dir, ignore_errors=True)
+
+    def _populate_dist_dir(self, builder):
+        """Set up a dist_dir with typical FHS-structured library artifacts."""
+        builder.dist_dir.mkdir(parents=True, exist_ok=True)
+        lib_dir = builder.dist_dir / "lib"
+        include_dir = builder.dist_dir / "include"
+        pkgconfig_dir = lib_dir / "pkgconfig"
+        lib_dir.mkdir()
+        include_dir.mkdir()
+        pkgconfig_dir.mkdir(parents=True)
+        (lib_dir / "libtest.a").write_text("fake static lib")
+        (include_dir / "test.h").write_text("fake header")
+        (pkgconfig_dir / "test.pc").write_text("Name: test\nVersion: 1.0.0\n")
+
+    def test_creates_tar_gz_archive(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+        self._populate_dist_dir(builder)
+
+        archive_path = builder._create_library_archive()
+
+        assert archive_path is not None
+        assert archive_path.exists()
+        assert archive_path.name == "libtest-1.0.0-wasm32.tar.gz"
+        assert archive_path.parent == builder.dist_dir
+
+    def test_archive_contains_all_artifacts(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+        self._populate_dist_dir(builder)
+
+        archive_path = builder._create_library_archive()
+
+        with tarfile.open(archive_path, "r:gz") as tf:
+            names = {m.name for m in tf.getmembers() if m.isfile()}
+
+        assert "./lib/libtest.a" in names
+        assert "./include/test.h" in names
+        assert "./lib/pkgconfig/test.pc" in names
+
+    def test_returns_none_when_dist_dir_missing(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+
+        assert not builder.dist_dir.exists()
+        assert builder._create_library_archive() is None
+
+    def test_returns_none_when_dist_dir_empty(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+        builder.dist_dir.mkdir(parents=True)
+
+        assert builder._create_library_archive() is None
+
+    def test_archive_is_extractable_with_correct_layout(self, tmp_path):
+        builder = RecipeBuilder.get_builder(
+            recipe=RECIPE_DIR / "libtest",
+            build_args=BuildArgs(),
+            build_dir=tmp_path / "libtest" / "build",
+        )
+        self._populate_dist_dir(builder)
+
+        archive_path = builder._create_library_archive()
+
+        extract_dir = tmp_path / "extracted"
+        shutil.unpack_archive(archive_path, extract_dir)
+
+        assert (extract_dir / "lib" / "libtest.a").read_text() == "fake static lib"
+        assert (extract_dir / "include" / "test.h").read_text() == "fake header"
+        assert (extract_dir / "lib" / "pkgconfig" / "test.pc").exists()

@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from collections.abc import Iterator
 from datetime import datetime
 from email.message import Message
@@ -37,7 +38,6 @@ from pyodide_build.common import (
     _get_sha256_checksum,
     chdir,
     find_matching_wheel,
-    make_zip_archive,
     modify_wheel,
     retag_wheel,
     retrying_rmtree,
@@ -535,6 +535,55 @@ class RecipeBuilder:
             # This normally happens when testing
             logger.warning("stdout/stderr does not have a fileno, not logging to file")
 
+    def _install_to_library_dir(self) -> None:
+        """
+        Copy build artifacts from DISTDIR (src_dist_dir) to WASM_LIBRARY_DIR
+        (library_install_prefix), preserving directory structure.
+
+        This allows library recipes to install to their own per-package dist
+        directory, while pyodide-build automatically copies them to the shared
+        directory so other packages can find headers and libraries.
+        """
+        if not self.src_dist_dir.exists():
+            return
+        self.library_install_prefix.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(
+            self.src_dist_dir,
+            self.library_install_prefix,
+            dirs_exist_ok=True,
+        )
+        logger.info(
+            "Installed library artifacts from %s to %s",
+            str(self.src_dist_dir),
+            str(self.library_install_prefix),
+        )
+
+    def _create_library_archive(self) -> Path | None:
+        """Create a .tar.gz archive of the library artifacts in dist_dir.
+
+        The archive contains the FHS-structured contents of the per-package
+        dist directory (include/, lib/, etc.) and can be distributed
+        independently for downstream consumption.
+
+        Returns the path to the created archive, or None if dist_dir is empty.
+        """
+        if not self.dist_dir.exists() or not any(self.dist_dir.iterdir()):
+            return None
+
+        archive_name = f"{self.fullname}-wasm32"
+        archive_base = self.dist_dir / archive_name
+
+        archive_path = Path(
+            shutil.make_archive(
+                str(archive_base),
+                "gztar",
+                root_dir=self.dist_dir,
+                base_dir=".",
+            )
+        )
+        logger.info("Created library archive: %s", str(archive_path))
+        return archive_path
+
     def _get_helper_vars(self) -> dict[str, str]:
         """
         Get the helper variables for the build script.
@@ -694,6 +743,12 @@ class RecipeBuilderStaticLibrary(RecipeBuilder):
             cwd=self.src_extract_dir,
         )
 
+        self._install_to_library_dir()
+
+        shutil.rmtree(self.dist_dir, ignore_errors=True)
+        shutil.copytree(self.src_dist_dir, self.dist_dir, dirs_exist_ok=True)
+        self._create_library_archive()
+
 
 class RecipeBuilderSharedLibrary(RecipeBuilder):
     """
@@ -707,11 +762,20 @@ class RecipeBuilderSharedLibrary(RecipeBuilder):
             cwd=self.src_extract_dir,
         )
 
-        # copy .so files to dist_dir
-        # and create a zip archive of the .so files
+        self._install_to_library_dir()
+
         shutil.rmtree(self.dist_dir, ignore_errors=True)
-        self.dist_dir.mkdir(parents=True)
-        make_zip_archive(self.dist_dir / f"{self.fullname}.zip", self.src_dist_dir)
+        shutil.copytree(self.src_dist_dir, self.dist_dir, dirs_exist_ok=True)
+
+        # Create a zip of .so files (flattened) for Pyodide runtime loading
+        so_files = list(self.src_dist_dir.rglob("*.so"))
+        if so_files:
+            zip_path = self.dist_dir / f"{self.fullname}.zip"
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                for so_file in so_files:
+                    zf.write(so_file, so_file.name)
+
+        self._create_library_archive()
 
 
 @cache
