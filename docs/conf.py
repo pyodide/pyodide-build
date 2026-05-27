@@ -75,6 +75,10 @@ class PyodideCLIReference(SphinxDirective):
     to pyodide-build, to automatically generate CLI reference documentation.
     """
 
+    # Recipe-related commands are intentionally excluded: they are not relevant
+    # to most users building out-of-tree packages.
+    _EXCLUDE = {"build-recipes", "build-recipes-no-deps", "skeleton"}
+
     def run(self) -> list[nodes.Node]:
         entry_points = sorted(
             (
@@ -82,6 +86,7 @@ class PyodideCLIReference(SphinxDirective):
                 for entry_point in importlib_metadata.entry_points(group="pyodide.cli")
                 if entry_point.dist is not None
                 and entry_point.dist.name == "pyodide-build"
+                and entry_point.name not in self._EXCLUDE
             ),
             key=lambda ep: ep.name,
         )
