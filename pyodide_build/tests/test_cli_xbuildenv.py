@@ -567,7 +567,6 @@ def fake_nightly_debug_metadata(tmp_path):
 
 def test_xbuildenv_search_nightly(
     tmp_path,
-    fake_xbuildenv_releases_compatible,
     fake_nightly_release_metadata,
     monkeypatch,
 ):
@@ -580,8 +579,6 @@ def test_xbuildenv_search_nightly(
         xbuildenv.app,
         [
             "search",
-            "--metadata",
-            str(fake_xbuildenv_releases_compatible),
             "--nightly",
             "--all",
         ],
@@ -612,7 +609,6 @@ def test_xbuildenv_search_nightly(
 
 def test_xbuildenv_search_debug(
     tmp_path,
-    fake_xbuildenv_releases_compatible,
     fake_nightly_debug_metadata,
     monkeypatch,
 ):
@@ -625,8 +621,6 @@ def test_xbuildenv_search_debug(
         xbuildenv.app,
         [
             "search",
-            "--metadata",
-            str(fake_xbuildenv_releases_compatible),
             "--debug",
             "--all",
         ],
@@ -645,7 +639,6 @@ def test_xbuildenv_search_debug(
 
 def test_xbuildenv_search_nightly_json(
     tmp_path,
-    fake_xbuildenv_releases_compatible,
     fake_nightly_release_metadata,
     fake_nightly_debug_metadata,
     monkeypatch,
@@ -663,8 +656,6 @@ def test_xbuildenv_search_nightly_json(
         xbuildenv.app,
         [
             "search",
-            "--metadata",
-            str(fake_xbuildenv_releases_compatible),
             "--nightly",
             "--debug",
             "--all",
