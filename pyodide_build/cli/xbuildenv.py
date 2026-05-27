@@ -270,32 +270,29 @@ def _search(
             ),
         )
 
-    views = []
-
-    # Stable releases (only when neither --nightly nor --debug is passed)
-    if not (nightly or debug):
+    if nightly or debug:
+        # Nightly and/or debug releases (mutually exclusive with stable)
+        sources = []
+        if nightly:
+            sources.append(("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL))
+        if debug:
+            sources.append(
+                ("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)
+            )
+        views = [
+            _make_view(r, source)
+            for source, url in sources
+            for r in load_cross_build_env_metadata(url).releases.values()
+            if show_all or r.is_compatible(**_compat_kwargs())
+        ]
+    else:
+        # Stable releases
         stable_metadata = load_cross_build_env_metadata(
             metadata_path or cross_build_env_metadata_url()
         )
         views = [
             _make_view(r, "stable")
             for r in stable_metadata.list_compatible_releases(**_compat_kwargs())
-        ]
-
-    # Nightly and/or debug releases
-    extra_sources = []
-    if nightly:
-        extra_sources.append(("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL))
-    if debug:
-        extra_sources.append(
-            ("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)
-        )
-    for source, url in extra_sources:
-        nightly_metadata = load_cross_build_env_metadata(url)
-        views += [
-            _make_view(r, source)
-            for r in nightly_metadata.releases.values()
-            if show_all or r.is_compatible(**_compat_kwargs())
         ]
 
     if not views:
