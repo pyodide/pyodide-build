@@ -183,6 +183,88 @@ def test_xbuildenv_install_force_install(
     os.environ.pop(CROSS_BUILD_ENV_METADATA_URL_ENV_VAR, None)
 
 
+def test_xbuildenv_install_nightly(tmp_path, mock_xbuildenv_url, monkeypatch):
+    """Installing with --nightly uses the nightly metadata URL, not stable."""
+    from pyodide_build import build_env
+
+    envpath = Path(tmp_path) / ".xbuildenv"
+    local = build_env.local_versions()
+
+    nightly_data = {
+        "releases": {
+            "20260520": {
+                "version": "20260520",
+                "url": mock_xbuildenv_url,
+                "sha256": None,
+                "python_version": f"{local['python']}.0",
+                "emscripten_version": "5.0.3",
+                "published_at": "2026-05-20T04:40:12Z",
+                "min_pyodide_build_version": None,
+                "max_pyodide_build_version": None,
+            }
+        }
+    }
+    metadata_path = tmp_path / "nightly.json"
+    metadata_path.write_text(json.dumps(nightly_data))
+
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.NIGHTLY_CROSS_BUILD_ENV_METADATA_URL",
+        str(metadata_path),
+    )
+
+    result = runner.invoke(
+        xbuildenv.app,
+        ["install", "20260520", "--path", str(envpath), "--nightly"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Pyodide cross-build environment installed at" in result.output
+    assert str(envpath.resolve()) in result.output
+    assert (envpath / "xbuildenv").is_symlink()
+    assert (envpath / "20260520").exists()
+
+
+def test_xbuildenv_install_debug(tmp_path, mock_xbuildenv_url, monkeypatch):
+    """Installing with --debug uses the nightly-debug metadata URL, not stable."""
+    from pyodide_build import build_env
+
+    envpath = Path(tmp_path) / ".xbuildenv"
+    local = build_env.local_versions()
+
+    debug_data = {
+        "releases": {
+            "20260520": {
+                "version": "20260520",
+                "url": mock_xbuildenv_url,
+                "sha256": None,
+                "python_version": f"{local['python']}.0",
+                "emscripten_version": "5.0.3",
+                "published_at": "2026-05-20T04:40:12Z",
+                "min_pyodide_build_version": None,
+                "max_pyodide_build_version": None,
+            }
+        }
+    }
+    metadata_path = tmp_path / "nightly-debug.json"
+    metadata_path.write_text(json.dumps(debug_data))
+
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL",
+        str(metadata_path),
+    )
+
+    result = runner.invoke(
+        xbuildenv.app,
+        ["install", "20260520", "--path", str(envpath), "--debug"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Pyodide cross-build environment installed at" in result.output
+    assert str(envpath.resolve()) in result.output
+    assert (envpath / "xbuildenv").is_symlink()
+    assert (envpath / "20260520").exists()
+
+
 def test_xbuildenv_version(tmp_path):
     envpath = Path(tmp_path) / ".xbuildenv"
 
