@@ -1,4 +1,5 @@
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -659,7 +660,10 @@ def test_build_cpython_module(tmp_path, dummy_xbuildenv, mock_emscripten):
     results = list(dist_dir.glob("*.whl"))
     assert len(results) == 1
     result = results[0]
-    assert result.name == "pydecimal-1.0.0-cp312-cp312-pyemscripten_2024_0_wasm32.whl"
+    pyver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    assert (
+        result.name == f"pydecimal-1.0.0-{pyver}-{pyver}-pyemscripten_2025_0_wasm32.whl"
+    )
 
 
 def test_wheel_download_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten):

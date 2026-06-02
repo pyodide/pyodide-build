@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Self
@@ -8,7 +9,7 @@ import pydantic
 import pytest
 
 from pyodide_build import common
-from pyodide_build.build_env import BuildArgs, get_build_flag
+from pyodide_build.build_env import BuildArgs, get_build_flag, pyodide_tags
 from pyodide_build.recipe import builder as _builder
 from pyodide_build.recipe.builder import (
     RecipeBuilder,
@@ -218,12 +219,14 @@ def test_needs_rebuild(tmpdir, is_wheel):
     if is_wheel:
         dist_dir = pkg_root / "dist"
         dist_dir.mkdir()
+        platform = next(iter(pyodide_tags())).platform
+        pyver = f"cp{sys.version_info.major}{sys.version_info.minor}"
         # Build of current version with wrong abi
-        (dist_dir / "regex-12-cp311-cp311-pyemscripten_2024_0_wasm32.whl").touch()
+        (dist_dir / f"regex-12-cp311-cp311-{platform}.whl").touch()
         # Build of old version with current abi
-        (dist_dir / "regex-11-cp312-cp312-pyemscripten_2024_0_wasm32.whl").touch()
+        (dist_dir / f"regex-11-{pyver}-{pyver}-{platform}.whl").touch()
         # the version we're trying to build
-        packaged = dist_dir / "regex-12-cp312-cp312-pyemscripten_2024_0_wasm32.whl"
+        packaged = dist_dir / f"regex-12-{pyver}-{pyver}-{platform}.whl"
     else:
         packaged = buildpath / ".packaged"
 
