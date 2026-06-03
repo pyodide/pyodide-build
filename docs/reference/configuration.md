@@ -29,17 +29,15 @@ These keys can be set in `pyproject.toml` under `[tool.pyodide.build]` or via en
 
 | pyproject.toml key | Env variable | Description |
 |---|---|---|
-| `cflags` | `SIDE_MODULE_CFLAGS` | C compiler flags |
-| `cxxflags` | `SIDE_MODULE_CXXFLAGS` | C++ compiler flags |
-| `ldflags` | `SIDE_MODULE_LDFLAGS` | Linker flags |
+| `cflags` | `CFLAGS` | C compiler flags |
+| `cxxflags` | `CXXFLAGS` | C++ compiler flags |
+| `ldflags` | `LDFLAGS` | Linker flags |
 | `rustflags` | `RUSTFLAGS` | Rust compiler flags |
 | `rust_toolchain` | `RUST_TOOLCHAIN` | Required Rust nightly toolchain |
-| `rust_emscripten_target_url` | `RUST_EMSCRIPTEN_TARGET_URL` | URL for the Rust Emscripten target |
 | `meson_cross_file` | `MESON_CROSS_FILE` | Path to the Meson cross file |
 | `xbuildenv_path` | `PYODIDE_XBUILDENV_PATH` | Path to the cross-build environment |
 | `ignored_build_requirements` | `IGNORED_BUILD_REQUIREMENTS` | Space-separated PEP 508 build requirements to ignore |
 | `skip_emscripten_version_check` | `SKIP_EMSCRIPTEN_VERSION_CHECK` | Skip Emscripten version compatibility check (`0`/`1`) |
-| `build_dependency_index_url` | `BUILD_DEPENDENCY_INDEX_URL` | PyPI index URL for host-side build dependencies |
 | `default_cross_build_env_url` | `DEFAULT_CROSS_BUILD_ENV_URL` | URL override for the cross-build environment archive |
 | `use_legacy_platform` | `USE_LEGACY_PLATFORM` | Use the legacy `pyodide_*` platform tag instead of `pyemscripten_*` (`0`/`1`) |
 
