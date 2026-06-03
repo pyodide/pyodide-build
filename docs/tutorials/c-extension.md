@@ -119,4 +119,4 @@ No special configuration is needed for Cython. Just run `pyodide build .` as usu
 - [How pyodide-build Works](../explanation/architecture.md) — how the compiler wrapper handles your build
 - [Customizing Compiler Flags](../how-to/compiler-flags.md) — fine-tuning the build
 - [Debugging Build Failures](../how-to/debugging.md) — common error messages and systematic troubleshooting
-- [CLI Reference — Export modes](../reference/cli.md#export-modes) — controlling which symbols are exported (`--exports`)
+- [CLI Reference — Export modes](../reference/cli.md) — controlling which symbols are exported (`--exports`)
