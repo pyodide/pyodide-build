@@ -261,7 +261,13 @@ DEFAULT_PATH = default_xbuildenv_path()
     default="requested",
     envvar="PYODIDE_BUILD_EXPORTS",
     show_envvar=True,
-    help="Which symbols should be exported when linking .so files?",
+    help=(
+        "Which symbols to export when linking .so files. "
+        "Choices: 'pyinit' (only PyInit_<module>), "
+        "'requested' (default, symbols requested by the build system), "
+        "'whole_archive' (all symbols from all archives), "
+        "or a comma-separated list of symbol names."
+    ),
 )
 @click.option(
     "--build-dependencies/--no-build-dependencies",
