@@ -61,12 +61,12 @@ pip install dist/your_package-*.whl
 python -c "import your_package; print('it works!')"
 ```
 
-See [Testing with `pyodide venv`](testing.md) for a full walkthrough.
+See [Testing with `pyodide venv`](../how-to/testing.md) for a full walkthrough.
 
 ## What's next?
 
-- [Testing with `pyodide venv`](testing.md) — verify your wheel in a Pyodide environment
+- [Testing with `pyodide venv`](../how-to/testing.md) — verify your wheel in a Pyodide environment
 - [CI with cibuildwheel](../how-to/cibuildwheel.md) — automate Pyodide builds in CI
-- [Tutorial: Meson Package](../tutorials/meson.md) — building packages with Meson
-- [Tutorial: CMake Package](../tutorials/cmake.md) — building packages with CMake
-- [Tutorial: Rust Package](../tutorials/rust.md) — building packages with Rust/PyO3 extensions
+- [Tutorial: Meson Package](meson.md) — building packages with Meson
+- [Tutorial: CMake Package](cmake.md) — building packages with CMake
+- [Tutorial: Rust Package](rust.md) — building packages with Rust/PyO3 extensions

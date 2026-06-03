@@ -61,3 +61,20 @@ pyodide config get rust_toolchain
 ```
 
 See the [CLI Reference](cli.md) for details.
+
+(flags-automatically-filtered)=
+## Flags automatically filtered
+
+pyodide-build's compiler wrapper automatically removes flags that are incompatible with Emscripten/WebAssembly.
+The following is a non-exhaustive list; if you find a flag that is incorrectly filtered or should be filtered but is not, please [open an issue](https://github.com/pyodide/pyodide-build/issues).
+
+| Filtered flag | Reason |
+|---|---|
+| `-pthread` | Threading is not supported |
+| `-bundle`, `-undefined dynamic_lookup` | macOS-specific linker flags |
+| `-mpopcnt`, `-mno-sse2`, `-mno-avx2` | x86 SIMD flags (not applicable to Wasm) |
+| `-Bsymbolic-functions` | GCC-specific flag not supported by Clang |
+| `-fstack-protector` | Not supported in Emscripten |
+| `-L/usr/*` | System library paths (not valid for cross-compilation) |
+
+These flags are stripped silently — you do not need to remove them from your build scripts.
