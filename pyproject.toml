@@ -37,7 +37,7 @@ content-type = "text/markdown"
 [project.urls]
 Homepage = "https://github.com/pyodide/pyodide-build"
 "Bug Tracker" = "https://github.com/pyodide/pyodide-build/issues"
-Documentation = "https://pyodide.org/en/stable/"
+Documentation = "https://pyodide-build.readthedocs.io"
 
 [project.entry-points."pipx.run"]
 pyodide = "pyodide_cli.__main__:main"
