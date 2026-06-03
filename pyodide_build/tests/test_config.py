@@ -87,7 +87,11 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert "pythoninclude" in makefile_vars
 
         default_config = config_manager._load_default_config()
+        # Skip rust-related flags that pyodide >= 0.28.0 provides in their Makefile.envs
+        skip_keys = {"rustflags", "rust_toolchain", "rust_emscripten_target_url"}
         for key in default_config:
+            if key in skip_keys:
+                continue
             assert key not in makefile_vars
 
     def test_get_make_environment_vars(
