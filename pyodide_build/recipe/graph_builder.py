@@ -904,7 +904,7 @@ def generate_lockfile(
         "arch": arch,
         "platform": platform,
         "version": build_env.get_build_flag("PYODIDE_VERSION"),
-        "python": sys.version.partition(" ")[0],
+        "python": build_env.get_build_flag("PYVERSION"),
         "abi_version": build_env.get_build_flag("PYODIDE_ABI_VERSION"),
     }
     packages = generate_packagedata(output_dir, pkg_map)
