@@ -86,8 +86,8 @@ pyodide-build/
 python -m venv .venv
 source .venv/bin/activate
 
-# Install in editable mode with test and resolve dependencies
-pip install -e ".[test,resolve]"
+# Install in editable mode with test dependencies
+pip install -e ".[test]"
 
 # Run unit tests (excludes integration tests)
 pytest pyodide_build -m "not integration"

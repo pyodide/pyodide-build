@@ -54,10 +54,6 @@ config = "pyodide_build.cli.config:app"
 xbuildenv = "pyodide_build.cli.xbuildenv:app"
 
 [project.optional-dependencies]
-resolve = [
-    "resolvelib",
-    "unearth~=0.6",
-]
 uv = [
   "build[uv]>=1.4,<1.6,!=1.4.4",
 ]
@@ -125,14 +121,11 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = [
   "loky",
-  "resolvelib",
   "ruamel.yaml",
   "termcolor",
   "test",
   "tomli",
   "tomllib",
-  "unearth",
-  "unearth.*",
   "virtualenv>=20.31.2",
   "auditwheel_emscripten.*"
 ]
