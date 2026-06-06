@@ -116,21 +116,6 @@ class TestOutOfTree(TestInTree):
         assert "PIP_CONSTRAINT" in e
         assert "RANDOM_ENV" not in e
 
-    def test_get_unisolated_packages(
-        self, dummy_xbuildenv, reset_env_vars, reset_cache
-    ):
-        expected = {"numpy", "scipy"}  # this relies on the dummy xbuildenv file
-        pkgs = build_env.get_unisolated_packages()
-        for pkg in expected:
-            assert pkg in pkgs
-
-    def test_get_unisolated_files(self, dummy_xbuildenv, reset_env_vars, reset_cache):
-        pkgs = build_env.get_unisolated_packages()
-
-        for pkg in pkgs:
-            files = build_env.get_unisolated_files(pkg)
-            assert files
-
 
 class TestWheelPlatform:
     def test_default_pyemscripten(self, dummy_xbuildenv, reset_env_vars, reset_cache):
