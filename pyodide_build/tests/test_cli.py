@@ -440,6 +440,7 @@ def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
         backend_flags: Any,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ) -> str:
         results["srcdir"] = srcdir
         results["outdir"] = outdir
@@ -521,6 +522,7 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
         backend_flags,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         nonlocal exports_
         exports_ = exports
@@ -576,6 +578,7 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         nonlocal config_settings_passed
         config_settings_passed = config_settings
@@ -757,6 +760,7 @@ def test_build_isolation_flags(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -819,6 +823,7 @@ def test_build_skip_dependency_check(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -882,6 +887,7 @@ def test_build_combined_flags(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
