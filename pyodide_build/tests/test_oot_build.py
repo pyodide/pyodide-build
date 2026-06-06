@@ -43,34 +43,54 @@ def test_non_platformed_build(dummy_xbuildenv, fake_pkg):
 @pytest.mark.parametrize("verbosity", [0, 1, 2])
 def test_build_verbosity_output(dummy_xbuildenv, fake_pkg, capfd, verbosity):
     """
-    This test checks for two things:
+    This test checks that the stderr output at each verbosity level is correct.
     1. Building at any verbosity level from 0 to 2 must succeed in producing a wheel,
        and show the expected pypa/build step messages (like "Building wheel...") on stderr.
-    2. At verbosity level 1 or higher, the backend subprocess command lines, i.e., the
-       pyproject_hook invocations that are printed with a "> " prefix to stderr, should
-       appear. At verbosity 0, they should not.
+    2.a. At verbosity level 1 or higher, the backend subprocess command lines (i.e., the
+       PEP 517 pyproject_hook invocations) and the installer commands should appear and be
+       printed as a "> cmd" prefix to stderr.
+    2.b. The output from the installer should appear as "< output" lines.
+    3. At build verbosity level 2 or higher, the installer command should include the "-v" flag
+    that pypa/build
+       passes along to the installer. See:
+       - _UvBackend: https://github.com/pypa/build/blob/615d04cfc52ac3c1592a463f0afe484fee1cc368/src/build/env.py#L418-L419
+       - _PipBackend: https://github.com/pypa/build/blob/dcfa865c7150426e01eccc494dc22a55849ecad2/src/build/env.py#L352-L353
+    4. At verbosity 0, nothing should happen, except for the step messages from point 1.
     """
     dst = fake_pkg / "dist"
     build.run(fake_pkg, dst, "pyinit", {}, verbosity=verbosity)
     captured = capfd.readouterr()
     err = captured.err
+    stderr_lines = err.splitlines()
 
     wheels = list(dst.glob("*.whl"))
     assert len(wheels) == 1, "build must produce a wheel at every verbosity level"
 
+    # Both step messages must appear at every verbosity level.
+    assert "Getting build dependencies for wheel" in err, (
+        f"Expected 'Getting build dependencies for wheel' at verbosity={verbosity}"
+    )
     assert "Building wheel" in err, (
         f"Expected 'Building wheel' step message at verbosity={verbosity}"
     )
 
-    # The pyproject_hooks invocation is printed with "> " prefix to stderr only
-    # when verbosity >= 1 (mirrors pypa/build's "> cmd" formatting).
+    cmd_lines = [line for line in stderr_lines if line.startswith("> ")]
+    out_lines = [line for line in stderr_lines if line.startswith("< ")]
+
     if verbosity >= 1:
-        assert "> " in err, (
-            f"Expected '> cmd' backend call line on stderr at verbosity={verbosity}"
-        )
+        # Both PEP 517 hooks must appear
+        assert any("get_requires_for_build_wheel" in line for line in cmd_lines)
+        assert any("build_wheel" in line for line in cmd_lines)
+        # Installer command must appear
+        assert any("pip" in line or "uv" in line for line in cmd_lines)
+        # Output from the installer must appear
+        assert out_lines
+    # At zero verbosity, nothing should appear except the step messages (which we check above).
     else:
-        # At verbosity=0, no subprocess command lines should appear on stderr
-        # (step messages appear, but not the "> cmd" prefix lines)
-        assert not any(line.startswith("> ") for line in err.splitlines()), (
-            "Did not expect '> cmd' lines on stderr at 0 verbosity"
+        assert not cmd_lines
+        assert not out_lines
+
+    if verbosity >= 2:
+        assert any(
+            ("-v" in line) and ("pip" in line or "uv" in line) for line in cmd_lines
         )
