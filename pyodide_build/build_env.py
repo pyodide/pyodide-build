@@ -258,7 +258,7 @@ def get_unisolated_packages() -> dict[str, str]:
 
 def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
     """
-    Get a list of unisolated files for a package.
+    Get an unisolated package's cross-build files.
 
     Parameters
     ----------
@@ -268,6 +268,7 @@ def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
     Returns
     -------
     A tuple of the package directory and a list of file paths relative to the package directory.
+
     """
     PYODIDE_ROOT = get_pyodide_root()
 
