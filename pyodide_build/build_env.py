@@ -242,7 +242,14 @@ def get_unisolated_packages() -> dict[str, str]:
         unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
 
         for line in unisolated_packages_file.read_text().splitlines():
-            name, version = line.split("==")
+            line = line.strip()
+            # The xbuildenv requirements.txt is machine-generated and always
+            # uses pinned name==version entries, but we skip blank lines,
+            # comments, and any non-pinned specs just in case. Shouldn't
+            # really happen though.
+            if not line or line.startswith("#") or "==" not in line:
+                continue
+            name, version = line.split("==", 1)
             unisolated_packages[name] = version
     else:
         from pyodide_build.recipe.loader import load_all_recipes
