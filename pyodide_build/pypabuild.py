@@ -147,6 +147,8 @@ def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
     unisolated
         The set of unisolated packages.
     """
+    if not unisolated:
+        return
     _, _, purelib = _find_executable_and_scripts(venv_path)
     sitepackagesdir = Path(purelib)
     for name in unisolated:
