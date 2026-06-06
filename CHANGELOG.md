@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.34.5] - 2026/05/20
+## [0.35.0] - 2026/XX/XX
 
 ### Added
 
@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `--debug` flags to search and install nightly and nightly-debug cross-build
   environments respectively.
   [#350](https://github.com/pyodide/pyodide-build/pull/350)
+
+- `pyodide build` now accepts `-v`/`--verbose` flags (stackable twice up to `-vv`)
+  to increase build verbosity. At `-v`, installer commands and
+  backend hook invocations are shown. At `-vv`, the package installers (`uv`/`pip`)
+  additionally receive a `-v` flag for detailed package resolution output.
+  [#363](https://github.com/pyodide/pyodide-build/pull/363)
 
 ## [0.34.4] - 2026/05/15
 
