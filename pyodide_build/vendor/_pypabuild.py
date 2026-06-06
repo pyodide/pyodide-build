@@ -135,16 +135,14 @@ def _handle_build_error() -> Iterator[None]:
         _error(str(e))
 
 
-def _get_venv_paths(path: str) -> dict[str, str]:
+# Vendored from pypa/build v1.5.0. See source at:
+# https://github.com/pypa/build/blob/615d04cfc52ac3c1592a463f0afe484fee1cc368/src/build/env.py#L461-L501
+def _find_executable_and_scripts(path: str) -> tuple[str, str, str]:
     """
-    Find the sysconfig paths for a virtual environment.
+    Detect the Python executable and script folder of a virtual environment.
 
-    Copied from pypabuild (https://github.com/pypa/build/blob/562907e605c3becb135ac52b6eb2aa939e84bdda/src/build/env.py#L326)
-
-    Parameters
-    ----------
-    path
-        The root path of the virtual environment
+    :param path: The location of the virtual environment
+    :return: The Python executable, script folder, and purelib folder
     """
     config_vars = (
         sysconfig.get_config_vars().copy()
@@ -158,7 +156,7 @@ def _get_venv_paths(path: str) -> dict[str, str]:
         # The distributors are encouraged to set a "venv" scheme to be used for this.
         # See https://bugs.python.org/issue45413
         # and https://github.com/pypa/virtualenv/issues/2208
-        paths = sysconfig.get_paths(scheme="venv", vars=config_vars)
+        paths = sysconfig.get_paths(scheme="venv", vars=config_vars)  # pragma: no cover
     elif "posix_local" in scheme_names:
         # The Python that ships on Debian/Ubuntu varies the default scheme to
         # install to /usr/local
@@ -176,4 +174,11 @@ def _get_venv_paths(path: str) -> dict[str, str]:
     else:
         paths = sysconfig.get_paths(vars=config_vars)
 
-    return paths
+    executable = os.path.join(
+        paths["scripts"], "python.exe" if os.name == "nt" else "python"
+    )
+    if not os.path.exists(executable):
+        msg = f"Virtual environment creation failed, executable {executable} missing"
+        raise RuntimeError(msg)
+
+    return executable, paths["scripts"], paths["purelib"]
