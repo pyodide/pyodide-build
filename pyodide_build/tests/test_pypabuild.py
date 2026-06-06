@@ -1,4 +1,15 @@
+import subprocess
+
+import pytest
+from build import BuildBackendException, BuildException, FailedProcessError
+
 from pyodide_build import pypabuild, pywasmcross
+from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
+from pyodide_build.vendor._pypabuild import (
+    _find_called_process_error,
+    _handle_build_error,
+    _log_subprocess_output,
+)
 
 
 class MockIsolatedEnv:
@@ -18,21 +29,21 @@ def test_remove_avoided_requirements():
     ) == {"baz"}
 
 
-def test_install_reqs(tmp_path):
+def test_install_reqs(tmp_path, dummy_xbuildenv):
     env = MockIsolatedEnv(tmp_path)
 
     reqs = {"foo", "bar", "baz"}
 
-    pypabuild.install_reqs(env, reqs)  # type: ignore[arg-type]
+    pypabuild.install_reqs({}, env, reqs)  # type: ignore[arg-type]
     for req in reqs:
         assert req in env.installed
 
-    pypabuild.install_reqs(env, set(pypabuild.AVOIDED_REQUIREMENTS))  # type: ignore[arg-type]
-    for req in pypabuild.AVOIDED_REQUIREMENTS:
+    pypabuild.install_reqs({}, env, set(BASE_IGNORED_REQUIREMENTS))  # type: ignore[arg-type]
+    for req in BASE_IGNORED_REQUIREMENTS:
         assert req not in env.installed
 
 
-def test_make_command_wrapper_symlinks(tmp_path):
+def test_make_command_wrapper_symlinks(tmp_path, dummy_xbuildenv):
     symlink_dir = tmp_path
     env = pypabuild.make_command_wrapper_symlinks(symlink_dir)
 
@@ -77,6 +88,7 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         ldflags="",
         target_install_dir=str(tmp_path),
         exports="pyinit",
+        build_dir=tmp_path,
     )
 
     with build_env_ctx as env:
@@ -95,7 +107,6 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "cxxflags" in wasmcross_args
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
-        assert "builddir" in wasmcross_args
 
 
 def test_replace_unisolated_packages():
@@ -143,3 +154,87 @@ def test_replace_unisoloated_packages_oldest_supported_numpy():
     )
     assert new_requires == {"numpy==1.20"}
     assert replaced == {"numpy"}
+
+
+def _make_cpe(
+    stdout: str | bytes | None = None, stderr: str | bytes | None = None
+) -> subprocess.CalledProcessError:
+    exc = subprocess.CalledProcessError(1, ["pip", "install", "bad-pkg"])
+    exc.stdout = stdout
+    exc.stderr = stderr
+    return exc
+
+
+class TestFindCalledProcessError:
+    def test_direct_called_process_error(self):
+        cpe = _make_cpe()
+        assert _find_called_process_error(cpe) is cpe
+
+    def test_wrapped_in_failed_process_error(self):
+        cpe = _make_cpe()
+        fpe = FailedProcessError(cpe, "install failed")
+        assert _find_called_process_error(fpe) is cpe
+
+    def test_wrapped_in_build_backend_exception(self):
+        cpe = _make_cpe()
+        bbe = BuildBackendException(cpe)
+        assert _find_called_process_error(bbe) is cpe
+
+    def test_unrelated_exception(self):
+        assert _find_called_process_error(RuntimeError("boom")) is None
+
+    def test_build_exception_without_inner(self):
+        assert _find_called_process_error(BuildException("bad")) is None
+
+
+class TestLogSubprocessOutput:
+    def test_logs_str_output(self, capsys):
+        cpe = _make_cpe(stdout="pkg not found\n", stderr="ERROR: no match\n")
+        _log_subprocess_output(cpe)
+        captured = capsys.readouterr().out
+        assert "pkg not found" in captured
+        assert "ERROR: no match" in captured
+        assert "stdout:" in captured
+        assert "stderr:" in captured
+
+    def test_logs_bytes_output(self, capsys):
+        cpe = _make_cpe(stdout=b"bytes stdout\n", stderr=b"bytes stderr\n")
+        _log_subprocess_output(cpe)
+        captured = capsys.readouterr().out
+        assert "bytes stdout" in captured
+        assert "bytes stderr" in captured
+
+    def test_no_output(self, capsys):
+        cpe = _make_cpe()
+        _log_subprocess_output(cpe)
+        captured = capsys.readouterr().out
+        assert captured == ""
+
+
+class TestHandleBuildErrorSubprocessOutput:
+    def test_called_process_error_surfaces_output(self, capsys):
+        with pytest.raises(SystemExit):
+            with _handle_build_error():
+                raise _make_cpe(
+                    stdout="Collecting bad-pkg\n",
+                    stderr="ERROR: No matching distribution found for bad-pkg\n",
+                )
+        captured = capsys.readouterr()
+        assert "Collecting bad-pkg" in captured.out
+        assert "No matching distribution found for bad-pkg" in captured.out
+
+    def test_failed_process_error_surfaces_output(self, capsys):
+        cpe = _make_cpe(stderr="pip resolution failed\n")
+        with pytest.raises(SystemExit):
+            with _handle_build_error():
+                raise FailedProcessError(cpe, "Failed to install deps")
+        captured = capsys.readouterr()
+        assert "pip resolution failed" in captured.out
+
+    def test_build_backend_exception_with_cpe_surfaces_output(self, capsys):
+        cpe = _make_cpe(stderr="backend install error\n")
+        with pytest.raises(SystemExit):
+            with _handle_build_error():
+                raise BuildBackendException(cpe)
+        captured = capsys.readouterr()
+        assert "backend install error" in captured.out

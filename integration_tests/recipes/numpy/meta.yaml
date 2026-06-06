@@ -1,13 +1,13 @@
 package:
   name: numpy
-  version: 1.26.4
+  version: 2.2.3
   tag:
     - min-scipy-stack
   top-level:
     - numpy
 source:
-  url: https://files.pythonhosted.org/packages/65/6e/09db70a523a96d25e115e71cc56a6f9031e7b8cd166c1ac8438307c14058/numpy-1.26.4.tar.gz
-  sha256: 2a02aba9ed12e4ac4eb3ea9421c420301a0c6460d9830d74a9df87efa4912010
+  url: https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.2.3.tar.gz
+  sha256: dbdc15f0c81611925f382dfa97b3bd0bc2c1ce19d4fe50482cb0ddc12ba30020
 
 build:
   # numpy uses vendored meson, so we need to pass the cross file manually
@@ -22,9 +22,9 @@ build:
     -Wno-return-type
   cross-build-env: true
   cross-build-files:
-    - numpy/core/include/numpy/numpyconfig.h
-    - numpy/core/include/numpy/_numpyconfig.h
-    - numpy/core/lib/libnpymath.a
+    - numpy/_core/include/numpy/numpyconfig.h
+    - numpy/_core/include/numpy/_numpyconfig.h
+    - numpy/_core/lib/libnpymath.a
     - numpy/random/lib/libnpyrandom.a
 about:
   home: https://www.numpy.org

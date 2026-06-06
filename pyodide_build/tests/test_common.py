@@ -1,15 +1,19 @@
 import zipfile
+from pathlib import Path
 
 import pytest
 
 from pyodide_build.common import (
+    IS_WIN,
     check_wasm_magic_number,
+    default_xbuildenv_path,
     environment_substitute_args,
     extract_wheel_metadata_file,
     find_missing_executables,
     make_zip_archive,
     parse_top_level_import_name,
     repack_zip_archive,
+    xbuildenv_dirname,
 )
 
 
@@ -61,12 +65,15 @@ def test_environment_var_substitution(monkeypatch):
             "ldflags": '"-l$(PYODIDE_BASE)"',
             "cxxflags": "$(BOB)",
             "cflags": "$(FRED)",
+            "test_var": "$(BOB)$(UNDEFINED_VAR)",
         }
     )
     assert (
         args["cflags"] == "Frederick F. Freddertson Esq."
         and args["cxxflags"] == "Robert Mc Roberts"
         and args["ldflags"] == '"-lpyodide_build_dir"'
+        # Emulate expanding undefined variables to empty strings.
+        and args["test_var"] == "Robert Mc Roberts"
     )
 
 
@@ -153,3 +160,106 @@ def test_check_wasm_magic_number(tmp_path):
 
     (tmp_path / "badfile.so").write_bytes(not_wasm_magic_number)
     assert check_wasm_magic_number(tmp_path / "badfile.so") is False
+
+
+def test_default_xbuildenv_path(tmp_path, reset_cache):
+    import platformdirs
+
+    dirname = xbuildenv_dirname()
+
+    assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
+
+
+def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
+    import os
+    import sys
+
+    import platformdirs
+
+    if sys.platform != "linux":
+        pytest.skip("Test only runs on Linux")
+
+    os.environ.pop("XDG_CACHE_HOME", None)
+
+    dirname = xbuildenv_dirname()
+
+    assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
+
+    reset_cache()
+
+    os.environ["XDG_CACHE_HOME"] = str(tmp_path)
+
+    assert default_xbuildenv_path() == tmp_path / dirname
+
+    reset_cache()
+
+    not_writeable_path = tmp_path / "not_writeable"
+    not_writeable_path.mkdir()
+    not_writeable_path.chmod(0o444)
+
+    os.environ["XDG_CACHE_HOME"] = str(not_writeable_path)
+
+    assert default_xbuildenv_path() == Path.cwd() / dirname
+
+    reset_cache()
+
+    os.environ.pop("XDG_CACHE_HOME", None)
+
+
+def test_default_xbuildenv_path_env_var(tmp_path, reset_cache, monkeypatch):
+    from pathlib import Path
+
+    # default case
+    monkeypatch.delenv("PYODIDE_XBUILDENV_PATH", raising=False)
+
+    import platformdirs
+
+    dirname = xbuildenv_dirname()
+
+    baseline_path = Path(platformdirs.user_cache_dir()) / dirname
+
+    assert default_xbuildenv_path() == baseline_path
+
+    reset_cache()
+
+    # custom path
+    custom_path = tmp_path / "custom_xbuildenv_path"
+    custom_path.mkdir(exist_ok=True)
+
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(custom_path))
+
+    assert default_xbuildenv_path() == custom_path.resolve()
+
+    reset_cache()
+
+    # relative path from cwd
+    relative_dir = Path("../relative/xbuildenv").resolve()
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(relative_dir))
+
+    expected_path = Path.cwd() / relative_dir
+    assert default_xbuildenv_path() == expected_path
+
+    reset_cache()
+
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", "")
+    assert default_xbuildenv_path() == baseline_path
+
+
+@pytest.mark.skipif(
+    IS_WIN, reason="Permission-based fallback is not reliable on Windows"
+)
+def test_default_xbuildenv_path_env_var_non_writable(
+    tmp_path, reset_cache, monkeypatch
+):
+    import platformdirs
+
+    dirname = xbuildenv_dirname()
+    baseline_path = Path(platformdirs.user_cache_dir()) / dirname
+
+    non_writable_path = tmp_path / "non_writable"
+    non_writable_path.mkdir(exist_ok=True)
+    non_writable_path.chmod(0o444)
+
+    monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(non_writable_path))
+
+    assert default_xbuildenv_path() == baseline_path

@@ -3,7 +3,7 @@ default_language_version:
   python: "3.12"
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: "v5.0.0"
+    rev: "v6.0.0"
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -17,7 +17,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.6.9"
+    rev: "v0.15.9"
     hooks:
       - id: ruff
         args: [--fix]
@@ -32,12 +32,13 @@ repos:
       - id: rst-inline-touching-normal
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: "v0.10.0.1"
+    rev: "v0.11.0.1"
     hooks:
       - id: shellcheck
+        exclude: ^(integration_tests/scripts/pyodide_venv_test.sh)$
 
   - repo: https://github.com/codespell-project/codespell
-    rev: "v2.3.0"
+    rev: "v2.4.2"
     hooks:
       - id: codespell
         args:
@@ -47,7 +48,7 @@ repos:
           ]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.11.2"
+    rev: "v1.20.0"
     hooks:
       - id: mypy
         files: ^(pyodide-build/pyodide_build)
@@ -73,11 +74,6 @@ repos:
         args: [--ignore-missing-imports]
         files: ^(conftest.py|src/tests|pyodide-build/pyodide_build/tests)
         additional_dependencies: *mypy-deps
-
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: "v4.0.0-alpha.8"
-    hooks:
-      - id: prettier
 
 ci:
   autoupdate_schedule: "quarterly"

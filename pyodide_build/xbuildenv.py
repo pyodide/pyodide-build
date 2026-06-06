@@ -1,13 +1,13 @@
 import json
+import os
 import shutil
-import warnings
+import subprocess
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from urllib.request import urlopen
 
 from pyodide_lock import PyodideLockSpec
 
 from pyodide_build import build_env
+from pyodide_build.common import download_and_unpack_archive, remove_readonly
 from pyodide_build.create_package_index import create_package_index
 from pyodide_build.logger import logger
 from pyodide_build.xbuildenv_releases import (
@@ -17,6 +17,8 @@ from pyodide_build.xbuildenv_releases import (
 )
 
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
+PYTHON_VERSION_MARKER_FILE = ".build-python-version"
+EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
 
 
 class CrossBuildEnvManager:
@@ -134,7 +136,7 @@ class CrossBuildEnvManager:
         version: str | None = None,
         *,
         url: str | None = None,
-        skip_install_cross_build_packages: bool = False,
+        skip_install_cross_build_packages: bool = True,
         force_install: bool = False,
     ) -> Path:
         """
@@ -169,6 +171,10 @@ class CrossBuildEnvManager:
         if url:
             version = _url_to_version(url)
             download_url = url
+        # if default version is specified in the configuration, use that
+        elif not version and (default_url := self._get_default_xbuildenv_url()):
+            version = _url_to_version(default_url)
+            download_url = default_url
         else:
             version = version or self._find_latest_version()
 
@@ -192,7 +198,9 @@ class CrossBuildEnvManager:
                 download_path,
             )
         else:
-            self._download(download_url, download_path)
+            download_and_unpack_archive(
+                download_url, download_path, "Pyodide cross-build environment"
+            )
 
         try:
             # there is an redundant directory "xbuildenv" inside the xbuildenv archive
@@ -201,7 +209,9 @@ class CrossBuildEnvManager:
             xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
             install_marker = download_path / ".installed"
             if not install_marker.exists():
-                logger.info("Installing Pyodide cross-build environment")
+                logger.info(
+                    "Installing Pyodide cross-build environment to %s", download_path
+                )
 
                 if not url:
                     # If installed from url, skip creating the PyPI index (version is not known)
@@ -209,6 +219,7 @@ class CrossBuildEnvManager:
 
             install_marker.touch()
             self.use_version(version)
+            self._add_version_marker()
         except Exception as e:
             # if the installation failed, remove the downloaded directory
             shutil.rmtree(download_path)
@@ -228,52 +239,34 @@ class CrossBuildEnvManager:
         )
 
         if not latest:
-            raise ValueError("No compatible cross-build environment found")
+            # Check for Python version mismatch
+            python_versions = [
+                v.python_version_tuple[:2] for v in metadata.list_compatible_releases()
+            ]
+            pyver = tuple(int(x) for x in local["python"].split("."))
+            if pyver > python_versions[0]:
+                latest_supported = ".".join(str(x) for x in python_versions[0])
+                raise ValueError(
+                    f"Python version {local['python']} is not yet supported. The newest supported version of Python is {latest_supported}."
+                )
+
+            if pyver < python_versions[-1]:
+                oldest_supported = ".".join(str(x) for x in python_versions[-1])
+                raise ValueError(
+                    f"Python version {local['python']} is too old. The oldest supported version of Python is {oldest_supported}."
+                )
+
+            raise ValueError(
+                f"Python version {local['python']} is not compatible with pyodide build version {local['pyodide-build']}"
+            )
 
         return latest.version
 
-    def _download(self, url: str, path: Path) -> None:
+    def _get_default_xbuildenv_url(self) -> str:
         """
-        Download the cross-build environment from the given URL and extract it to the given path.
-
-        Parameters
-        ----------
-        url
-            URL to download the cross-build environment from.
-        path
-            Path to extract the cross-build environment to.
-            If the path already exists, raise an error.
+        Get the default URL for the cross-build environment. If not specified, return empty string (no default).
         """
-        logger.info("Downloading Pyodide cross-build environment from %s", url)
-
-        if path.exists():
-            raise FileExistsError(f"Path {path} already exists")
-
-        try:
-            resp = urlopen(url)
-            data = resp.read()
-        except Exception as e:
-            raise ValueError(
-                f"Failed to download cross-build environment from {url}"
-            ) from e
-
-        # FIXME: requests makes a verbose output (see: https://github.com/pyodide/pyodide/issues/4810)
-        # r = requests.get(url)
-
-        # if r.status_code != 200:
-        #     raise ValueError(
-        #         f"Failed to download cross-build environment from {url} (status code: {r.status_code})"
-        #     )
-
-        with NamedTemporaryFile(suffix=".tar") as f:
-            f_path = Path(f.name)
-            f_path.write_bytes(data)
-            with warnings.catch_warnings():
-                # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
-                # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
-                # https://github.com/python/cpython/issues/112760
-                warnings.simplefilter("ignore")
-                shutil.unpack_archive(str(f_path), path)
+        return build_env.get_host_build_flag("DEFAULT_CROSS_BUILD_ENV_URL")
 
     def _host_site_packages_dir(
         self, xbuildenv_pyodide_root: Path | None = None
@@ -318,7 +311,7 @@ class CrossBuildEnvManager:
         lockfile = PyodideLockSpec(**json.loads(lockfile_path.read_bytes()))
         create_package_index(lockfile.packages, xbuildenv_pyodide_root, cdn_base)
 
-    def uninstall_version(self, version: str) -> None:
+    def uninstall_version(self, version: str | None) -> str:
         """
         Uninstall the installed xbuildenv version.
 
@@ -327,6 +320,12 @@ class CrossBuildEnvManager:
         version
             The version of xbuildenv to uninstall.
         """
+        if version is None:
+            version = self.current_version
+
+        if version is None:
+            raise ValueError("No xbuildenv version is currently in use")
+
         version_path = self._path_for_version(version)
 
         # if the target version is the current version, remove the symlink
@@ -341,6 +340,180 @@ class CrossBuildEnvManager:
                 f"Cannot find cross-build environment version {version}, available versions: {self.list_versions()}"
             )
 
+        return version
+
+    def _clone_emscripten(self, emsdk_dir: Path | str | None = None) -> Path:
+        """
+        Clone the Emscripten SDK repository into the currently selected xbuildenv.
+
+        Parameters
+        ----------
+        emsdk_dir
+            The directory to clone the emsdk into. If not specified, uses the default location
+            inside the currently selected xbuildenv.
+
+        Returns
+        -------
+        Path
+            Path to the emsdk directory inside the xbuildenv.
+        """
+        if not self.symlink_dir.exists():
+            raise ValueError(
+                "No active xbuildenv. Run `pyodide xbuildenv install` first."
+            )
+
+        if emsdk_dir is None:
+            xbuild_root = self.symlink_dir.resolve()
+            emsdk_dir = xbuild_root / "emsdk"
+        else:
+            emsdk_dir = Path(emsdk_dir)
+
+        logger.info("Cloning Emscripten SDK into %s", emsdk_dir)
+
+        if emsdk_dir.exists():
+            logger.info("Removing existing emsdk directory %s", emsdk_dir)
+            shutil.rmtree(emsdk_dir, onexc=remove_readonly)
+
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "https://github.com/emscripten-core/emsdk.git",
+                str(emsdk_dir),
+            ],
+            check=True,
+        )
+
+        return emsdk_dir
+
+    def install_emscripten(
+        self, emscripten_version: str = "latest", *, force: bool = False
+    ) -> Path:
+        """
+        Install and activate Emscripten SDK inside the currently selected xbuildenv.
+
+        Parameters
+        ----------
+        emscripten_version
+            The Emscripten SDK version to install (default: 'latest').
+        force
+            If True, force reinstallation even if the same version is already installed.
+
+        Returns
+        -------
+        Path
+            Path to the emsdk directory inside the xbuildenv.
+        """
+        if not self.symlink_dir.exists():
+            raise ValueError(
+                "No active xbuildenv. Run `pyodide xbuildenv install` first."
+            )
+
+        xbuild_root = self.symlink_dir.resolve()
+        emsdk_dir = xbuild_root / "emsdk"
+        patches_dir = self.pyodide_root / "emsdk" / "patches"
+        emscripten_root = emsdk_dir / "upstream" / "emscripten"
+
+        marker = xbuild_root / EMSCRIPTEN_VERSION_MARKER_FILE
+        if not force and marker.exists():
+            installed_version = marker.read_text().strip()
+            if installed_version == emscripten_version:
+                logger.debug(
+                    "Emscripten SDK (version: %s) is already installed at %s, skipping",
+                    emscripten_version,
+                    emsdk_dir,
+                )
+                return emsdk_dir
+
+        logger.info(
+            "Installing Emscripten SDK (version: %s) into %s",
+            emscripten_version,
+            emsdk_dir,
+        )
+
+        # Clone or update emsdk directory
+        self._clone_emscripten()
+
+        # Install the specified Emscripten version
+        emsdk = shutil.which("emsdk", path=emsdk_dir)
+        assert emsdk
+        subprocess.run(
+            [emsdk, "install", "--build=Release", emscripten_version],
+            cwd=emsdk_dir,
+            check=True,
+        )
+
+        # Apply patches from xbuildenv/emsdk/patches directory to upstream/emscripten
+        # `GIT_DIR=.` prevents `git apply` from finding the parent emsdk git repo
+        # and applying patches relative to it instead of the current emscripten directory
+        # and skipping them silently.
+        try:
+            patch_env = os.environ.copy() | {"GIT_DIR": "."}
+            for patch_file in sorted(patches_dir.glob("*.patch")):
+                subprocess.run(
+                    ["git", "apply", "--verbose", str(patch_file)],
+                    cwd=emscripten_root,
+                    env=patch_env,
+                    check=True,
+                )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Failed to apply Emscripten patches. This may occur if the Emscripten version "
+                f"({emscripten_version}) does not match the version for which the patches were generated. "
+                f"Please ensure you are using a compatible Emscripten version or update the patches "
+                f"in {patches_dir}"
+            ) from e
+
+        # Activate the specified Emscripten version
+        subprocess.run(
+            [
+                emsdk,
+                "activate",
+                "--embedded",
+                "--build=Release",
+                emscripten_version,
+            ],
+            cwd=emsdk_dir,
+            check=True,
+        )
+
+        marker.write_text(emscripten_version)
+
+        logger.info("Emscripten SDK installed successfully at %s", emsdk_dir)
+        return emsdk_dir
+
+    def _add_version_marker(self) -> None:
+        """
+        Store the Python version in the xbuildenv directory, so we can check compatibility later.
+        """
+        if not self.symlink_dir.is_dir():
+            raise ValueError("cross-build env directory does not exist")
+
+        version_file = self.symlink_dir / PYTHON_VERSION_MARKER_FILE
+        version_file.write_text(build_env.local_versions()["python"])
+
+    def version_marker_matches(self) -> tuple[bool, str | None]:
+        if not self.symlink_dir.is_dir():
+            return False, "cross-build env directory does not exist"
+
+        version_file = self.symlink_dir / PYTHON_VERSION_MARKER_FILE
+        if not version_file.exists():
+            return False, "Python version marker file not found"
+
+        version_local = build_env.local_versions()["python"]
+        version_on_install = version_file.read_text().strip()
+        if version_on_install != version_local:
+            return False, (
+                f"local Python version ({version_local}) does not match the Python version ({version_on_install}) "
+                "used to create the Pyodide cross-build environment. "
+                "Please switch back to the original Python version, "
+                "or reinstall the xbuildenv, by running `pyodide xbuildenv uninstall` and then `pyodide xbuildenv install`"
+            )
+        return True, None
+
 
 def _url_to_version(url: str) -> str:
-    return url.replace("://", "_").replace(".", "_").replace("/", "_")
+    # : - invalid character on Windows.
+    return url.replace("://", "_").replace(".", "_").replace("/", "_").replace(":", "_")

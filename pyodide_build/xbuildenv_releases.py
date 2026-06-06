@@ -6,7 +6,15 @@ from functools import cache
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict
 
-DEFAULT_CROSS_BUILD_ENV_METADATA_URL = "https://raw.githubusercontent.com/pyodide/pyodide/main/pyodide-cross-build-environments.json"
+DEFAULT_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide/api/v2/pyodide-cross-build-environments.json"
+)
+NIGHTLY_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide-build-environment-nightly/api/v2/release.json"
+)
+NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL = (
+    "https://pyodide.github.io/pyodide-build-environment-nightly/api/v2/debug.json"
+)
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
 
 
@@ -21,10 +29,12 @@ class CrossBuildEnvReleaseSpec(BaseModel):
     python_version: str
     # The version of the Emscripten SDK
     emscripten_version: str
+    # The UTC timestamp when the release was published on GitHub (ISO 8601)
+    published_at: str = ""
     # Minimum and maximum pyodide-build versions that are compatible with this release
     min_pyodide_build_version: str | None = None
     max_pyodide_build_version: str | None = None
-    model_config = ConfigDict(extra="forbid", title="CrossBuildEnvReleasesSpec")
+    model_config = ConfigDict(extra="ignore", title="CrossBuildEnvReleasesSpec")
 
     @property
     def python_version_tuple(self) -> tuple[int, int, int]:
@@ -214,11 +224,13 @@ def cross_build_env_metadata_url() -> str:
     # This has two purposes:
     # 1. When running tests, we can set this variable to use a local metadata file
     # 2. If we change the URL for the metadata file, people can set this variable to use the new URL
-    url = os.environ.get(CROSS_BUILD_ENV_METADATA_URL_ENV_VAR)
-    if url is not None:
-        return url
 
-    return DEFAULT_CROSS_BUILD_ENV_METADATA_URL
+    url = os.environ.get(
+        key=CROSS_BUILD_ENV_METADATA_URL_ENV_VAR,
+        default=DEFAULT_CROSS_BUILD_ENV_METADATA_URL,
+    )
+
+    return url
 
 
 @cache

@@ -21,6 +21,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import contextlib
+import contextvars
 import os
 import subprocess
 import sys
@@ -28,13 +29,12 @@ import sysconfig
 import traceback
 import warnings
 from collections.abc import Iterator
-from typing import NoReturn
+from typing import NoReturn, TextIO
 
 from build import (
     BuildBackendException,
     BuildException,
     FailedProcessError,
-    ProjectBuilder,
 )
 from build.env import DefaultIsolatedEnv
 
@@ -47,27 +47,26 @@ _COLORS = {
     "underline": "\33[4m",
     "reset": "\33[0m",
 }
-_NO_COLORS = {color: "" for color in _COLORS}
+_NO_COLORS = dict.fromkeys(_COLORS, "")
+
+_styles = contextvars.ContextVar("_styles", default=_COLORS)
 
 
-def _init_colors() -> dict[str, str]:
+def _init_colors() -> None:
     if "NO_COLOR" in os.environ:
         if "FORCE_COLOR" in os.environ:
             warnings.warn(
                 "Both NO_COLOR and FORCE_COLOR environment variables are set, disabling color",
                 stacklevel=2,
             )
-        return _NO_COLORS
+        _styles.set(_NO_COLORS)
     elif "FORCE_COLOR" in os.environ or sys.stdout.isatty():
-        return _COLORS
-    return _NO_COLORS
+        return
+    _styles.set(_NO_COLORS)
 
 
-_STYLES = _init_colors()
-
-
-def _cprint(fmt: str = "", msg: str = "") -> None:
-    print(fmt.format(msg, **_STYLES), flush=True)
+def _cprint(fmt: str = "", msg: str = "", file: TextIO | None = None) -> None:
+    print(fmt.format(msg, **_styles.get()), file=file, flush=True)
 
 
 def _error(msg: str, code: int = 1) -> NoReturn:  # pragma: no cover
@@ -77,53 +76,62 @@ def _error(msg: str, code: int = 1) -> NoReturn:  # pragma: no cover
     :param msg: Error message
     :param code: Error code
     """
-    _cprint("{red}ERROR{reset} {}", msg)
+    _cprint("{red}ERROR{reset} {}", msg, file=sys.stderr)
     raise SystemExit(code)
 
 
-class _ProjectBuilder(ProjectBuilder):
-    @staticmethod
-    def log(message: str) -> None:
-        _cprint("{bold}* {}{reset}", message)
-
-
 class _DefaultIsolatedEnv(DefaultIsolatedEnv):
-    @staticmethod
-    def log(message: str) -> None:
-        _cprint("{bold}* {}{reset}", message)
-
     @property
     def scripts_dir(self) -> str:
-        if hasattr(self, "_env_backend"):  # pypabuild >= 1.2.0
-            return self._env_backend.scripts_dir
-        elif hasattr(self, "_scripts_dir"):
-            return self._scripts_dir
-        else:
-            raise AttributeError("No attribute '_env_backend' or '_scripts_dir' found")
+        return self._env_backend.scripts_dir
+
+
+def _log_subprocess_output(error: subprocess.CalledProcessError) -> None:
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(error, stream_name, None)
+        if stream:
+            decoded = stream.decode() if isinstance(stream, bytes) else stream
+            _cprint("{bold}{red}" + stream_name + ":{reset}\n{dim}{}{reset}", decoded)
+
+
+def _find_called_process_error(
+    exc: Exception,
+) -> subprocess.CalledProcessError | None:
+    if isinstance(exc, subprocess.CalledProcessError):
+        return exc
+    inner = getattr(exc, "exception", None)
+    if isinstance(inner, subprocess.CalledProcessError):
+        return inner
+    return None
 
 
 @contextlib.contextmanager
 def _handle_build_error() -> Iterator[None]:
     try:
         yield
-    except (BuildException, FailedProcessError) as e:
-        _error(str(e))
-    except BuildBackendException as e:
-        if isinstance(e.exception, subprocess.CalledProcessError):
-            _cprint()
-            _error(str(e))
+    except Exception as e:
+        if isinstance(e, BuildBackendException) and not isinstance(
+            e.exception, subprocess.CalledProcessError
+        ):
+            if e.exc_info:
+                tb_lines = traceback.format_exception(
+                    e.exc_info[0],
+                    e.exc_info[1],
+                    e.exc_info[2],
+                    limit=-1,
+                )
+                tb = "".join(tb_lines)
+            else:
+                tb = traceback.format_exc(-1)  # type: ignore[unreachable]
+            _cprint("\n{dim}{}{reset}\n", tb.strip("\n"))
+        elif not isinstance(e, (BuildException, FailedProcessError)):
+            tb = traceback.format_exc().strip("\n")
+            _cprint("\n{dim}{}{reset}\n", tb)
 
-        if e.exc_info:
-            tb_lines = traceback.format_exception(
-                e.exc_info[0],
-                e.exc_info[1],
-                e.exc_info[2],
-                limit=-1,
-            )
-            tb = "".join(tb_lines)
-        else:
-            tb = traceback.format_exc(-1)  # type: ignore[unreachable]
-        _cprint("\n{dim}{}{reset}\n", tb.strip("\n"))
+        cpe = _find_called_process_error(e)
+        if cpe is not None:
+            _log_subprocess_output(cpe)
+
         _error(str(e))
 
 

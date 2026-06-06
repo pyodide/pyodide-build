@@ -2,12 +2,16 @@ import dataclasses
 import sys
 from pathlib import Path
 
-import typer
+import click
 
-from pyodide_build import build_env, buildall, buildpkg
-from pyodide_build.build_env import BuildArgs, init_environment
+from pyodide_build import build_env
+from pyodide_build.build_env import BuildArgs, ensure_emscripten, init_environment
 from pyodide_build.common import get_num_cores
 from pyodide_build.logger import logger
+from pyodide_build.recipe import graph_builder, loader
+from pyodide_build.recipe.builder import RecipeBuilder
+
+# Typer application for `pyodide build-recipes`
 
 
 @dataclasses.dataclass(eq=False, order=False, kw_only=True)
@@ -16,8 +20,10 @@ class Args:
     build_dir: Path
     install_dir: Path
     build_args: BuildArgs
+    skip_rust_setup: bool
     force_rebuild: bool
     n_jobs: int
+    clean: bool
 
     def __init__(
         self,
@@ -27,7 +33,9 @@ class Args:
         install_dir: Path | str | None = None,
         build_args: BuildArgs,
         force_rebuild: bool,
+        skip_rust_setup: bool = False,
         n_jobs: int | None = None,
+        clean: bool = False,
     ):
         cwd = Path.cwd()
         root = build_env.search_pyodide_root(cwd) or cwd
@@ -40,7 +48,9 @@ class Args:
         )
         self.build_args = build_args
         self.force_rebuild = force_rebuild
+        self.skip_rust_setup = skip_rust_setup
         self.n_jobs = n_jobs or get_num_cores()
+        self.clean = clean
         if not self.recipe_dir.is_dir():
             raise FileNotFoundError(f"Recipe directory {self.recipe_dir} not found")
 
@@ -51,53 +61,108 @@ class InstallOptions:
     metadata_files: bool
 
 
+@click.command()
+@click.argument("packages", nargs=-1, required=True)
+@click.option(
+    "--recipe-dir",
+    default=None,
+    help=(
+        "The directory containing the recipe of packages. "
+        "If not specified, the default is ``./packages``"
+    ),
+)
+@click.option(
+    "--build-dir",
+    default=None,
+    envvar="PYODIDE_RECIPE_BUILD_DIR",
+    show_envvar=True,
+    help=(
+        "The directory where build directories for packages are created. "
+        "Default: recipe_dir."
+    ),
+)
+@click.option(
+    "--cflags",
+    default="",
+    help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS",
+)
+@click.option(
+    "--cxxflags",
+    default="",
+    help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS",
+)
+@click.option(
+    "--ldflags",
+    default="",
+    help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS",
+)
+@click.option(
+    "--target-install-dir",
+    default="",
+    help="The path to the target Python installation. Default: TARGETINSTALLDIR",
+)
+@click.option(
+    "--host-install-dir",
+    default="",
+    help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
+)
+@click.option(
+    "--force-rebuild/--no-force-rebuild",
+    default=False,
+    help="Force rebuild of all packages regardless of whether they appear to have been updated",
+)
+@click.option(
+    "--continue",
+    "continue_",
+    is_flag=True,
+    default=False,
+    help="Continue a build from the middle. For debugging. Implies '--force-rebuild'",
+)
+@click.option(
+    "--skip-rust-setup",
+    is_flag=True,
+    default=False,
+    help="Don't setup rust environment when building a rust package",
+)
+@click.option(
+    "--clean",
+    is_flag=True,
+    default=False,
+    help="Remove the build directory after a successful build of each package.",
+)
+@click.option(
+    "--skip-emscripten-install",
+    is_flag=True,
+    default=False,
+    envvar="PYODIDE_SKIP_EMSCRIPTEN_INSTALL",
+    show_envvar=True,
+    help="Skip automatic installation of Emscripten if not found.",
+)
 def build_recipes_no_deps(
-    packages: list[str] = typer.Argument(
-        ..., help="Packages to build, or ``*`` for all packages in recipe directory"
-    ),
-    recipe_dir: str = typer.Option(
-        None,
-        help="The directory containing the recipe of packages. "
-        "If not specified, the default is ``./packages``",
-    ),
-    build_dir: str = typer.Option(
-        None,
-        envvar="PYODIDE_RECIPE_BUILD_DIR",
-        help="The directory where build directories for packages are created. "
-        "Default: recipe_dir.",
-    ),
-    cflags: str = typer.Option(
-        "", help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS"
-    ),
-    cxxflags: str = typer.Option(
-        "", help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS"
-    ),
-    ldflags: str = typer.Option(
-        "", help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS"
-    ),
-    target_install_dir: str = typer.Option(
-        "",
-        help="The path to the target Python installation. Default: TARGETINSTALLDIR",
-    ),
-    host_install_dir: str = typer.Option(
-        "",
-        help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
-    ),
-    force_rebuild: bool = typer.Option(
-        False,
-        help="Force rebuild of all packages regardless of whether they appear to have been updated",
-    ),
-    continue_: bool = typer.Option(
-        False,
-        "--continue",
-        help="Continue a build from the middle. For debugging. Implies '--force-rebuild'",
-    ),
+    packages: tuple[str, ...],
+    recipe_dir: str | None,
+    build_dir: str | None,
+    cflags: str,
+    cxxflags: str,
+    ldflags: str,
+    target_install_dir: str,
+    host_install_dir: str,
+    force_rebuild: bool,
+    continue_: bool,
+    skip_rust_setup: bool,
+    clean: bool,
+    skip_emscripten_install: bool,
 ) -> None:
-    """Build packages using yaml recipes but don't try to resolve dependencies"""
+    """Build packages using yaml recipes but don't try to resolve dependencies.
+
+    \b
+    Arguments:
+        PACKAGES: Packages to build, or ``*`` for all packages in recipe directory.
+    """
     init_environment()
 
     if build_env.in_xbuildenv():
-        build_env.check_emscripten_version()
+        ensure_emscripten(skip_install=skip_emscripten_install)
 
     build_args = BuildArgs(
         cflags=cflags,
@@ -106,25 +171,36 @@ def build_recipes_no_deps(
         target_install_dir=target_install_dir,
         host_install_dir=host_install_dir,
     )
-    build_args = buildall.set_default_build_args(build_args)
+    build_args = graph_builder.set_default_build_args(build_args)
     args = Args(
         build_args=build_args,
         build_dir=build_dir,
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
+        skip_rust_setup=skip_rust_setup,
+        clean=clean,
     )
 
-    return build_recipes_no_deps_impl(packages, args, continue_)
+    return build_recipes_no_deps_impl(list(packages), args, continue_)
+
+
+def _rust_setup(recipe_dir: Path, packages: list[str]) -> None:
+    recipes = loader.load_recipes(recipe_dir, packages, False)
+    if any(recipe.is_rust_package() for recipe in recipes.values()):
+        graph_builder._ensure_rust_toolchain()
 
 
 def build_recipes_no_deps_impl(
     packages: list[str], args: Args, continue_: bool
 ) -> None:
     # TODO: use multiprocessing?
+    if not args.skip_rust_setup:
+        _rust_setup(args.recipe_dir, packages)
+
     for package in packages:
         package_path = args.recipe_dir / package
         package_build_dir = args.build_dir / package / "build"
-        builder = buildpkg.RecipeBuilder(
+        builder = RecipeBuilder.get_builder(
             package_path,
             args.build_args,
             package_build_dir,
@@ -132,74 +208,149 @@ def build_recipes_no_deps_impl(
             continue_,
         )
         builder.build()
+        if args.clean:
+            builder.clean(include_dist=False)
 
 
-def build_recipes(
-    packages: list[str] = typer.Argument(
-        ..., help="Packages to build, or ``*`` for all packages in recipe directory"
+@click.command()
+@click.argument("packages", nargs=-1, required=True)
+@click.option(
+    "--recipe-dir",
+    default=None,
+    help=(
+        "The directory containing the recipe of packages. "
+        "If not specified, the default is ``./packages``"
     ),
-    recipe_dir: str = typer.Option(
-        None,
-        help="The directory containing the recipe of packages. "
-        "If not specified, the default is ``./packages``",
+)
+@click.option(
+    "--build-dir",
+    default=None,
+    envvar="PYODIDE_RECIPE_BUILD_DIR",
+    show_envvar=True,
+    help=(
+        "The directory where build directories for packages are created. "
+        "Default: recipe_dir."
     ),
-    build_dir: str = typer.Option(
-        None,
-        envvar="PYODIDE_RECIPE_BUILD_DIR",
-        help="The directory where build directories for packages are created. "
-        "Default: recipe_dir.",
+)
+@click.option(
+    "--install/--no-install",
+    default=False,
+    help=(
+        "If true, install the built packages into the install_dir. "
+        "If false, build packages without installing."
     ),
-    install: bool = typer.Option(
-        False,
-        help="If true, install the built packages into the install_dir. "
-        "If false, build packages without installing.",
+)
+@click.option(
+    "--install-dir",
+    default=None,
+    help=(
+        "Path to install built packages and pyodide-lock.json. "
+        "If not specified, the default is ``./dist``."
     ),
-    install_dir: str = typer.Option(
-        None,
-        help="Path to install built packages and pyodide-lock.json. "
-        "If not specified, the default is ``./dist``.",
-    ),
-    metadata_files: bool = typer.Option(
-        False,
-        help="If true, extract the METADATA file from the built wheels "
+)
+@click.option(
+    "--metadata-files/--no-metadata-files",
+    default=False,
+    help=(
+        "If true, extract the METADATA file from the built wheels "
         "to a matching ``*.whl.metadata`` file. "
-        "If false, no ``*.whl.metadata`` file is produced.",
+        "If false, no ``*.whl.metadata`` file is produced."
     ),
-    no_deps: bool = typer.Option(
-        False, help="Removed, use `pyodide build-recipes-no-deps` instead."
-    ),
-    cflags: str = typer.Option(
-        None, help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS"
-    ),
-    cxxflags: str = typer.Option(
-        None, help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS"
-    ),
-    ldflags: str = typer.Option(
-        None, help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS"
-    ),
-    target_install_dir: str = typer.Option(
-        "",
-        help="The path to the target Python installation. Default: TARGETINSTALLDIR",
-    ),
-    host_install_dir: str = typer.Option(
-        "",
-        help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
-    ),
-    log_dir: str = typer.Option(None, help="Directory to place log files"),
-    force_rebuild: bool = typer.Option(
-        False,
-        help="Force rebuild of all packages regardless of whether they appear to have been updated",
-    ),
-    n_jobs: int = typer.Option(
-        None,
-        help="Number of packages to build in parallel  (default: # of cores in the system)",
-    ),
-    compression_level: int = typer.Option(
-        6,
-        envvar="PYODIDE_ZIP_COMPRESSION_LEVEL",
-        help="Level of zip compression to apply when installing. 0 means no compression.",
-    ),
+)
+@click.option(
+    "--no-deps/--no-no-deps",
+    default=False,
+    help="Removed, use `pyodide build-recipes-no-deps` instead.",
+)
+@click.option(
+    "--cflags",
+    default=None,
+    help="Extra compiling flags. Default: SIDE_MODULE_CFLAGS",
+)
+@click.option(
+    "--cxxflags",
+    default=None,
+    help="Extra compiling flags. Default: SIDE_MODULE_CXXFLAGS",
+)
+@click.option(
+    "--ldflags",
+    default=None,
+    help="Extra linking flags. Default: SIDE_MODULE_LDFLAGS",
+)
+@click.option(
+    "--target-install-dir",
+    default="",
+    help="The path to the target Python installation. Default: TARGETINSTALLDIR",
+)
+@click.option(
+    "--host-install-dir",
+    default="",
+    help="Directory for installing built host packages. Default: HOSTINSTALLDIR",
+)
+@click.option(
+    "--log-dir",
+    default=None,
+    help="Directory to place log files",
+)
+@click.option(
+    "--force-rebuild/--no-force-rebuild",
+    default=False,
+    help="Force rebuild of all packages regardless of whether they appear to have been updated",
+)
+@click.option(
+    "--n-jobs",
+    default=None,
+    type=int,
+    help="Number of packages to build in parallel (default: # of cores in the system)",
+)
+@click.option(
+    "--compression-level",
+    default=6,
+    show_default=True,
+    envvar="PYODIDE_ZIP_COMPRESSION_LEVEL",
+    show_envvar=True,
+    help="Level of zip compression to apply when installing. 0 means no compression.",
+)
+@click.option(
+    "--clean",
+    is_flag=True,
+    default=False,
+    help="Remove the build directory after a successful build of each package.",
+)
+@click.option(
+    "--skip-emscripten-install",
+    is_flag=True,
+    default=False,
+    envvar="PYODIDE_SKIP_EMSCRIPTEN_INSTALL",
+    show_envvar=True,
+    help="Skip automatic installation of Emscripten if not found.",
+)
+def build_recipes(
+    packages: tuple[str, ...],
+    recipe_dir: str | None,
+    build_dir: str | None,
+    install: bool,
+    install_dir: str | None,
+    metadata_files: bool,
+    no_deps: bool,
+    cflags: str | None,
+    cxxflags: str | None,
+    ldflags: str | None,
+    target_install_dir: str,
+    host_install_dir: str,
+    log_dir: str | None,
+    force_rebuild: bool,
+    n_jobs: int | None,
+    compression_level: int,
+    clean: bool,
+    skip_emscripten_install: bool,
 ) -> None:
+    """Build packages using yaml recipes.
+
+    \b
+    Arguments:
+        PACKAGES: Packages to build, or ``*`` for all packages in recipe directory.
+    """
     if no_deps:
         logger.error(
             "--no-deps has been removed, use pyodide build-package-no-deps instead",
@@ -219,16 +370,16 @@ def build_recipes(
     init_environment()
 
     if build_env.in_xbuildenv():
-        build_env.check_emscripten_version()
+        ensure_emscripten(skip_install=skip_emscripten_install)
 
     build_args = BuildArgs(
-        cflags=cflags,
-        cxxflags=cxxflags,
-        ldflags=ldflags,
+        cflags=cflags or "",
+        cxxflags=cxxflags or "",
+        ldflags=ldflags or "",
         target_install_dir=target_install_dir,
         host_install_dir=host_install_dir,
     )
-    build_args = buildall.set_default_build_args(build_args)
+    build_args = graph_builder.set_default_build_args(build_args)
     args = Args(
         build_args=build_args,
         build_dir=build_dir,
@@ -236,9 +387,10 @@ def build_recipes(
         recipe_dir=recipe_dir,
         force_rebuild=force_rebuild,
         n_jobs=n_jobs,
+        clean=clean,
     )
     log_dir_ = Path(log_dir).resolve() if log_dir else None
-    build_recipes_impl(packages, args, log_dir_, install_options)
+    build_recipes_impl(list(packages), args, log_dir_, install_options)
 
 
 def build_recipes_impl(
@@ -254,20 +406,20 @@ def build_recipes_impl(
     else:
         targets = ",".join(packages)
 
-    pkg_map = buildall.build_packages(
+    pkg_map = graph_builder.build_packages(
         args.recipe_dir,
         targets=targets,
         build_args=args.build_args,
         build_dir=args.build_dir,
         n_jobs=args.n_jobs,
         force_rebuild=args.force_rebuild,
+        clean=args.clean,
     )
-
     if log_dir:
-        buildall.copy_logs(pkg_map, log_dir)
+        graph_builder.copy_logs(pkg_map, log_dir)
 
     if install_options:
-        buildall.install_packages(
+        graph_builder.install_packages(
             pkg_map,
             args.install_dir,
             compression_level=install_options.compression_level,

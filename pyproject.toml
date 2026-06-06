@@ -8,28 +8,25 @@ authors = [{name = "Pyodide developers"}]
 description = '"Tools for building Pyodide"'
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Operating System :: OS Independent",
 ]
-license = {text = "MPL-2.0"}
+license = "MPL-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-    "build~=1.2.0",
-    "pyodide-cli~=0.2.1",
-    "pyodide-lock==0.1.0a7",
-    "auditwheel-emscripten~=0.0.9",
+    "build>=1.4,<1.6,!=1.4.4", # keep in sync with uv extra
+    "pyodide-cli>=0.4.1",
+    "pyodide-lock~=0.1.0",
+    "auditwheel-emscripten~=0.2.0",
     "pydantic>=2,<3",
-    "cmake>=3.24",
     "wheel",
     "ruamel.yaml",
     "packaging",
     "virtualenv",
     "requests",
-    "typer",
+    "click",
     "rich",
-    # TODO: make this a extra dependency
-    "resolvelib",
-    "unearth~=0.6",
+    "platformdirs",
 ]
 dynamic = ["version"]
 
@@ -40,28 +37,51 @@ content-type = "text/markdown"
 [project.urls]
 Homepage = "https://github.com/pyodide/pyodide-build"
 "Bug Tracker" = "https://github.com/pyodide/pyodide-build/issues"
-Documentation = "https://pyodide.org/en/stable/"
+Documentation = "https://pyodide-build.readthedocs.io"
 
 [project.entry-points."pipx.run"]
 pyodide = "pyodide_cli.__main__:main"
 
 [project.entry-points."pyodide.cli"]
 build = "pyodide_build.cli.build:main"
+clean = "pyodide_build.cli.clean:app"
 build-recipes = "pyodide_build.cli.build_recipes:build_recipes"
 build-recipes-no-deps = "pyodide_build.cli.build_recipes:build_recipes_no_deps"
 venv = "pyodide_build.cli.venv:main"
 skeleton = "pyodide_build.cli.skeleton:app"
 py-compile = "pyodide_build.cli.py_compile:main"
 config = "pyodide_build.cli.config:app"
-create-zipfile = "pyodide_build.cli.create_zipfile:main"
 xbuildenv = "pyodide_build.cli.xbuildenv:app"
 
 [project.optional-dependencies]
+resolve = [
+    "resolvelib",
+    "unearth~=0.6",
+]
+uv = [
+  "build[uv]>=1.4,<1.6,!=1.4.4",
+]
+
+[dependency-groups]
 test = [
     "pytest",
     "pytest-httpserver",
     "pytest-cov",
     "types-requests",
+    # click 8.3.3 has a regression where
+    # pytest giving OSError: [Errno 29] Illegal seek error
+    "click>=8.0,<8.3.3",
+]
+docs = [
+    # sphinx-click 6.2.0 is broken with Sphinx 9 due to a mock resolution issue.
+    # see https://github.com/click-contrib/sphinx-click/pull/160. We can remove
+    # this when merged and released.
+    "sphinx>=5.3.0,<9",
+    "sphinx_book_theme>=0.4.0rc1",
+    "myst-parser",
+    "sphinx-autodoc-typehints>=1.21.7",
+    "sphinx-design",
+    "sphinx-click",
 ]
 
 [tool.hatch.version]
@@ -70,6 +90,12 @@ source = "vcs"
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/pyodide_build/tests",
+]
+
+[tool.pytest.ini_options]
+addopts = "-vra --strict-markers"
+markers = [
+  "integration: mark a test as an integration test"
 ]
 
 [tool.mypy]
@@ -99,40 +125,54 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = [
   "loky",
+  "resolvelib",
   "ruamel.yaml",
   "termcolor",
   "test",
   "tomli",
   "tomllib",
-  "typer",
-  "virtualenv",
+  "unearth",
+  "unearth.*",
+  "virtualenv>=20.31.2",
   "auditwheel_emscripten.*"
 ]
 ignore_missing_imports = true
 
 
 [tool.ruff]
+lint.exclude = ["pyodide_build/vendor/*"]
 lint.select = [
+  "ASYNC",  # flake8-async
   "B0",     # bugbear (all B0* checks enabled by default)
   "B904",   # bugbear (Within an except clause, raise exceptions with raise ... from err)
   "B905",   # bugbear (zip() without an explicit strict= parameter set.)
+  "C4",     # flake8-comprehensions
   "C9",     # mccabe complexity
   "E",      # pycodestyles
-  "W",      # pycodestyles
   "F",      # pyflakes
-  "I",      # isort
-  "PGH",    # pygrep-hooks
-  "PLC",    # pylint conventions
-  "PLE",    # pylint errors
-  "UP",     # pyupgrade
   "G004",   # f-string logging should be avoided
+  "I",      # isort
+  "PERF",   # Perflint
+  "PGH",    # pygrep-hooks
+  "PL",     # Pylint
+  "UP",     # pyupgrade
+  "W",      # pycodestyles
 ]
 
 lint.logger-objects = ["pyodide_build.logger.logger"]
 
-lint.ignore = ["E402", "E501", "E731", "E741", "UP038"]
+lint.ignore = [
+  "E402",    # Module level import not at top of file
+  "E501",    # Line too long
+  "E731",    # Do not assign a lambda expression, use a def
+  "E741",    # Ambiguous variable name (l, O, I)
+  "PERF401", # Replace for loops that build lists with list comprehension
+  "PLW2901", # Redefined loop variable
+  "PLR0912", # Too many branches in function
+  "PLC0415"  # Import inside function or class
+]
 # line-length = 219  # E501: Recommended goal is 88 to match black
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "src/py/_pyodide/_base.py" = [
@@ -144,12 +184,9 @@ target-version = "py311"
 "src/tests/test_typeconversions.py" = [
   "PGH001",  # No builtin `eval()` allowed
 ]
-"tools/*" = [
-  "B008",  # Do not perform function call `typer.Optional` in argument defaults
-]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["typer.Argument", "typer.Option"]
+extend-immutable-calls = []
 
 [tool.ruff.lint.isort]
 known-first-party = [
@@ -162,6 +199,13 @@ known-third-party = [
 
 [tool.ruff.lint.mccabe]
 max-complexity = 31  # C901: Recommended goal is 10
+
+[tool.ruff.lint.pylint]
+allow-magic-value-types = ["bytes", "int", "str"]
+max-args = 20        # Default is 5
+max-branches = 27    # Default is 12
+max-returns = 12     # Default is 6
+max-statements = 67  # Default is 50
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

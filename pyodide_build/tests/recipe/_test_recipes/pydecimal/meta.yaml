@@ -1,0 +1,13 @@
+package:
+  name: pydecimal
+  version: 1.0.0 # Nonsense
+  tag:
+    - always
+  top-level:
+    - _pydecimal
+source:
+  path: src
+build:
+  type: cpython_module
+about:
+  license: PSF

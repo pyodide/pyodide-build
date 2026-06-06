@@ -1,0 +1,17 @@
+package:
+  name: scikit-learn
+  version: 1.6.1
+
+source:
+  url: https://files.pythonhosted.org/packages/source/s/scikit-learn/scikit-learn-1.6.1.tar.gz
+  sha256: b4fc2525eca2c69a59260f583c56a7557c6ccdf8deafdba6e060f94c1c59738e
+
+requirements:
+  run:
+    - scipy
+    - joblib
+    - threadpoolctl
+
+test:
+  imports:
+    - sklearn

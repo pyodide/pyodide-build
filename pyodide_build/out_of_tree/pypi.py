@@ -22,19 +22,56 @@ from build import ConfigSettingsType
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import Version
-from resolvelib import BaseReporter, Resolver
-from resolvelib.providers import AbstractProvider
-from unearth.evaluator import TargetPython
-from unearth.finder import PackageFinder
+
+if TYPE_CHECKING:
+    from resolvelib import BaseReporter, Resolver
+    from unearth.evaluator import TargetPython
+    from unearth.finder import PackageFinder
+
+try:
+    from resolvelib.providers import AbstractProvider as _AbstractProvider
+except ImportError:
+
+    class _AbstractProvider:  # type: ignore[no-redef]
+        pass
+
 
 from pyodide_build import build_env
 from pyodide_build.common import repack_zip_archive
-from pyodide_build.io import _BuildSpecExports
 from pyodide_build.logger import logger
 from pyodide_build.out_of_tree import build
+from pyodide_build.spec import _BuildSpecExports
 
 _PYPI_INDEX = ["https://pypi.org/simple/"]
 _PYPI_TRUSTED_HOSTS = ["pypi.org"]
+
+
+class MissingOptionalDependencyError(RuntimeError):
+    pass
+
+
+def _missing_resolve_extra_error() -> MissingOptionalDependencyError:
+    return MissingOptionalDependencyError(
+        "This functionality requires optional dependencies 'resolvelib' and 'unearth'. "
+        "Install them with `pip install pyodide-build[resolve]`"
+    )
+
+
+def _import_unearth() -> tuple[type["TargetPython"], type["PackageFinder"]]:
+    try:
+        from unearth.evaluator import TargetPython
+        from unearth.finder import PackageFinder
+    except ImportError as e:
+        raise _missing_resolve_extra_error() from e
+    return TargetPython, PackageFinder
+
+
+def _import_resolvelib() -> tuple[type["BaseReporter"], type["Resolver"]]:
+    try:
+        from resolvelib import BaseReporter, Resolver
+    except ImportError as e:
+        raise _missing_resolve_extra_error() from e
+    return BaseReporter, Resolver
 
 
 @contextmanager
@@ -70,12 +107,12 @@ def stream_redirected(to=os.devnull, stream=None):
             to = None
 
 
-def get_built_wheel(url):
-    return _get_built_wheel_internal(url)["path"]
+def get_built_wheel(url, isolation=True, skip_dependency_check=False):
+    return _get_built_wheel_internal(url, isolation, skip_dependency_check)["path"]
 
 
 @cache
-def _get_built_wheel_internal(url):
+def _get_built_wheel_internal(url, isolation=True, skip_dependency_check=False):
     parsed_url = urlparse(url)
     gz_name = Path(parsed_url.path).name
 
@@ -107,6 +144,8 @@ def _get_built_wheel_internal(url):
                 build_path / "dist",
                 PyPIProvider.BUILD_EXPORTS,
                 PyPIProvider.BUILD_FLAGS,
+                isolation=isolation,
+                skip_dependency_check=skip_dependency_check,
             )
         except BaseException as e:
             logger.error(" Failed\n Error is:")
@@ -166,15 +205,11 @@ class Candidate:
         return self._dependencies
 
 
-if TYPE_CHECKING:
-    APBase = AbstractProvider[Requirement, Candidate, str]
-else:
-    APBase = AbstractProvider
-
 PYTHON_VERSION = Version(python_version())
 
 
 def get_target_python():
+    TargetPython, _ = _import_unearth()
     PYMAJOR = build_env.get_pyversion_major()
     PYMINOR = build_env.get_pyversion_minor()
     tp = TargetPython(
@@ -187,6 +222,7 @@ def get_target_python():
 
 def get_project_from_pypi(package_name, extras):
     """Return candidates created from the project name and extras."""
+    _, PackageFinder = _import_unearth()
     pf = PackageFinder(
         index_urls=_PYPI_INDEX,
         trusted_hosts=_PYPI_TRUSTED_HOSTS,
@@ -199,11 +235,15 @@ def get_project_from_pypi(package_name, extras):
 
 
 def download_or_build_wheel(
-    url: str, target_directory: Path, compression_level: int = 6
+    url: str,
+    target_directory: Path,
+    compression_level: int = 6,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
 ) -> None:
     parsed_url = urlparse(url)
     if parsed_url.path.endswith("gz"):
-        wheel_file = get_built_wheel(url)
+        wheel_file = get_built_wheel(url, isolation, skip_dependency_check)
         shutil.copy(wheel_file, target_directory)
         wheel_path = target_directory / wheel_file.name
     elif parsed_url.path.endswith(".whl"):
@@ -234,7 +274,7 @@ def get_metadata_for_wheel(url):
     return EmailMessage()
 
 
-class PyPIProvider(APBase):
+class PyPIProvider(_AbstractProvider):
     BUILD_FLAGS: ConfigSettingsType = {}
     BUILD_SKIP: list[str] = []
     BUILD_EXPORTS: _BuildSpecExports = []
@@ -333,8 +373,11 @@ def _resolve_and_build(
     build_dependencies: bool,
     extras: list[str],
     output_lockfile: str | None,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
     compression_level: int = 6,
 ) -> None:
+    BaseReporter, Resolver = _import_resolvelib()
     requirements = []
 
     target_env = {
@@ -353,7 +396,7 @@ def _resolve_and_build(
     # Create the (reusable) resolver.
     provider = PyPIProvider(build_dependencies=build_dependencies)
     reporter = BaseReporter()
-    resolver: Resolver[Requirement, Candidate, str] = Resolver(provider, reporter)
+    resolver = Resolver(provider, reporter)
 
     # Kick off the resolution process, and get the final result.
     result = resolver.resolve(requirements)
@@ -362,7 +405,7 @@ def _resolve_and_build(
     if output_lockfile is not None and len(output_lockfile) > 0:
         version_file = open(output_lockfile, "w")
     for x in result.mapping.values():
-        download_or_build_wheel(x.url, target_folder)
+        download_or_build_wheel(x.url, target_folder, compression_level)
         if len(x.extras) > 0:
             extratxt = "[" + ",".join(x.extras) + "]"
         else:
@@ -380,7 +423,10 @@ def build_wheels_from_pypi_requirements(
     skip_dependency: list[str],
     exports: _BuildSpecExports,
     config_settings: ConfigSettingsType,
-    output_lockfile: str | None,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
+    output_lockfile: str | None = None,
+    compression_level: int = 6,
 ) -> None:
     """
     Given a list of package requirements, build or fetch them. If build_dependencies is true, then
@@ -395,6 +441,9 @@ def build_wheels_from_pypi_requirements(
         build_dependencies,
         extras=[],
         output_lockfile=output_lockfile,
+        isolation=isolation,
+        skip_dependency_check=skip_dependency_check,
+        compression_level=compression_level,
     )
 
 
@@ -404,7 +453,9 @@ def build_dependencies_for_wheel(
     skip_dependency: list[str],
     exports: _BuildSpecExports,
     config_settings: ConfigSettingsType,
-    output_lockfile: str | None,
+    isolation: bool = True,
+    skip_dependency_check: bool = False,
+    output_lockfile: str | None = None,
     compression_level: int = 6,
 ) -> None:
     """Extract dependencies from this wheel and build pypi dependencies
@@ -435,6 +486,8 @@ def build_dependencies_for_wheel(
         build_dependencies=True,
         extras=extras,
         output_lockfile=output_lockfile,
+        isolation=isolation,
+        skip_dependency_check=skip_dependency_check,
         compression_level=compression_level,
     )
     # add the current wheel to the package-versions.txt
@@ -450,6 +503,7 @@ def build_dependencies_for_wheel(
 
 
 def fetch_pypi_package(package_spec: str, destdir: Path) -> Path:
+    _, PackageFinder = _import_unearth()
     pf = PackageFinder(
         index_urls=_PYPI_INDEX,
         trusted_hosts=_PYPI_TRUSTED_HOSTS,

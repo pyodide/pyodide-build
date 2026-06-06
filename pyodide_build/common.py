@@ -5,38 +5,126 @@
 import contextlib
 import hashlib
 import os
+import re
 import shutil
+import stat
 import subprocess
 import sys
 import textwrap
+import time
 import tomllib
+import warnings
 import zipfile
 from collections import deque
-from collections.abc import Generator, Iterable, Iterator, Mapping
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from functools import cache
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, NoReturn
+from urllib.request import urlopen
 from zipfile import ZipFile
 
+import platformdirs
 from packaging.tags import Tag
 from packaging.utils import canonicalize_name as canonicalize_package_name
 from packaging.utils import parse_wheel_filename
 
 from pyodide_build.logger import logger
 
+IS_WIN = sys.platform == "win32"
+
 
 def xbuildenv_dirname() -> str:
-    from pyodide_build import __version__
+    try:
+        from pyodide_build import __version__
+    except ImportError:
+        __version__ = "0.0.0"
 
     return f".pyodide-xbuildenv-{__version__}"
 
 
-def find_matching_wheels(
-    wheel_paths: Iterable[Path], supported_tags: Iterator[Tag]
+@cache
+def default_xbuildenv_path() -> Path:
+    """
+    Return the default path to the cross-build environment directory. This directory
+    is used when no path is provided to `pyodide xbuildenv`'s subcommands.
+
+    The search order for determining the path is as follows:
+    1. the PYODIDE_XBUILDENV_PATH environment variable if set
+    2. the value provided by "pyodide config xbuildenv_path"
+    3. the default location based on platformdirs
+
+    Returns
+    -------
+    Path
+        The path to the cross-build environment directory
+    """
+
+    # 1. check "pyodide config xbuildenv_path"
+    try:
+        from pyodide_build.build_env import get_host_build_flag
+
+        config_path_str = get_host_build_flag("PYODIDE_XBUILDENV_PATH")
+
+        # we can skip to fallback options if the config path is empty
+        # as Path("") returns Path("."), which is not what we want.
+        if config_path_str:
+            config_path = Path(config_path_str).resolve()
+
+            if _has_write_access(config_path):
+                return config_path
+            else:
+                logger.error(
+                    "Error: the directory specified in pyproject.toml or PYODIDE_XBUILDENV_PATH (%s) is not writable. ",
+                    config_path,
+                )
+
+    except Exception as e:
+        logger.error("Error reading xbuildenv_path from config system: %s", e)
+
+    # 2. use default locations from platformdirs and elsewhere
+    dirname = xbuildenv_dirname()
+    candidates = []
+
+    # 2.1. default cache directory
+    candidates.append(Path(platformdirs.user_cache_dir()) / dirname)
+    # 2.2. current working directory
+    candidates.append(Path.cwd() / dirname)
+
+    for candidate in candidates:
+        if _has_write_access(candidate):
+            return candidate
+
+    raise RuntimeError(
+        "Cannot find a writable directory for the cross-build environment. "
+        "Please check if you have write access to the following directories:\n"
+        f"  {', '.join(str(c) for c in candidates)}\n"
+    )
+
+
+def _has_write_access(folder: Path) -> bool:
+    """
+    Checks if the current user has write access to the given folder using pathlib.
+    """
+    try:
+        if not folder.exists() and folder.parent != folder:
+            return _has_write_access(folder.parent)
+
+        return os.access(str(folder), os.W_OK)
+    except OSError:
+        return False
+
+
+def _find_matching_wheels(
+    wheel_paths: Iterable[Path],
+    supported_tags: Sequence[Tag],
+    version: str | None = None,
 ) -> Iterator[Path]:
     """
     Returns the sequence wheels whose tags match the Pyodide interpreter.
+
+    We don't bother ordering them carefully because we are only hoping to find one.
 
     Parameters
     ----------
@@ -49,17 +137,41 @@ def find_matching_wheels(
     -------
     The subset of wheel_paths that have tags that match the Pyodide interpreter.
     """
-    wheel_paths = list(wheel_paths)
-    wheel_tags_list: list[frozenset[Tag]] = []
-
-    for wheel in wheel_paths:
-        _, _, _, tags = parse_wheel_filename(wheel.name)
-        wheel_tags_list.append(tags)
-
-    for supported_tag in supported_tags:
-        for wheel_path, wheel_tags in zip(wheel_paths, wheel_tags_list, strict=True):
+    for wheel_path in wheel_paths:
+        _, wheel_version, _, wheel_tags = parse_wheel_filename(wheel_path.name)
+        if version and version != str(wheel_version):
+            continue
+        for supported_tag in supported_tags:
             if supported_tag in wheel_tags:
                 yield wheel_path
+                continue
+
+
+def find_matching_wheel(
+    wheel_paths: Iterable[Path], supported_tags: Sequence[Tag], version: str = None
+) -> Path | None:
+    """
+    Find a matching wheel or raise an error if none is present.
+
+    Parameters
+    ----------
+    wheel_paths
+        A list of paths to wheels
+    supported_tags
+        A list of tags that the environment supports
+
+    Returns
+    -------
+    The subset of wheel_paths that have tags that match the Pyodide interpreter.
+    """
+    result = list(_find_matching_wheels(wheel_paths, supported_tags, version))
+    if not result:
+        return None
+    if len(result) > 1:
+        raise RuntimeError(
+            "Found multiple matching wheels:\n" + "\n".join(w.name for w in result)
+        )
+    return result[0]
 
 
 def parse_top_level_import_name(whlfile: Path) -> list[str] | None:
@@ -73,7 +185,7 @@ def parse_top_level_import_name(whlfile: Path) -> list[str] | None:
     whlzip = zipfile.Path(whlfile)
 
     def _valid_package_name(dirname: str) -> bool:
-        return all([invalid_chr not in dirname for invalid_chr in ".- "])
+        return all(invalid_chr not in dirname for invalid_chr in ".- ")
 
     def _has_python_file(subdir: zipfile.Path) -> bool:
         queue = deque([subdir])
@@ -129,10 +241,11 @@ def _environment_substitute_str(
     if env is None:
         env = dict(os.environ)
 
-    for e_name, e_value in env.items():
-        string = string.replace(f"$({e_name})", e_value)
+    def repl(match_: re.Match[str]) -> str:
+        name = match_.group(1)
+        return env.get(name, "")
 
-    return string
+    return re.sub(r"\$\(([^)]+)\)", repl, string)
 
 
 def environment_substitute_args(
@@ -183,6 +296,36 @@ def exit_with_stdio(result: subprocess.CompletedProcess[str]) -> NoReturn:
         logger.error("  stderr:")
         logger.error(textwrap.indent(result.stderr, "    "))
     raise SystemExit(result.returncode)
+
+
+def run_command(
+    cmd: list[str],
+    *,
+    text: bool = True,
+    err_msg: str | tuple[str, ...] | None = None,
+    capture_output: bool = True,
+    **kwargs,
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run command. If it returns a nonzero status code, log an error message and
+    exit.
+    """
+    logger.debug("Running command: %s", " ".join(str(c) for c in cmd))
+
+    result = subprocess.run(
+        cmd, text=text, capture_output=capture_output, check=False, **kwargs
+    )
+
+    if result.returncode == 0:
+        return result
+
+    if err_msg is None:
+        err_msg = ("ERROR: command failed %s", " ".join(cmd))
+    elif not isinstance(err_msg, tuple):
+        err_msg = ("ERROR: %s", err_msg)
+
+    logger.error(*err_msg)
+    exit_with_stdio(result)
 
 
 def find_missing_executables(executables: list[str]) -> list[str]:
@@ -284,34 +427,43 @@ def _get_sha256_checksum(archive: Path) -> str:
     return h.hexdigest()
 
 
-def unpack_wheel(wheel_path: Path, target_dir: Path | None = None) -> None:
+def _format_dep_chain(dep_chain: Sequence[str]) -> str:
+    return " -> ".join(dep.partition(";")[0].strip() for dep in dep_chain)
+
+
+def _format_missing_dependencies(missing: set[tuple[str, ...]]) -> str:
+    return "".join(
+        "\n\t" + dep
+        for deps in missing
+        for dep in (deps[0], _format_dep_chain(deps[1:]))
+        if dep
+    )
+
+
+def unpack_wheel(
+    wheel_path: Path, target_dir: Path | None = None, verbose=True
+) -> None:
     if target_dir is None:
         target_dir = wheel_path.parent
-    result = subprocess.run(
+    run_command(
         [sys.executable, "-m", "wheel", "unpack", wheel_path, "-d", target_dir],
-        check=False,
-        encoding="utf-8",
+        capture_output=not verbose,
+        err_msg=("ERROR: Unpacking wheel %s failed", wheel_path.name),
     )
-    if result.returncode != 0:
-        logger.error("ERROR: Unpacking wheel %s failed", wheel_path.name)
-        exit_with_stdio(result)
 
 
-def pack_wheel(wheel_dir: Path, target_dir: Path | None = None) -> None:
+def pack_wheel(wheel_dir: Path, target_dir: Path | None = None, verbose=True) -> None:
     if target_dir is None:
         target_dir = wheel_dir.parent
-    result = subprocess.run(
+    run_command(
         [sys.executable, "-m", "wheel", "pack", wheel_dir, "-d", target_dir],
-        check=False,
-        encoding="utf-8",
+        capture_output=not verbose,
+        err_msg=("ERROR: Packing wheel %s failed", wheel_dir),
     )
-    if result.returncode != 0:
-        logger.error("ERROR: Packing wheel %s failed", wheel_dir)
-        exit_with_stdio(result)
 
 
 @contextmanager
-def modify_wheel(wheel: Path) -> Iterator[Path]:
+def modify_wheel(wheel: Path, verbose=True) -> Iterator[Path]:
     """Unpacks the wheel into a temp directory and yields the path to the
     unpacked directory.
 
@@ -322,17 +474,28 @@ def modify_wheel(wheel: Path) -> Iterator[Path]:
     wheel is left unchanged.
     """
     with TemporaryDirectory() as temp_dir:
-        unpack_wheel(wheel, Path(temp_dir))
+        unpack_wheel(wheel, Path(temp_dir), verbose=verbose)
         name, ver, _ = wheel.name.split("-", 2)
         wheel_dir_name = f"{name}-{ver}"
         wheel_dir = Path(temp_dir) / wheel_dir_name
         yield wheel_dir
         wheel.unlink()
-        pack_wheel(wheel_dir, wheel.parent)
+        pack_wheel(wheel_dir, wheel.parent, verbose=verbose)
 
 
-def retag_wheel(wheel_path: Path, platform: str) -> Path:
-    result = subprocess.run(
+def retag_wheel(
+    wheel_path: Path,
+    platform: str,
+    *,
+    python: str | None = None,
+    abi: str | None = None,
+) -> Path:
+    extra_flags = []
+    if python:
+        extra_flags += ["--python-tag", python]
+    if abi:
+        extra_flags += ["--abi-tag", abi]
+    result = run_command(
         [
             sys.executable,
             "-m",
@@ -342,14 +505,10 @@ def retag_wheel(wheel_path: Path, platform: str) -> Path:
             "--platform-tag",
             platform,
             "--remove",
+            *extra_flags,
         ],
-        check=False,
-        encoding="utf-8",
-        capture_output=True,
+        err_msg=("ERROR: Retagging wheel %s to %s failed", wheel_path, platform),
     )
-    if result.returncode != 0:
-        logger.error("ERROR: Retagging wheel %s to %s failed", wheel_path, platform)
-        exit_with_stdio(result)
     return wheel_path.parent / result.stdout.splitlines()[-1].strip()
 
 
@@ -440,3 +599,82 @@ def search_pyproject_toml(
             raise ValueError(f"Could not parse {pyproject_file}.") from e
 
     return None, None
+
+
+def to_bool(value: str) -> bool:
+    """
+    Convert a string to a boolean value. Useful for parsing environment variables.
+    """
+    return value.lower() not in {"", "0", "false", "no", "off"}
+
+
+def download_and_unpack_archive(
+    url: str, path: Path, descr: str, *, exists_ok: bool = False
+) -> None:
+    """
+    Download the cross-build environment from the given URL and extract it to the given path.
+
+    Parameters
+    ----------
+    url
+        URL to download the cross-build environment from.
+    path
+        Path to extract the cross-build environment to.
+        If the path already exists, raise an error.
+    """
+    logger.info("Downloading %s from %s", descr, url)
+
+    if not exists_ok and path.exists():
+        raise FileExistsError(f"Path {path} already exists")
+
+    try:
+        resp = urlopen(url)
+        data = resp.read()
+    except Exception as e:
+        raise ValueError(f"Failed to download {descr} from {url}") from e
+
+    # FIXME: requests makes a verbose output (see: https://github.com/pyodide/pyodide/issues/4810)
+    # r = requests.get(url)
+
+    # if r.status_code != 200:
+    #     raise ValueError(
+    #         f"Failed to download cross-build environment from {url} (status code: {r.status_code})"
+    #     )
+
+    with TemporaryDirectory() as temp_dir:
+        f_path = Path(temp_dir) / "temp.tar"
+        f_path.write_bytes(data)
+        with warnings.catch_warnings():
+            # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
+            # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
+            # https://github.com/python/cpython/issues/112760
+            warnings.simplefilter("ignore")
+            shutil.unpack_archive(str(f_path), path)
+
+
+def retrying_rmtree(d):
+    """Sometimes rmtree fails with OSError: Directory not empty
+
+    Try again a few times if this happens.
+    See: https://github.com/python/cpython/issues/128076
+    """
+    for _ in range(3):
+        try:
+            return shutil.rmtree(d)
+        except OSError as e:
+            if e.strerror == "Directory not empty":
+                # wait a bit and try again up to 3 tries
+                time.sleep(0.01)
+            else:
+                raise
+    raise RuntimeError(f"shutil.rmtree('{d}') failed with ENOTEMPTY three times")
+
+
+def remove_readonly(func, path, _):
+    """Clear the readonly bit and reattempt removal.
+
+    Needed on Windows to remove read-only files like `git` objects.
+    Use with: `shutil.rmtree(path, onexc=remove_readonly)`
+    """
+    os.chmod(path, stat.S_IWRITE)
+    func(path)

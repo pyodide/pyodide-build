@@ -1,0 +1,9 @@
+package:
+  name: pyparsing
+  version: 3.2.1
+source:
+  sha256: 506ff4f4386c4cec0590ec19e6302d3aedb992fdc02c761e90416f158dacf8e1
+  url: https://files.pythonhosted.org/packages/pyparsing/p/pyparsing/pyparsing-3.2.1-py3-none-any.whl
+test:
+  imports:
+    - pyparsing

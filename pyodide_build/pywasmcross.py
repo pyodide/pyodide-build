@@ -11,7 +11,9 @@ cross-compiling and then pass the command long to emscripten.
 import json
 import os
 import sys
+from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import Literal, NamedTuple
 
 from __main__ import __file__ as INVOKED_PATH_STR
 
@@ -57,11 +59,6 @@ if IS_COMPILER_INVOCATION:
     __name__ = PYWASMCROSS_ARGS.pop("orig__name__")
 
 
-import subprocess
-from collections.abc import Iterable, Iterator
-from typing import Literal, NamedTuple
-
-
 class CrossCompileArgs(NamedTuple):
     """
     Arguments for cross-compiling a package.
@@ -77,23 +74,34 @@ class CrossCompileArgs(NamedTuple):
     target_install_dir: str = ""  # The path to the target Python installation
     pythoninclude: str = ""  # path to the cross-compiled Python include directory
     exports: Literal["whole_archive", "requested", "pyinit"] | list[str] = "pyinit"
+    # Pyodide abi, e.g., 2025_0
+    # Sometimes we have to inject compile flags only for certain abis.
+    abi: str = ""
 
 
 def is_link_cmd(line: list[str]) -> bool:
     """
     Check if the command is a linker invocation.
     """
-    import re
-
-    SHAREDLIB_REGEX = re.compile(r"\.so(.\d+)*$")
     for arg in line:
-        if not arg.startswith("-") and SHAREDLIB_REGEX.search(arg):
+        if not arg or arg[0] == "-":
+            continue
+
+        if arg.endswith(".so"):
             return True
+
+        dot_so_pos = arg.find(".so.")
+        if dot_so_pos != -1:
+            version = arg[dot_so_pos + 4 :]
+            # versioned shared libraries start with a digit, and consist of only digits and dots.
+            if version and version[0].isdigit():
+                if all(c.isdigit() or c == "." for c in version):
+                    return True
 
     return False
 
 
-def replay_genargs_handle_dashl(arg: str, used_libs: set[str]) -> str | None:
+def replay_genargs_handle_dashl(arg: str, used_libs: set[str], abi: str) -> str | None:
     """
     Figure out how to replace a `-lsomelib` argument.
 
@@ -112,11 +120,14 @@ def replay_genargs_handle_dashl(arg: str, used_libs: set[str]) -> str | None:
     """
     assert arg.startswith("-l")
 
-    if arg == "-lffi":
+    if arg in {"-lffi", "-lgfortran"}:
         return None
 
-    if arg == "-lgfortran":
-        return None
+    # Some Emscripten libraries that use setjmp/longjmp.
+    # The Emscripten linker should automatically know to use these variants so
+    # this shouldn't be necessary.
+    if abi > "2025" and arg in ("-lfreetype", "-lpng"):
+        arg += "-legacysjlj"
 
     # WASM link doesn't like libraries being included twice
     # skip second one
@@ -144,12 +155,15 @@ def replay_genargs_handle_dashI(arg: str, target_install_dir: str) -> str | None
     """
     assert arg.startswith("-I")
 
+    include_path_str = arg[2:]
+
     # Don't include any system directories
-    if arg[2:].startswith("/usr"):
+    if include_path_str.startswith("/usr"):
         return None
 
     # Replace local Python include paths with the cross compiled ones
-    include_path = str(Path(arg[2:]).resolve())
+    include_path = str(Path(include_path_str).resolve())
+
     if include_path.startswith(sys.prefix + "/include/python"):
         return arg.replace("-I" + sys.prefix, "-I" + target_install_dir)
 
@@ -166,34 +180,43 @@ def replay_genargs_handle_linker_opts(arg: str) -> str | None:
     because arg may be something like "-Wl,-xxx,-yyy" where we only want
     to ignore "-xxx" but not "-yyy".
     """
-
     assert arg.startswith("-Wl")
+
+    excluded_linker_opts = (
+        "-Bsymbolic-functions",
+        # breaks emscripten see https://github.com/emscripten-core/emscripten/issues/14460
+        "--strip-all",
+        "-strip-all",
+        # wasm-ld does not recognize some link flags
+        "--sort-common",
+        "--as-needed",
+        # macOS-specific linker flags that wasm-ld doesn't understand
+        "-headerpad_max_install_names",
+        "-dead_strip_dylibs",
+        # Newer clang seems to add this by default, but wasm-ld doesn't support it
+        "--enable-new-dtags",
+    )
+
+    excluded_linker_prefixes = (
+        "--sysroot=",  # ignore unsupported --sysroot compile argument used in conda
+        "--version-script=",
+        "-R/",  # wasm-ld does not accept -R (runtime libraries)
+        "-R.",  # wasm-ld does not accept -R (runtime libraries)
+        "--exclude-libs=",
+    )
+
     link_opts = arg.split(",")[1:]
     new_link_opts = ["-Wl"]
+
     for opt in link_opts:
-        if opt in [
-            "-Bsymbolic-functions",
-            # breaks emscripten see https://github.com/emscripten-core/emscripten/issues/14460
-            "--strip-all",
-            "-strip-all",
-            # wasm-ld does not recognize some link flags
-            "--sort-common",
-            "--as-needed",
-        ]:
+        if opt in excluded_linker_opts:
             continue
 
-        if opt.startswith(
-            (
-                "--sysroot=",  # ignore unsupported --sysroot compile argument used in conda
-                "--version-script=",
-                "-R/",  # wasm-ld does not accept -R (runtime libraries)
-                "-R.",  # wasm-ld does not accept -R (runtime libraries)
-                "--exclude-libs=",
-            )
-        ):
+        if opt.startswith(excluded_linker_prefixes):
             continue
 
         new_link_opts.append(opt)
+
     if len(new_link_opts) > 1:
         return ",".join(new_link_opts)
     else:
@@ -222,7 +245,7 @@ def replay_genargs_handle_argument(arg: str) -> str | None:
         return None
 
     # fmt: off
-    if arg in [
+    excluded_arguments = (
         # threading is disabled for now
         "-pthread",
         # this only applies to compiling fortran code, but we already f2c'd
@@ -240,21 +263,21 @@ def replay_genargs_handle_argument(arg: str) -> str | None:
         "-mno-sse2", # warning: argument unused during compilation
         "-mno-avx2", # warning: argument unused during compilation
         "-std=legacy", # fortran flag that clang does not support
-    ]:
-        return None
-
-    if arg.startswith((
-        "-J",  # fortran flag that clang does not support
-    )):
-        return None
-
+    )
     # fmt: on
+
+    if arg in excluded_arguments:
+        return None
+
+    if arg.startswith("-J"):  # fortran flag that clang does not support
+        return None
+
     return arg
 
 
 def get_cmake_compiler_flags() -> list[str]:
     """
-    GeneraTe cmake compiler flags.
+    Generate cmake compiler flags.
     emcmake will set these values to emcc, em++, ...
     but we need to set them to cc, c++, in order to make them pass to pywasmcross.
     Returns
@@ -337,21 +360,35 @@ def _calculate_object_exports_readobj_parse(output: str) -> list[str]:
 
 
 def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
-    import shutil
+    from shutil import which
+    from subprocess import run as sp_run
 
-    readobj_path = shutil.which("llvm-readobj")
+    # This works for bootstrapped Emscripten via GitHub sources.
+    # llvm-readobj might not be available this way with Homebrew
+    # or conda-forge distributions of Emscripten.
+    which_emcc = which("emcc")
+    assert which_emcc
+    emcc = Path(which_emcc)
+    readobj = (emcc / "../../bin/llvm-readobj").resolve()
+    if readobj.exists():
+        readobj_path = str(readobj)
+    else:
+        readobj_path = which("llvm-readobj")
     if not readobj_path:
-        which_emcc = shutil.which("emcc")
-        assert which_emcc
-        emcc = Path(which_emcc)
-        readobj_path = str((emcc / "../../bin/llvm-readobj").resolve())
+        print("Failed to find llvm-readobj, quitting", file=sys.stdout)
+        sys.exit(1)
+
     args = [
         readobj_path,
         "--section-details",
         "-st",
     ] + objects
-    completedprocess = subprocess.run(
-        args, encoding="utf8", capture_output=True, env={"PATH": os.environ["PATH"]}
+    completedprocess = sp_run(
+        args,
+        encoding="utf8",
+        capture_output=True,
+        env={"PATH": os.environ["PATH"]},
+        check=False,
     )
     if completedprocess.returncode:
         print(f"Command '{' '.join(args)}' failed. Output to stderr was:")
@@ -365,9 +402,15 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
 
 
 def calculate_object_exports_nm(objects: list[str]) -> list[str]:
+    from subprocess import run as sp_run
+
     args = ["emnm", "-j", "--export-symbols"] + objects
-    result = subprocess.run(
-        args, encoding="utf8", capture_output=True, env={"PATH": os.environ["PATH"]}
+    result = sp_run(
+        args,
+        encoding="utf8",
+        capture_output=True,
+        env={"PATH": os.environ["PATH"]},
+        check=False,
     )
     if result.returncode:
         print(f"Command '{' '.join(args)}' failed. Output to stderr was:")
@@ -420,6 +463,8 @@ def get_export_flags(
     If "whole_archive" was requested, no action is needed. Otherwise, add
     `-sSIDE_MODULE=2` and the appropriate export list.
     """
+    from tempfile import NamedTemporaryFile
+
     if exports == "whole_archive":
         return
     yield "-sSIDE_MODULE=2"
@@ -430,9 +475,7 @@ def get_export_flags(
 
     prefixed_exports = ["_" + x for x in export_list]
 
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+    with NamedTemporaryFile(mode="w", delete=False) as f:
         # Use a response file to avoid command line length limits
         f.write(json.dumps(prefixed_exports))
 
@@ -475,9 +518,9 @@ def handle_command_generate_args(  # noqa: C901
         return ["emcc", "-v"]
 
     cmd = line[0]
-    if cmd == "c++" or cmd == "g++":
+    if cmd in {"c++", "g++"}:
         new_args = ["em++"]
-    elif cmd in ("cc", "gcc", "ld", "lld"):
+    elif cmd in {"cc", "gcc", "ld", "lld"}:
         new_args = ["emcc"]
         # distutils doesn't use the c++ compiler when compiling c++ <sigh>
         if any(arg.endswith((".cpp", ".cc")) for arg in line):
@@ -495,10 +538,6 @@ def handle_command_generate_args(  # noqa: C901
             "emcmake",
             "cmake",
             *flags,
-            # Since we create a temporary directory and install compiler symlinks every time,
-            # CMakeCache.txt will contain invalid paths to the compiler when re-running,
-            # so we need to tell CMake to ignore the existing cache and build from scratch.
-            "--fresh",
         ]
         return line
     elif cmd == "meson":
@@ -514,16 +553,22 @@ def handle_command_generate_args(  # noqa: C901
             ]
 
         return line
-    elif cmd in ("install_name_tool", "otool"):
+    elif cmd in {"install_name_tool", "otool"}:
         # In MacOS, meson tries to run install_name_tool to fix the rpath of the shared library
-        # assuming that it is a ELF file. We need to skip this step.
+        # assuming that it is an ELF file. We need to skip this step.
         # See: https://github.com/mesonbuild/meson/issues/8027
         return ["echo", *line]
     elif cmd == "ranlib":
         line[0] = "emranlib"
         return line
     elif cmd == "strip":
-        line[0] = "emstrip"
+        if build_args.abi > "2026":
+            # Emscripten > 5.0.0 strips out the dylink.0 section
+            # so we skip strip to avoid the error
+            # https://github.com/emscripten-core/emscripten/issues/26563
+            line[0] = "echo"
+        else:
+            line[0] = "emstrip"
         return line
     else:
         return line
@@ -538,7 +583,7 @@ def handle_command_generate_args(  # noqa: C901
             continue
 
         if arg.startswith("-l"):
-            result = replay_genargs_handle_dashl(arg, used_libs)
+            result = replay_genargs_handle_dashl(arg, used_libs, build_args.abi)
         elif arg.startswith("-I"):
             result = replay_genargs_handle_dashI(arg, build_args.target_install_dir)
         elif arg.startswith("-Wl"):
@@ -589,6 +634,7 @@ def handle_command(
     build_args : BuildArgs
        a container with additional compilation options
     """
+    from subprocess import run as sp_run
 
     if line[0] == "gfortran":
         from _f2c_fixes import replay_f2c
@@ -597,7 +643,7 @@ def handle_command(
         if tmp is None:
             # No source file, it's a query for information about the compiler. Pretend we're
             # gfortran by letting gfortran handle it
-            return subprocess.run(line).returncode
+            return sp_run(line, check=False).returncode
 
         line = tmp
 
@@ -608,7 +654,7 @@ def handle_command(
 
         scipy_fixes(new_args)
 
-    result = subprocess.run(new_args)
+    result = sp_run(new_args, check=False)
     return result.returncode
 
 
@@ -621,6 +667,7 @@ def compiler_main():
         target_install_dir=PYWASMCROSS_ARGS["target_install_dir"],
         pythoninclude=PYWASMCROSS_ARGS["pythoninclude"],
         exports=PYWASMCROSS_ARGS["exports"],
+        abi=PYWASMCROSS_ARGS["abi"],
     )
     basename = Path(sys.argv[0]).name
     args = list(sys.argv)

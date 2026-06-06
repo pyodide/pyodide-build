@@ -243,6 +243,31 @@ def test_is_compatible_full():
     )
 
 
+def test_published_at():
+    release = CrossBuildEnvReleaseSpec(
+        version="0.1.0",
+        url="https://example.com/0.1.0.tar.gz",
+        sha256="1234567890abcdef",
+        python_version="3.8.0",
+        emscripten_version="1.39.8",
+        published_at="2024-01-18T21:52:25Z",
+    )
+    assert release.published_at == "2024-01-18T21:52:25Z"
+
+    release_no_date = CrossBuildEnvReleaseSpec(
+        version="0.1.0",
+        url="https://example.com/0.1.0.tar.gz",
+        sha256="1234567890abcdef",
+        python_version="3.8.0",
+        emscripten_version="1.39.8",
+    )
+    assert release_no_date.published_at == ""
+
+    metadata = CrossBuildEnvMetaSpec(**FAKE_METADATA)
+    for release in metadata.releases.values():
+        assert release.published_at == ""
+
+
 def test_is_compatible_without_pyodide_build_range():
     release = CrossBuildEnvReleaseSpec(
         version="0.1.0",
