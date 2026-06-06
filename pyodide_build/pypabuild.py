@@ -126,11 +126,26 @@ def _replace_unisolated_packages(
     new_reqs = reqs.copy()
     unisolated: set[str] = set()
     for reqstr in list(reqs):
-        name = Requirement(reqstr).name
-        if name in unisolated_packages:
-            new_reqs.discard(reqstr)
-            new_reqs.add(f"{name}=={unisolated_packages[name]}")
-            unisolated.add(name)
+        req = Requirement(reqstr)
+        for name, version in unisolated_packages.items():
+            if req.name == name:
+                # TODO: find a better way to handle this case
+                if not req.specifier.contains(version):
+                    print(
+                        f"WARNING: found build dependency {req} but the only supported cross-build version is {name}=={version}"
+                    )
+                    print(f"WARNING: using {name}=={version} instead")
+                new_reqs.discard(reqstr)
+                new_reqs.add(f"{name}=={version}")
+                unisolated.add(name)
+                break
+        else:
+            # oldest-supported-numpy is a meta package for numpy
+            # TODO: use dependency resolution instead of hardcoding this
+            if req.name == "oldest-supported-numpy" and "numpy" in unisolated_packages:
+                new_reqs.discard(reqstr)
+                new_reqs.add(f"numpy=={unisolated_packages['numpy']}")
+                unisolated.add("numpy")
     return new_reqs, unisolated
 
 

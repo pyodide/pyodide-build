@@ -29,7 +29,55 @@ def test_remove_avoided_requirements():
     ) == {"baz"}
 
 
-def test_install_reqs(tmp_path, dummy_xbuildenv):
+def test_replace_unisolated_packages():
+    requires = {"foo", "bar<1.0", "baz==1.0", "qux"}
+    unisolated = {
+        "foo": "2.0",
+        "bar": "0.5",
+        "baz": "1.0",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"foo==2.0", "bar==0.5", "baz==1.0", "qux"}
+    assert replaced == {"foo", "bar", "baz"}
+
+
+def test_replace_unisolated_packages_version_mismatch():
+    """
+    FIXME: This is not an ideal behavior, but for now we just ignore the version mismatch.
+    """
+    requires = {"baz==1.0"}
+    unisolated = {
+        "baz": "1.1",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"baz==1.1"}
+    assert replaced == {"baz"}
+
+
+def test_replace_unisolated_packages_oldest_supported_numpy():
+    """
+    oldest-supported-numpy is a special case where we want to replace it with numpy instead.
+    """
+    requires = {"oldest-supported-numpy"}
+    unisolated = {
+        "numpy": "1.20",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"numpy==1.20"}
+    assert replaced == {"numpy"}
+
+
+def test_install_reqs(tmp_path, dummy_xbuildenv, monkeypatch):
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
     env = MockIsolatedEnv(tmp_path)
 
     reqs = {"foo", "bar", "baz"}
