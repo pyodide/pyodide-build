@@ -27,7 +27,7 @@ from pyodide_build.build_env import (
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
-    _DefaultIsolatedEnv,
+    _configure_build_verbosity,
     _error,
     _handle_build_error,
     _styles,
@@ -371,7 +371,7 @@ def get_build_env(
         yield env
 
 
-def _make_pypa_build_logger() -> Callable[[str], None]:
+def _make_pypa_build_logger(verbosity: int) -> Callable[[str], None]:
     """
     Returns a logger function compatible with build._ctx.LOGGER.
 
@@ -387,10 +387,12 @@ def _make_pypa_build_logger() -> Callable[[str], None]:
         if not msg:
             return
         match kind:
-            case ("subprocess", "cmd"):
+            case ("subprocess", "cmd") if verbosity >= 1:
                 print(f"> {msg}", file=sys.stderr, flush=True)
-            case ("subprocess", *_):
+            case ("subprocess", *_) if verbosity >= 1:
                 print(f"< {msg}", file=sys.stderr, flush=True)
+            case ("subprocess", *_):
+                pass  # verbosity=0: installer output is not shown
             case _:
                 print(msg, file=sys.stderr, flush=True)
 
