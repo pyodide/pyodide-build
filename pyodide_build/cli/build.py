@@ -35,6 +35,7 @@ class BuildArgs:
     config_settings: ConfigSettingsType
     isolation: bool
     skip_dependency_check: bool
+    verbosity: int = 0
 
 
 def _convert_exports(exports: str) -> _BuildSpecExports:
@@ -76,6 +77,7 @@ def _build_from_source(
         args.config_settings,
         isolation=args.isolation,
         skip_dependency_check=args.skip_dependency_check,
+        verbosity=args.verbosity,
     )
 
 
