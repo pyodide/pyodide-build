@@ -226,7 +226,9 @@ def _build_in_current_env(
     verbosity: int = 0,
 ) -> str:
     with common.replace_env(build_env):
-        builder = ProjectBuilder(srcdir, runner=_gen_runner(build_env, verbosity=verbosity))
+        builder = ProjectBuilder(
+            srcdir, runner=_gen_runner(build_env, verbosity=verbosity)
+        )
 
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})
