@@ -484,6 +484,7 @@ def source(
     config_settings: ConfigSettingsType,
     isolation: bool = True,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> Path:
     """Use pypa/build to build a Python package from source"""
     args = BuildArgs(
@@ -491,5 +492,6 @@ def source(
         config_settings=config_settings,
         isolation=isolation,
         skip_dependency_check=skip_dependency_check,
+        verbosity=verbosity,
     )
     return _build_from_source(source_location, output_directory, args)
