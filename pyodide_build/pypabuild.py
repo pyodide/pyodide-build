@@ -4,6 +4,7 @@ import shutil
 import subprocess as sp
 import sys
 import traceback
+import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -131,10 +132,12 @@ def _replace_unisolated_packages(
             if req.name == name:
                 # TODO: find a better way to handle this case
                 if not req.specifier.contains(version):
-                    print(
-                        f"WARNING: found build dependency {req} but the only supported cross-build version is {name}=={version}"
+                    warnings.warn(
+                        f"Found build dependency {req} but the only supported "
+                        f"cross-build version is {name}=={version}; "
+                        f"using {name}=={version} instead.",
+                        stacklevel=2,
                     )
-                    print(f"WARNING: using {name}=={version} instead")
                 new_reqs.discard(reqstr)
                 new_reqs.add(f"{name}=={version}")
                 unisolated.add(name)
