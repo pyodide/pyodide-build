@@ -372,6 +372,8 @@ def get_build_env(
         yield env
 
 
+# Based on pypa/build's reference logger implementation. See
+# https://github.com/pypa/build/blob/615d04cfc52ac3c1592a463f0afe484fee1cc368/src/build/__main__.py#L99-L123
 def _make_pypa_build_logger(verbosity: int) -> Callable[[str], None]:
     """
     Returns a logger function compatible with build._ctx.LOGGER.
@@ -380,7 +382,18 @@ def _make_pypa_build_logger(verbosity: int) -> Callable[[str], None]:
     at INFO level, but that logger has no handlers and an effective level of WARNING,
     so all output is silently dropped when we use pypa/build as a library.
 
-    We mirror pypa/build's CLI logger where everything goes to stderr.
+    We mirror pypa/build's CLI logger, where all messages go to stderr. The subprocess
+    commands are prefixed by "> " and subprocess output is prefixed by "< ".
+
+    The ``message`` is a plain string. ``kind`` is a tuple tag that is set by pypa/build:
+      - ``('step',)``                  --> this is a high-level build step (such as "Building wheel...")
+      - ``('subprocess', 'cmd')``      --> the installer command that is being run
+      - ``('subprocess', 'stdout')``   --> a line of the installer's stdout
+      - ``('subprocess', 'stderr')``   --> a line of the installer's stderr
+      - ``None``                       --> some untagged informational message
+
+    pypa/build only calls this logger with the subprocess's content when
+    _ctx.VERBOSITY is greater than zero.
     """
 
     def _log(message: str, *, kind: tuple[str, ...] | None = None) -> None:
