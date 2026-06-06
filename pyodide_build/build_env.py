@@ -228,8 +228,8 @@ def get_unisolated_packages() -> dict[str, str]:
 
     Unisolated packages are packages that are used during the build process
     and have some platform-specific files. When these packages are used
-    during the build process, we switch need to switch platform-specific files,
-    in order to build the package correctly.
+    during the build process, their platform-specific files are replaced with
+    WASM-compatible versions to build the package correctly.
 
     Returns
     -------
