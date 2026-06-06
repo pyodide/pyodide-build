@@ -165,6 +165,15 @@ class CrossBuildEnvManager:
         Path to the root directory for the cross-build environment.
         """
 
+        if not skip_install_cross_build_packages:
+            import warnings
+
+            warnings.warn(
+                "skip_install_cross_build_packages is deprecated and no longer has any effect.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         if url and version:
             raise ValueError("Cannot specify both version and url")
 
