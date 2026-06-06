@@ -149,7 +149,7 @@ def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
 
     Parameters
     ----------
-    path
+    venv_path
         The path to the isolated environment.
 
     unisolated
