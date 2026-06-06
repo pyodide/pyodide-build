@@ -215,3 +215,34 @@ class TestHandleBuildErrorSubprocessOutput:
                 raise BuildBackendException(cpe)
         captured = capsys.readouterr()
         assert "backend install error" in captured.out
+
+
+@pytest.mark.parametrize("verbosity", [0, 1, 2])
+def test_build_sets_ctx_verbosity(tmp_path, dummy_xbuildenv, monkeypatch, verbosity):
+    """pypabuild.build() must set build._ctx.VERBOSITY before calling the builder."""
+    from build import _ctx as _build_ctx
+
+    observed: list[int] = []
+
+    def _fake_isolated(
+        build_env, srcdir, outdir, distribution, config_settings, verbosity=0
+    ):
+        observed.append(_build_ctx.VERBOSITY.get())
+        return str(outdir / "pkg-1.0-py3-none-any.whl")
+
+    monkeypatch.setattr(pypabuild, "_build_in_isolated_env", _fake_isolated)
+
+    build_env_ctx = pypabuild.get_build_env(
+        env={"PATH": ""},
+        pkgname="",
+        cflags="",
+        cxxflags="",
+        ldflags="",
+        target_install_dir=str(tmp_path),
+        exports="pyinit",
+        build_dir=tmp_path,
+    )
+    with build_env_ctx as env:
+        pypabuild.build(tmp_path, tmp_path / "dist", env, {}, verbosity=verbosity)
+
+    assert observed == [verbosity]
