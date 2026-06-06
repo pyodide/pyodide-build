@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.35.0] - 2026/XX/XX
+
+### Changed
+
+- Unisolated packages are now installed into the isolated build environment via
+  pip, with their cross-build files replaced by WASM-compatible versions from
+  the cross-build environment. This makes build-time scripts exposed by these
+  packages available on `PATH` during the build process.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
+- `oldest-supported-numpy` is no longer silently ignored when encountered as a
+  build-time dependency. It will now be installed as any other package. Since
+  `oldest-supported-numpy` is deprecated since NumPy 2.0, packages that still
+  list it should migrate to a direct `numpy` dependency. If you need to ignore
+  it (or any other build requirement), set it via
+  `pyodide config set ignored_build_requirements "patchelf oldest-supported-numpy"`
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
+- The `skip_install_cross_build_packages` parameter of
+  `CrossBuildEnvManager.install()` is deprecated and no longer has any effect.
+  Cross-build files are now copied into the isolated build environment's
+  site-packages at package build time, rather than being pre-installed into
+  a shared directory inside the xbuildenv at install time.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
 ## [0.34.5] - 2026/05/20
 
 ### Added
