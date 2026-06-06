@@ -28,6 +28,7 @@ from pyodide_build.build_env import (
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
     _configure_build_verbosity,
+    _DefaultIsolatedEnv,
     _error,
     _handle_build_error,
     _styles,
@@ -408,42 +409,36 @@ def build(
     skip_dependency_check: bool = False,
     verbosity: int = 0,
 ) -> str:
-    from build import _ctx as _build_ctx
-
-    token_verbosity = _build_ctx.VERBOSITY.set(verbosity)
-    token_logger = _build_ctx.LOGGER.set(_make_pypa_build_logger())
-    try:
-        with _handle_build_error():
-            if isolation:
-                built = _build_in_isolated_env(
-                    build_env,
-                    srcdir,
-                    str(outdir),
-                    "wheel",
-                    config_settings,
-                    verbosity=verbosity,
+    with _configure_build_verbosity(verbosity, _make_pypa_build_logger(verbosity)):
+        try:
+            with _handle_build_error():
+                if isolation:
+                    built = _build_in_isolated_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        verbosity=verbosity,
+                    )
+                else:
+                    built = _build_in_current_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        skip_dependency_check,
+                        verbosity=verbosity,
+                    )
+                print(
+                    "{bold}{green}Successfully built {}{reset}".format(
+                        built, **_styles.get()
+                    )
                 )
-            else:
-                built = _build_in_current_env(
-                    build_env,
-                    srcdir,
-                    str(outdir),
-                    "wheel",
-                    config_settings,
-                    skip_dependency_check,
-                    verbosity=verbosity,
-                )
-            print(
-                "{bold}{green}Successfully built {}{reset}".format(
-                    built, **_styles.get()
-                )
-            )
-            return built
-    except Exception as e:  # pragma: no cover
-        tb = traceback.format_exc().strip("\n")
-        print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
-        _error(str(e))
-        sys.exit(1)
-    finally:
-        _build_ctx.VERBOSITY.reset(token_verbosity)
-        _build_ctx.LOGGER.reset(token_logger)
+                return built
+        except Exception as e:  # pragma: no cover
+            tb = traceback.format_exc().strip("\n")
+            print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
+            _error(str(e))
+            sys.exit(1)
