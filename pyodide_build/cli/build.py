@@ -347,6 +347,13 @@ DEFAULT_PATH = default_xbuildenv_path()
     show_envvar=True,
     help="Skip automatic installation of Emscripten if not found.",
 )
+@click.option(
+    "-v",
+    "--verbose",
+    "verbosity",
+    count=True,
+    help="Increase build verbosity. Use -v for verbose output, -vv for very verbose output.",
+)
 @click.pass_context
 def main(
     ctx: click.Context,
@@ -364,6 +371,7 @@ def main(
     config_setting: tuple[str, ...],
     xbuildenv_path: Path,
     skip_emscripten_install: bool,
+    verbosity: int,
 ) -> None:
     """Use pypa/build to build a Python package from source, pypi or url.
 
@@ -389,6 +397,7 @@ def main(
         config_settings=config_settings,
         isolation=not no_isolation,
         skip_dependency_check=skip_dependency_check,
+        verbosity=verbosity,
     )
 
     skip_dependency_list = list(skip_dependency)
