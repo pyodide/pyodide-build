@@ -25,6 +25,7 @@ from pyodide_build.build_env import (
     in_xbuildenv,
     platform,
 )
+from pyodide_build.logger import logger, set_log_level
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
     _DefaultIsolatedEnv,
@@ -51,6 +52,7 @@ SYMLINK_ENV_VARS = {
 def _gen_runner(
     cross_build_env: Mapping[str, str],
     isolated_build_env: _DefaultIsolatedEnv = None,
+    verbosity: int = 0,
 ) -> Callable[[Sequence[str], str | None, Mapping[str, str] | None], None]:
     """
     This returns a slightly modified version of default subprocess runner that pypa/build uses.
@@ -66,6 +68,8 @@ def _gen_runner(
         The cross build environment for pywasmcross.
     isolated_build_env
         The isolated build environment created by pypa/build.
+    verbosity
+        Verbosity level. When >= 1, the build backend command is logged.
     """
 
     def _runner(cmd, cwd=None, extra_environ=None):
@@ -85,8 +89,8 @@ def _gen_runner(
             env["BUILD_ENV_SCRIPTS_DIR"] = scripts_dir
 
         env["PATH"] = f"{cross_build_env['COMPILER_WRAPPER_DIR']}:{env['PATH']}"
-        # For debugging: Uncomment the following line to print the build command
-        # print("Build backend call:", " ".join(str(x) for x in cmd), file=sys.stderr)
+        if verbosity >= 1:
+            logger.debug("Build backend call: %s", " ".join(str(x) for x in cmd))
         sp.check_call(cmd, cwd=cwd, env=env)
 
     return _runner
