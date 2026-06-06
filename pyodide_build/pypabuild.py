@@ -165,6 +165,7 @@ def _build_in_isolated_env(
     outdir: str,
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
+    verbosity: int = 0,
 ) -> str:
     # For debugging: The following line disables removal of the isolated venv.
     # It will be left in the /tmp folder and can be inspected or entered as
@@ -176,7 +177,7 @@ def _build_in_isolated_env(
         builder = ProjectBuilder.from_isolated_env(
             env,
             srcdir,
-            runner=_gen_runner(build_env, env),
+            runner=_gen_runner(build_env, env, verbosity=verbosity),
         )
 
         # first install the build dependencies
@@ -222,9 +223,10 @@ def _build_in_current_env(
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> str:
     with common.replace_env(build_env):
-        builder = ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+        builder = ProjectBuilder(srcdir, runner=_gen_runner(build_env, verbosity=verbosity))
 
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})
@@ -375,30 +377,44 @@ def build(
     config_settings: ConfigSettingsType,
     isolation: bool = True,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> str:
-    try:
-        with _handle_build_error():
-            if isolation:
-                built = _build_in_isolated_env(
-                    build_env, srcdir, str(outdir), "wheel", config_settings
+    import logging
+
+    from build import _ctx as _build_ctx
+
+    _build_ctx.VERBOSITY.set(verbosity)
+    log_level = logging.DEBUG if verbosity >= 1 else logging.INFO
+    with set_log_level(logger, log_level):
+        try:
+            with _handle_build_error():
+                if isolation:
+                    built = _build_in_isolated_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        verbosity=verbosity,
+                    )
+                else:
+                    built = _build_in_current_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        skip_dependency_check,
+                        verbosity=verbosity,
+                    )
+                print(
+                    "{bold}{green}Successfully built {}{reset}".format(
+                        built, **_styles.get()
+                    )
                 )
-            else:
-                built = _build_in_current_env(
-                    build_env,
-                    srcdir,
-                    str(outdir),
-                    "wheel",
-                    config_settings,
-                    skip_dependency_check,
-                )
-            print(
-                "{bold}{green}Successfully built {}{reset}".format(
-                    built, **_styles.get()
-                )
-            )
-            return built
-    except Exception as e:  # pragma: no cover
-        tb = traceback.format_exc().strip("\n")
-        print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
-        _error(str(e))
-        sys.exit(1)
+                return built
+        except Exception as e:  # pragma: no cover
+            tb = traceback.format_exc().strip("\n")
+            print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
+            _error(str(e))
+            sys.exit(1)
