@@ -26,19 +26,10 @@ from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
     _DefaultIsolatedEnv,
     _error,
-    _get_venv_paths,
+    _find_executable_and_scripts,
     _handle_build_error,
     _styles,
 )
-
-AVOIDED_REQUIREMENTS = [
-    # We don't want to install cmake Python package inside the isolated env as it will shadow
-    # the pywasmcross cmake wrapper.
-    # TODO: Find a way to make scikit-build use the pywasmcross cmake wrapper.
-    "cmake",
-    # mesonpy installs patchelf in linux platform but we don't want it.
-    "patchelf",
-]
 
 # corresponding env variables for symlinks
 SYMLINK_ENV_VARS = {
@@ -102,8 +93,6 @@ def _gen_runner(
 def symlink_unisolated_packages(
     env: DefaultIsolatedEnv, reqs: set[str] | None = None
 ) -> None:
-    from pyodide_build.build_env import get_build_flag
-
     pyversion = get_pyversion()
     site_packages_path = f"lib/{pyversion}/site-packages"
     env_site_packages = Path(env.path) / site_packages_path
@@ -117,9 +106,59 @@ def symlink_unisolated_packages(
     shutil.copy(sysconfigdata_path, env_site_packages)
 
 
-def _remove_avoided_requirements(
-    requires: set[str],
-    avoided_requirements: set[str] | list[str],
+def _replace_unisolated_packages(
+    reqs: set[str], unisolated_packages: dict[str, str]
+) -> tuple[set[str], set[str]]:
+    """
+    Replace unisolated packages with the correct version.
+
+    Parameters
+    ----------
+    requires
+        The set of requirements to filter.
+    unisolated_packages
+        The dictionary of unisolated packages [name: version].
+
+    Returns
+    -------
+    A tuple of (the filtered set of requirements, the set of unisolated requirements)
+    """
+    new_reqs = reqs.copy()
+    unisolated: set[str] = set()
+    for reqstr in list(reqs):
+        name = Requirement(reqstr).name
+        if name in unisolated_packages:
+            new_reqs.discard(reqstr)
+            new_reqs.add(f"{name}=={unisolated_packages[name]}")
+            unisolated.add(name)
+    return new_reqs, unisolated
+
+
+def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
+    """
+    Install the cross build files (headers, .a libs, .pxd files) to the
+    isolated environment's site packages.
+
+    Parameters
+    ----------
+    path
+        The path to the isolated environment.
+
+    unisolated
+        The set of unisolated packages.
+    """
+    _, _, purelib = _find_executable_and_scripts(venv_path)
+    sitepackagesdir = Path(purelib)
+    for name in unisolated:
+        base, files = get_unisolated_files(name)
+        for rel in files:
+            dest = sitepackagesdir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(base / rel, dest)
+
+
+def remove_avoided_requirements(
+    requires: set[str], avoided_requirements: set[str] | list[str]
 ) -> set[str]:
     """
     Remove requirements that are in the list of avoided requirements.
@@ -135,84 +174,12 @@ def _remove_avoided_requirements(
     -------
     The filtered set of requirements.
     """
-    avoided_requirements = set(avoided_requirements)
     for reqstr in list(requires):
         req = Requirement(reqstr)
-        for avoid_name in avoided_requirements:
-            if avoid_name in req.name.lower():
+        for avoid_name in set(avoided_requirements):
+            if avoid_name == req.name.lower():
                 requires.remove(reqstr)
-                break
-
     return requires
-
-
-def _replace_unisolated_packages(
-    requires: set[str],
-    unisolated_packages: dict[str, str],
-) -> tuple[set[str], set[str]]:
-    """
-    Replace unisolated packages with the correct version.
-
-    Parameters
-    ----------
-    requires
-        The set of requirements to filter.
-    unisolated_packages
-        The dictionary of unisolated packages [name: version].
-
-    Returns
-    -------
-    tuple of (The filtered set of requirements, The set of unisolated requirements)
-    """
-    requires_new = requires.copy()
-    unisolated = set()
-    for reqstr in list(requires):
-        req = Requirement(reqstr)
-        for name, version in unisolated_packages.items():
-            if req.name == name:
-                # TODO: find a better way to handle this case
-                if not req.specifier.contains(version):
-                    print(
-                        f"WARNING: found build dependency {req} but the only supported cross-build version is {name}=={version}"
-                    )
-                    print(f"WARNING: using {name}=={version} instead")
-
-                requires_new.remove(reqstr)
-                requires_new.add(f"{name}=={version}")
-                unisolated.add(name)
-                break
-        else:
-            # oldest-supported-numpy is a meta package for numpy
-            # TODO: use dependency resolution instead of hardcoding this
-            if req.name == "oldest-supported-numpy" and "numpy" in unisolated_packages:
-                requires_new.remove(reqstr)
-                requires_new.add(f"numpy=={unisolated_packages['numpy']}")
-                unisolated.add("numpy")
-                break
-
-    return requires_new, unisolated
-
-
-def _install_cross_build_files(path: str, unisolated: set[str]) -> None:
-    """
-    Install the cross build files to the isolated environment.
-
-    Parameters
-    ----------
-    path
-        The path to the isolated environment.
-
-    unisolated
-        The set of unisolated packages.
-    """
-
-    sitepackagesdir = Path(_get_venv_paths(path)["purelib"])
-    for name in unisolated:
-        base, files = get_unisolated_files(name)
-        for cross_build_file in files:
-            dest = sitepackagesdir / cross_build_file
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(base / cross_build_file, dest)
 
 
 def install_reqs(
@@ -221,11 +188,8 @@ def install_reqs(
     IGNORED_BUILD_REQUIREMENTS = [
         pkg.strip() for pkg in get_host_build_flag("IGNORED_BUILD_REQUIREMENTS").split()
     ]
-    # replace oldest-supported-numpy and other unisolated packages before filtering
     reqs, unisolated = _replace_unisolated_packages(reqs, get_unisolated_packages())
-    reqs = _remove_avoided_requirements(
-        reqs, set(AVOIDED_REQUIREMENTS + IGNORED_BUILD_REQUIREMENTS)
-    )
+    reqs = remove_avoided_requirements(reqs, IGNORED_BUILD_REQUIREMENTS)
     # propagate PIP config from build_env to current environment
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
