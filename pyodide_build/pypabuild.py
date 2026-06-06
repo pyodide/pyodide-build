@@ -186,7 +186,7 @@ def _build_in_isolated_env(
         except BuildBackendException:
             pass
 
-        if not build_reqs:
+        if build_reqs is None:
             # get_requires_for_build in native env failed. Maybe trying to
             # execute get_requires_for_build in the cross build environment will
             # work?
