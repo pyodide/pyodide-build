@@ -1,6 +1,8 @@
 import pytest
 from pytest_pyodide import run_in_pyodide
 
+from conftest import package_is_built
+
 
 @pytest.mark.driver_timeout(40)
 @run_in_pyodide(packages=["scipy"])
@@ -43,9 +45,15 @@ def test_binom_ppf(selenium):
     assert binom.ppf(0.9, 1000, 0.1) == 112
 
 
+_scipy_test_packages = ["pytest", "scipy", "micropip"] + (
+    ["scipy-tests"] if package_is_built("scipy-tests") else []
+)
+
+
+@pytest.mark.xfail_browsers(node="Can't fetch metadata for 'hypothesis'")
 @pytest.mark.skip_pyproxy_check
 @pytest.mark.driver_timeout(40)
-@run_in_pyodide(packages=["pytest", "scipy-tests", "micropip"])
+@run_in_pyodide(packages=_scipy_test_packages)
 async def test_scipy_pytest(selenium):
     import pytest
 
@@ -139,9 +147,9 @@ def test_dblquad(selenium):
     unit_square_area = scipy.integrate.dblquad(
         lambda y, x: 1, 0, 1, lambda x: 0, lambda x: 1
     )
-    assert (
-        abs(unit_square_area[0] - 1) < unit_square_area[1]
-    ), f"Unit square area calculated using scipy.integrate.dblquad of {unit_square_area[0]} (+- {unit_square_area[0]}) is too far from 1.0"
+    assert abs(unit_square_area[0] - 1) < unit_square_area[1], (
+        f"Unit square area calculated using scipy.integrate.dblquad of {unit_square_area[0]} (+- {unit_square_area[0]}) is too far from 1.0"
+    )
 
 
 import shutil

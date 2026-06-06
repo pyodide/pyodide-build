@@ -1,4 +1,6 @@
+import random
 import re
+import threading
 
 import pytest
 
@@ -15,9 +17,13 @@ todo_signature_mismatch_msg = "TODO signature mismatch"
 todo_memory_corruption_msgt = "TODO memory corruption"
 todo_genuine_difference_msg = "TODO genuine difference to be investigated"
 todo_fp_exception_msg = "TODO did not raise maybe no floating point exception support?"
+todo_overflow_msg = "TODO overflow not raised"
+todo_runtime_warning = "TODO runtime warning not shown"
 
 
 tests_to_mark = [
+    ("test_odeint_jac\\.py", skip, "test module removed: uses Fortran extension not built for WASM"),
+    ("io/tests/test_fortran\\.py", skip, "test module removed: uses Fortran extension not built for WASM"),
     # scipy/_lib/tests
     (
         "test__threadsafety.py::test_parallel_threads",
@@ -27,6 +33,7 @@ tests_to_mark = [
     ("test__threadsafety.py::test_parallel_threads", xfail, thread_msg),
     ("test__util.py::test_pool", xfail, process_msg),
     ("test__util.py::test_mapwrapper_parallel", xfail, process_msg),
+    ("test__util.py::test__workers_wrapper", xfail, process_msg),
     ("test_ccallback.py::test_threadsafety", xfail, thread_msg),
     ("test_import_cycles.py::test_modules_importable", xfail, process_msg),
     ("test_import_cycles.py::test_public_modules_importable", xfail, process_msg),
@@ -48,7 +55,7 @@ tests_to_mark = [
         thread_msg,
     ),
     # scipy/integrate tests
-    ("test__quad_vec.py::test_quad_vec_pool", xfail, process_msg),
+    ("test__quad_vec.py::TestQuadVec.test_quad_vec_pool.*", xfail, process_msg),
     (
         "test_quadpack.py.+TestCtypesQuad.test_ctypes.*",
         xfail,
@@ -69,6 +76,11 @@ tests_to_mark = [
         "test_fitpack.+test_kink",
         xfail,
         "TODO error not raised, maybe due to no floating point exception?",
+    ),
+    (
+        "test_rbf.py::test_rbf_concurrency",
+        xfail,
+        thread_msg,
     ),
     # scipy/io
     (
@@ -120,9 +132,44 @@ tests_to_mark = [
         "TODO no warnings emitted maybe due to no floating point exception?",
     ),
     ("test_minpack.py::TestFSolve.test_concurrent.+", xfail, process_msg),
-    ("test_minpack.py::TestLeastSq.test_concurrent+", xfail, process_msg),
+    ("test_minpack.py::TestLeastSq.test_concurrent.+", xfail, process_msg),
     ("test_optimize.py::test_cobyla_threadsafe", xfail, thread_msg),
     ("test_optimize.py::TestBrute.test_workers", xfail, process_msg),
+    (
+        "test__numdiff.py::TestApproxDerivativesDense.test_scalar_vector",
+        xfail,
+        process_msg,
+    ),
+    (
+        "test__numdiff.py::TestApproxDerivativesDense.test_workers_evaluations_and_nfev",
+        xfail,
+        process_msg,
+    ),
+    (
+        "test__numdiff.py::TestApproxDerivativesDense.test_vector_vector",
+        xfail,
+        process_msg,
+    ),
+    (
+        "test__numdiff.py::TestApproxDerivativeSparse.test_all",
+        xfail,
+        process_msg,
+    ),
+    (
+        ".*test_workers.*",
+        xfail,
+        process_msg,
+    ),
+    (
+        "test_optimize.py::TestWorkers.*",
+        xfail,
+        process_msg,
+    ),
+    (
+        "test_optimize.py::test_multiprocessing_too_many_open_files_23080",
+        xfail,
+        process_msg,
+    ),
     # scipy/signal/tests
     (
         "test_signaltools.py::TestMedFilt.test_medfilt2d_parallel",
@@ -190,6 +237,11 @@ tests_to_mark = [
         todo_fp_exception_msg,
     ),
     (
+        "test_sf_error.py::test_check_overflow_message",
+        xfail,
+        todo_overflow_msg,
+    ),
+    (
         "test_kdeoth.py::test_kde_[12]d",
         xfail,
         todo_genuine_difference_msg,
@@ -236,7 +288,7 @@ tests_to_mark = [
     ),
     ("test_qmc.py::TestVDC.test_van_der_corput", xfail, thread_msg),
     ("test_qmc.py::TestHalton.test_workers", xfail, thread_msg),
-    ("test_qmc.py::TestUtils.test_discrepancy_parallel", xfail, thread_msg),
+    ("test_qmc.py::TestUtils.test_discrepancy_parallel", skip, "thread constructor fails and leaves C destructor with WASM function-pointer mismatch, causing a fatal error during pytest GC cleanup"),
     (
         "test_qmc.py::TestMultivariateNormalQMC.test_validations",
         xfail,
@@ -269,7 +321,48 @@ tests_to_mark = [
         xfail,
         fp_exception_msg,
     ),
+    (
+        "test_fit.py::test_fit_error",
+        xfail,
+        todo_runtime_warning,
+    ),
+    (
+        "test_stats.py::TestWassersteinDistance.test_inf_values",
+        xfail,
+        todo_runtime_warning,
+    ),
+    (
+        "test_stats.py::TestEnergyDistance.test_inf_values",
+        xfail,
+        todo_runtime_warning,
+    ),
+    # many
+    (".*test_concurrency.*", xfail, thread_msg),
 ]
+
+
+def pytest_configure(config):
+    # threading.get_native_id is not available in Pyodide's WASM environment
+    if not hasattr(threading, "get_native_id"):
+        threading.get_native_id = lambda: random.randint(0, 10000)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
+    # C-extension destructors in SciPy call Fortran functions with void/int
+    # signature mismatches. These run both
+    # during the gc cleanup (gc_collect_harder in _pytest/unraisableexception)
+    # and during Python's own finalization sequence, causing fatal errors that
+    # cannot be caught in Python as they crash the interpreter. os._exit can
+    # at least bypass both of these.
+    import os
+    import sys
+
+    # For outputs (can't get this to work)
+    # sys.stdout.flush()
+    # sys.stderr.flush()
+    # test summary line doesn't work so we can't see how many passed/skipped/etc...
+    os._exit(int(exitstatus))
 
 
 def pytest_collection_modifyitems(config, items):
