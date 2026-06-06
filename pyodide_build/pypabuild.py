@@ -114,7 +114,7 @@ def _replace_unisolated_packages(
 
     Parameters
     ----------
-    requires
+    reqs
         The set of requirements to filter.
     unisolated_packages
         The dictionary of unisolated packages [name: version].
@@ -139,13 +139,6 @@ def _replace_unisolated_packages(
                 new_reqs.add(f"{name}=={version}")
                 unisolated.add(name)
                 break
-        else:
-            # oldest-supported-numpy is a meta package for numpy
-            # TODO: use dependency resolution instead of hardcoding this
-            if req.name == "oldest-supported-numpy" and "numpy" in unisolated_packages:
-                new_reqs.discard(reqstr)
-                new_reqs.add(f"numpy=={unisolated_packages['numpy']}")
-                unisolated.add("numpy")
     return new_reqs, unisolated
 
 

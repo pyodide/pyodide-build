@@ -60,22 +60,6 @@ def test_replace_unisolated_packages_version_mismatch():
     assert replaced == {"baz"}
 
 
-def test_replace_unisolated_packages_oldest_supported_numpy():
-    """
-    oldest-supported-numpy is a special case where we want to replace it with numpy instead.
-    """
-    requires = {"oldest-supported-numpy"}
-    unisolated = {
-        "numpy": "1.20",
-    }
-
-    new_requires, replaced = pypabuild._replace_unisolated_packages(
-        requires, unisolated
-    )
-    assert new_requires == {"numpy==1.20"}
-    assert replaced == {"numpy"}
-
-
 def test_install_reqs(tmp_path, dummy_xbuildenv, monkeypatch):
     monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
     env = MockIsolatedEnv(tmp_path)
