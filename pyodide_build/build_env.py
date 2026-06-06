@@ -219,6 +219,8 @@ def get_hostsitepackages() -> str:
     return get_build_flag("HOSTSITEPACKAGES")
 
 
+# TODO: Remove this function (and use remote package index)
+# https://github.com/pyodide/pyodide-build/issues/43
 @functools.cache
 def get_unisolated_packages() -> dict[str, str]:
     """
@@ -233,8 +235,6 @@ def get_unisolated_packages() -> dict[str, str]:
     -------
     A dictionary of package names and versions.
     """
-    # TODO: Remove this function (and use remote package index)
-    # https://github.com/pyodide/pyodide-build/issues/43
     PYODIDE_ROOT = get_pyodide_root()
 
     unisolated_packages: dict[str, str] = {}
