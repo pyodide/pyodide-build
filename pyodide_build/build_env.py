@@ -267,7 +267,9 @@ def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
 
     Returns
     -------
-    A tuple of the package directory and a list of file paths relative to the package directory.
+    A tuple of (base_dir, relative_paths) where base_dir is the root directory
+    containing all unisolated packages (e.g. site-packages-extras) and
+    relative_paths is the list of file paths for this package relative to base_dir.
 
     """
     PYODIDE_ROOT = get_pyodide_root()
