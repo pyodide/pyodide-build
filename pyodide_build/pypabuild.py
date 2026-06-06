@@ -25,7 +25,6 @@ from pyodide_build.build_env import (
     in_xbuildenv,
     platform,
 )
-from pyodide_build.logger import logger, set_log_level
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
     _DefaultIsolatedEnv,
@@ -90,7 +89,7 @@ def _gen_runner(
 
         env["PATH"] = f"{cross_build_env['COMPILER_WRAPPER_DIR']}:{env['PATH']}"
         if verbosity >= 1:
-            logger.debug("Build backend call: %s", " ".join(str(x) for x in cmd))
+            print(f"> {' '.join(str(x) for x in cmd)}", file=sys.stderr, flush=True)
         sp.check_call(cmd, cwd=cwd, env=env)
 
     return _runner
@@ -372,6 +371,32 @@ def get_build_env(
         yield env
 
 
+def _make_pypa_build_logger() -> Callable[[str], None]:
+    """
+    Returns a logger function compatible with build._ctx.LOGGER.
+
+    pypa/build's default _log_default sends messages to logging.getLogger('build')
+    at INFO level, but that logger has no handlers and an effective level of WARNING,
+    so all output is silently dropped when we use pypa/build as a library.
+
+    We mirror pypa/build's CLI logger where everything goes to stderr.
+    """
+
+    def _log(message: str, *, kind: tuple[str, ...] | None = None) -> None:
+        msg = message.rstrip()
+        if not msg:
+            return
+        match kind:
+            case ("subprocess", "cmd"):
+                print(f"> {msg}", file=sys.stderr, flush=True)
+            case ("subprocess", *_):
+                print(f"< {msg}", file=sys.stderr, flush=True)
+            case _:
+                print(msg, file=sys.stderr, flush=True)
+
+    return _log
+
+
 def build(
     srcdir: Path,
     outdir: Path,
@@ -381,42 +406,42 @@ def build(
     skip_dependency_check: bool = False,
     verbosity: int = 0,
 ) -> str:
-    import logging
-
     from build import _ctx as _build_ctx
 
-    _build_ctx.VERBOSITY.set(verbosity)
-    log_level = logging.DEBUG if verbosity >= 1 else logging.INFO
-    with set_log_level(logger, log_level):
-        try:
-            with _handle_build_error():
-                if isolation:
-                    built = _build_in_isolated_env(
-                        build_env,
-                        srcdir,
-                        str(outdir),
-                        "wheel",
-                        config_settings,
-                        verbosity=verbosity,
-                    )
-                else:
-                    built = _build_in_current_env(
-                        build_env,
-                        srcdir,
-                        str(outdir),
-                        "wheel",
-                        config_settings,
-                        skip_dependency_check,
-                        verbosity=verbosity,
-                    )
-                print(
-                    "{bold}{green}Successfully built {}{reset}".format(
-                        built, **_styles.get()
-                    )
+    token_verbosity = _build_ctx.VERBOSITY.set(verbosity)
+    token_logger = _build_ctx.LOGGER.set(_make_pypa_build_logger())
+    try:
+        with _handle_build_error():
+            if isolation:
+                built = _build_in_isolated_env(
+                    build_env,
+                    srcdir,
+                    str(outdir),
+                    "wheel",
+                    config_settings,
+                    verbosity=verbosity,
                 )
-                return built
-        except Exception as e:  # pragma: no cover
-            tb = traceback.format_exc().strip("\n")
-            print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
-            _error(str(e))
-            sys.exit(1)
+            else:
+                built = _build_in_current_env(
+                    build_env,
+                    srcdir,
+                    str(outdir),
+                    "wheel",
+                    config_settings,
+                    skip_dependency_check,
+                    verbosity=verbosity,
+                )
+            print(
+                "{bold}{green}Successfully built {}{reset}".format(
+                    built, **_styles.get()
+                )
+            )
+            return built
+    except Exception as e:  # pragma: no cover
+        tb = traceback.format_exc().strip("\n")
+        print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
+        _error(str(e))
+        sys.exit(1)
+    finally:
+        _build_ctx.VERBOSITY.reset(token_verbosity)
+        _build_ctx.LOGGER.reset(token_logger)
