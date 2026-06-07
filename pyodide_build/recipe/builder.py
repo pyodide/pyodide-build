@@ -291,6 +291,13 @@ class RecipeBuilder:
         ):
             self._build_package(bash_runner)
 
+    # Some packages such as RobotRaconteur and opencv-python reach into
+    # $HOSTINSTALLDIR/host site-packages directly from their build scripts
+    # which run before the isolated build environment is set up. The lazy
+    # install normally triggered from there would be too late for them, so
+    # we trigger it here instead, based on the package's declared host
+    # requirements. See https://github.com/pyodide/pyodide-build/issues/365
+    # for reference.
     def _ensure_cross_build_packages_for_host_requirements(self) -> None:
         """
         Make sure cross-build packages (numpy, scipy, etc.) are installed into
