@@ -45,6 +45,20 @@ def test_replace_unisolated_packages():
     assert replaced == {"foo", "bar", "baz"}
 
 
+def test_replace_unisolated_packages_normalizes_names():
+    requires = {"NumPy>=1.20", "Ruamel-YAML"}
+    unisolated = {
+        "numpy": "2.0.3",
+        "ruamel.yaml": "0.18.6",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"numpy==2.0.3", "ruamel.yaml==0.18.6"}
+    assert replaced == {"numpy", "ruamel.yaml"}
+
+
 def test_replace_unisolated_packages_version_mismatch():
     """
     FIXME: This is not an ideal behavior, but for now we just ignore the version mismatch.
