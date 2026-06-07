@@ -98,9 +98,11 @@ def _gen_runner(
     return _runner
 
 
-def symlink_unisolated_packages(
-    env: DefaultIsolatedEnv, reqs: set[str] | None = None
-) -> None:
+def _copy_sysconfigdata_to_isolated_env(env: DefaultIsolatedEnv) -> None:
+    """
+    Copy the sysconfigdata module into the isolated build environment's
+    site-packages so that builds can pick up Pyodide's build configuration.
+    """
     pyversion = get_pyversion()
     site_packages_path = f"lib/{pyversion}/site-packages"
     env_site_packages = Path(env.path) / site_packages_path
@@ -249,7 +251,7 @@ def _build_in_isolated_env(
         )
 
         # first install the build dependencies
-        symlink_unisolated_packages(env, builder.build_system_requires)
+        _copy_sysconfigdata_to_isolated_env(env)
         install_reqs(build_env, env, builder.build_system_requires)
         build_reqs: set[str] | None = None
         try:
