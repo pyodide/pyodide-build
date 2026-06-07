@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.35.0] - 2026/06/XX
+
+### Removed
+
+- `pyodide build` no longer supports building from a URL or a PyPI requirement
+  specifier, building from a `requirements.txt` file (`-r`/`--requirements`), or
+  fetching and building dependencies (`--build-dependencies`,
+  `--output-lockfile`, `--skip-dependency`, `--skip-built-in-packages`,
+  `--compression-level`). It now only builds a local source directory (or the
+  current working directory), matching the behavior of `pypa/build`.
+  We have supported these features as PyPI didn't support Emscripten wheels,
+  but now that cross-compiled wheels can be uploaded to PyPI, each package
+  should be built independently and uploaded to PyPI.
+
 ## [0.34.5] - 2026/05/20
 
 ### Added

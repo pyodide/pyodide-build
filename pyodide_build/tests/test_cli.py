@@ -505,13 +505,6 @@ def test_build2_replace_so_abi_tags(
 
 
 def test_build_exports(monkeypatch, dummy_xbuildenv):
-    def download_url_shim(url, tmppath):
-        (tmppath / "build").mkdir()
-        return "blah"
-
-    def unpack_archive_shim(*args):
-        pass
-
     exports_ = None
 
     def run_shim(
@@ -524,10 +517,9 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
     ):
         nonlocal exports_
         exports_ = exports
+        return output_directory / "package-1.0.0-py3-none-any.whl"
 
     monkeypatch.setattr(build, "ensure_emscripten", lambda skip_install=False: None)
-    monkeypatch.setattr(build, "_download_url", download_url_shim)
-    monkeypatch.setattr(shutil, "unpack_archive", unpack_archive_shim)
     monkeypatch.setattr(out_of_tree_build, "run", run_shim)
 
     def run(*args):
