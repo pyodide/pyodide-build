@@ -59,6 +59,47 @@ class TestOutOfTree(TestInTree):
     def test_in_xbuildenv(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         assert build_env.in_xbuildenv()
 
+    def test_get_unisolated_packages(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        requirements_file = manager.pyodide_root / ".." / "requirements.txt"
+
+        expected = {}
+        for line in requirements_file.read_text().splitlines():
+            name, version = line.strip().split("==", 1)
+            expected[name] = version
+
+        assert expected
+        assert build_env.get_unisolated_packages() == expected
+
+    def test_get_unisolated_packages_no_requirements_file(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        requirements_file = manager.pyodide_root / ".." / "requirements.txt"
+        requirements_file.unlink()
+
+        assert build_env.get_unisolated_packages() == {}
+
+    def test_get_unisolated_files(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        site_packages_extras = manager.pyodide_root / ".." / "site-packages-extras"
+
+        for name in ("numpy", "scipy"):
+            package_dir = build_env.get_unisolated_files(name)
+            assert package_dir == site_packages_extras / name
+            assert package_dir.is_dir()
+            assert any(package_dir.rglob("*"))
+
+    def test_get_unisolated_files_no_cross_build_files(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        # cffi is an unisolated package but has no cross-build files in the
+        # dummy xbuildenv, so the directory simply doesn't exist
+        package_dir = build_env.get_unisolated_files("cffi")
+        assert not package_dir.exists()
+
     def test_get_build_environment_vars(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
     ):
