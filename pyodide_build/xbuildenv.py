@@ -19,8 +19,8 @@ from pyodide_build.xbuildenv_releases import (
 
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
 PYTHON_VERSION_MARKER_FILE = ".build-python-version"
-EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
 CROSS_BUILD_PACKAGES_MARKER_FILE = ".cross-build-packages-installed"
+EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
 
 
 class CrossBuildEnvManager:
