@@ -165,7 +165,7 @@ def test_ensure_cross_build_packages_for_host_requirements(tmp_path, monkeypatch
             called["count"] += 1
 
     monkeypatch.setattr(_builder, "in_xbuildenv", lambda: True)
-    monkeypatch.setattr(_builder, "get_current_xbuildenv_manager", DummyManager())
+    monkeypatch.setattr(_builder, "get_current_xbuildenv_manager", DummyManager)
 
     # one of the host requirements is an unisolated package, so the install is triggered
     monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: ["pkg_3"])
