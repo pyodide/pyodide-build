@@ -192,6 +192,68 @@ def test_install_reqs_skips_lazy_install_when_not_unisolated(tmp_path, monkeypat
     assert called["count"] == 0
 
 
+def test_install_cross_build_files(tmp_path, monkeypatch):
+    purelib = tmp_path / "venv" / "lib" / "site-packages"
+    purelib.mkdir(parents=True)
+
+    extras = tmp_path / "site-packages-extras"
+    numpy_header = extras / "numpy" / "_core" / "include" / "numpy" / "ndarrayobject.h"
+    numpy_header.parent.mkdir(parents=True)
+    numpy_header.write_text("// header")
+    scipy_pxd = extras / "scipy" / "linalg" / "cython_blas.pxd"
+    scipy_pxd.parent.mkdir(parents=True)
+    scipy_pxd.write_text("# pxd")
+
+    monkeypatch.setattr(
+        pypabuild,
+        "_find_executable_and_scripts",
+        lambda venv_path: ("python", "scripts", str(purelib)),
+    )
+    monkeypatch.setattr(pypabuild, "get_unisolated_files", lambda name: extras / name)
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"numpy", "scipy"})
+
+    assert (
+        purelib / "numpy" / "_core" / "include" / "numpy" / "ndarrayobject.h"
+    ).read_text() == "// header"
+    assert (purelib / "scipy" / "linalg" / "cython_blas.pxd").read_text() == "# pxd"
+
+
+def test_install_cross_build_files_skips_packages_without_cross_build_files(
+    tmp_path, monkeypatch
+):
+    purelib = tmp_path / "venv" / "lib" / "site-packages"
+    purelib.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        pypabuild,
+        "_find_executable_and_scripts",
+        lambda venv_path: ("python", "scripts", str(purelib)),
+    )
+    # cffi has no cross-build files, so its directory does not exist
+    monkeypatch.setattr(
+        pypabuild,
+        "get_unisolated_files",
+        lambda name: tmp_path / "does-not-exist" / name,
+    )
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"cffi"})
+
+    assert list(purelib.iterdir()) == []
+
+
+def test_install_cross_build_files_skips_when_no_unisolated_packages(
+    tmp_path, monkeypatch
+):
+    def _unexpected_call(*args, **kwargs):
+        raise AssertionError("should not be called when there are no unisolated reqs")
+
+    monkeypatch.setattr(pypabuild, "_find_executable_and_scripts", _unexpected_call)
+    monkeypatch.setattr(pypabuild, "get_unisolated_files", _unexpected_call)
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), set())
+
+
 def _make_cpe(
     stdout: str | bytes | None = None, stderr: str | bytes | None = None
 ) -> subprocess.CalledProcessError:
