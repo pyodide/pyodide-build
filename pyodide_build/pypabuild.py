@@ -13,6 +13,7 @@ from typing import Literal, cast
 from build import BuildBackendException, ConfigSettingsType, ProjectBuilder
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
@@ -130,24 +131,29 @@ def _replace_unisolated_packages(
     -------
     A tuple of (the filtered set of requirements, the set of unisolated requirements)
     """
+    canonical_unisolated = {
+        canonicalize_name(name): (name, version)
+        for name, version in unisolated_packages.items()
+    }
+
     new_reqs = reqs.copy()
     unisolated: set[str] = set()
     for reqstr in list(reqs):
         req = Requirement(reqstr)
-        for name, version in unisolated_packages.items():
-            if req.name == name:
-                # TODO: find a better way to handle this case
-                if not req.specifier.contains(version):
-                    warnings.warn(
-                        f"Found build dependency {req} but the only supported "
-                        f"cross-build version is {name}=={version}; "
-                        f"using {name}=={version} instead.",
-                        stacklevel=2,
-                    )
-                new_reqs.discard(reqstr)
-                new_reqs.add(f"{name}=={version}")
-                unisolated.add(name)
-                break
+        match = canonical_unisolated.get(canonicalize_name(req.name))
+        if match is not None:
+            name, version = match
+            # TODO: find a better way to handle this case
+            if not req.specifier.contains(version):
+                warnings.warn(
+                    f"Found build dependency {req} but the only supported "
+                    f"cross-build version is {name}=={version}; "
+                    f"using {name}=={version} instead.",
+                    stacklevel=2,
+                )
+            new_reqs.discard(reqstr)
+            new_reqs.add(f"{name}=={version}")
+            unisolated.add(name)
     return new_reqs, unisolated
 
 
