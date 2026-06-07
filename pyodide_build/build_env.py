@@ -264,9 +264,10 @@ def get_unisolated_packages() -> dict[str, str]:
     return unisolated_packages
 
 
-def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
+def get_unisolated_files(package_name: str) -> Path:
     """
-    Get an unisolated package's cross-build files.
+    Get the directory containing an unisolated package's cross-build files
+    (such as headers, .a libs, .pxd files, and so on).
 
     Parameters
     ----------
@@ -275,10 +276,9 @@ def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
 
     Returns
     -------
-    A tuple of (base_dir, relative_paths) where base_dir is the root directory
-    containing all unisolated packages (e.g. site-packages-extras) and
-    relative_paths is the list of file paths for this package relative to base_dir.
-
+    The directory containing the package's cross-build files, relative to
+    which they should be laid out in site-packages. The directory may not
+    exist if the package has no cross-build files.
     """
     PYODIDE_ROOT = get_pyodide_root()
 
@@ -288,10 +288,7 @@ def get_unisolated_files(package_name: str) -> tuple[Path, list[str]]:
     else:
         libdir = Path(get_hostsitepackages())
 
-    package_dir = libdir / package_name
-    return libdir, [
-        str(f.relative_to(libdir)) for f in package_dir.rglob("*") if f.is_file()
-    ]
+    return libdir / package_name
 
 
 def platform() -> str:

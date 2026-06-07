@@ -177,11 +177,10 @@ def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
     _, _, purelib = _find_executable_and_scripts(venv_path)
     sitepackagesdir = Path(purelib)
     for name in unisolated:
-        base, files = get_unisolated_files(name)
-        for rel in files:
-            dest = sitepackagesdir / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(base / rel, dest)
+        package_dir = get_unisolated_files(name)
+        if not package_dir.is_dir():
+            continue
+        shutil.copytree(package_dir, sitepackagesdir / name, dirs_exist_ok=True)
 
 
 def remove_avoided_requirements(
