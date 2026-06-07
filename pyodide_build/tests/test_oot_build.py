@@ -94,3 +94,27 @@ def test_build_verbosity_output(dummy_xbuildenv, fake_pkg, capfd, verbosity):
         assert any(
             ("-v" in line) and ("pip" in line or "uv" in line) for line in cmd_lines
         )
+
+
+def test_get_requires_for_build_not_retried_on_empty_result(
+    dummy_xbuildenv, fake_pkg, monkeypatch
+):
+    """Regression test for https://github.com/pyodide/pyodide-build/pull/364"""
+    from build import ProjectBuilder
+
+    orig = ProjectBuilder.get_requires_for_build
+    call_count = [0]
+
+    def get_count_for_pep517_requires(self, distribution, config_settings=None):
+        call_count[0] += 1
+        return orig(self, distribution, config_settings)
+
+    monkeypatch.setattr(
+        ProjectBuilder, "get_requires_for_build", get_count_for_pep517_requires
+    )
+
+    build.run(fake_pkg, fake_pkg / "dist", "pyinit", {})
+
+    assert call_count[0] == 1, (
+        f"get_requires_for_build called {call_count[0]} times but expected 1"
+    )
