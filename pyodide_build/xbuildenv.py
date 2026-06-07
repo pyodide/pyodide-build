@@ -2,11 +2,12 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from pyodide_lock import PyodideLockSpec
 
-from pyodide_build import build_env
+from pyodide_build import build_env, uv_helper
 from pyodide_build.common import download_and_unpack_archive, remove_readonly
 from pyodide_build.create_package_index import create_package_index
 from pyodide_build.logger import logger
@@ -19,6 +20,7 @@ from pyodide_build.xbuildenv_releases import (
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
 PYTHON_VERSION_MARKER_FILE = ".build-python-version"
 EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
+CROSS_BUILD_PACKAGES_MARKER_FILE = ".cross-build-packages-installed"
 
 
 class CrossBuildEnvManager:
@@ -80,6 +82,44 @@ class CrossBuildEnvManager:
     def _path_for_version(self, version: str) -> Path:
         """Returns the path to the xbuildenv for the given version."""
         return self.env_dir / version
+
+    def _cross_build_packages_marker_path(self, version_path: Path) -> Path:
+        """
+        Return the marker file path used to record cross-build package installation.
+
+        Parameters
+        ----------
+        version_path
+            Path to a concrete xbuildenv version directory (for example, `.../<version>`).
+        """
+        return version_path / CROSS_BUILD_PACKAGES_MARKER_FILE
+
+    def ensure_cross_build_packages_installed(self) -> None:
+        """
+        Install cross-build packages for the active xbuildenv only when needed.
+
+        This method is idempotent: if the marker file is already present, it does
+        nothing. Otherwise it installs packages into HOSTSITEPACKAGES and writes
+        the marker on success.
+
+        Raises
+        ------
+        ValueError
+            If no active xbuildenv is selected.
+        RuntimeError
+            If package installation fails.
+        """
+        version_path = self.symlink_dir.resolve()
+        marker = self._cross_build_packages_marker_path(version_path)
+        if marker.exists():
+            return
+
+        xbuildenv_root = version_path / "xbuildenv"
+        xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
+
+        logger.info("Installing cross-build packages for %s", version_path.name)
+        self._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
+        marker.touch()
 
     def list_versions(self) -> list[str]:
         """
@@ -156,7 +196,7 @@ class CrossBuildEnvManager:
             as the current version of pyodide-build, make sure that the cross-build
             environment is compatible with the current version of Pyodide.
         skip_install_cross_build_packages
-            Deprecated, no longer used.
+            If True, skip installing the cross-build packages. This is mostly for testing purposes.
         force_install
             If True, force the installation even if the cross-build environment is not compatible
 
@@ -164,15 +204,6 @@ class CrossBuildEnvManager:
         -------
         Path to the root directory for the cross-build environment.
         """
-
-        if not skip_install_cross_build_packages:
-            import warnings
-
-            warnings.warn(
-                "skip_install_cross_build_packages is deprecated and no longer has any effect.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
         if url and version:
             raise ValueError("Cannot specify both version and url")
@@ -221,6 +252,12 @@ class CrossBuildEnvManager:
                 logger.info(
                     "Installing Pyodide cross-build environment to %s", download_path
                 )
+
+                if not skip_install_cross_build_packages:
+                    self._install_cross_build_packages(
+                        xbuildenv_root, xbuildenv_pyodide_root
+                    )
+                    self._cross_build_packages_marker_path(download_path).touch()
 
                 if not url:
                     # If installed from url, skip creating the PyPI index (version is not known)
@@ -276,6 +313,64 @@ class CrossBuildEnvManager:
         Get the default URL for the cross-build environment. If not specified, return empty string (no default).
         """
         return build_env.get_host_build_flag("DEFAULT_CROSS_BUILD_ENV_URL")
+
+    def _install_cross_build_packages(
+        self, xbuildenv_root: Path, xbuildenv_pyodide_root: Path
+    ) -> None:
+        """
+        Install package that are used in the cross-build environment.
+
+        Parameters
+        ----------
+        xbuildenv_root
+            Path to the xbuildenv directory.
+        xbuildenv_pyodide_root
+            Path to the pyodide-root directory inside the xbuildenv directory.
+        """
+        host_site_packages = self._host_site_packages_dir(xbuildenv_pyodide_root)
+        host_site_packages.mkdir(exist_ok=True, parents=True)
+
+        install_prefix = (
+            [
+                uv_helper.find_uv_bin(),
+                "pip",
+                "install",
+            ]
+            if uv_helper.should_use_uv()
+            else [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--no-user",
+            ]
+        )
+
+        result = subprocess.run(
+            [
+                *install_prefix,
+                "-r",
+                str(xbuildenv_root / "requirements.txt"),
+                "--target",
+                str(host_site_packages),
+            ],
+            capture_output=True,
+            encoding="utf8",
+            check=False,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Failed to install cross-build packages: {result.stderr}"
+            )
+
+        # Copy the site-packages-extras (coming from the cross-build-files meta.yaml
+        # key) over the site-packages directory with the newly installed packages.
+        shutil.copytree(
+            xbuildenv_root / "site-packages-extras",
+            host_site_packages,
+            dirs_exist_ok=True,
+        )
 
     def _host_site_packages_dir(
         self, xbuildenv_pyodide_root: Path | None = None

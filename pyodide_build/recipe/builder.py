@@ -640,13 +640,46 @@ class RecipeBuilderPackage(RecipeBuilder):
                 Path(self.build_args.host_install_dir)
                 / f"lib/{python_dir}/site-packages"
             )
-            # Copy cross build files to host site packages
-            for cross_build_file in self.build_metadata.cross_build_files:
-                src_file = wheel_dir / cross_build_file
-                dest_file = host_site_packages / cross_build_file
-                dest_file.parent.mkdir(parents=True, exist_ok=True)
+            if self.build_metadata.cross_build_env:
+                subprocess.run(
+                    [
+                        "pip",
+                        "install",
+                        # Upgrade the package in the host environment if there is a
+                        # older or newer version of the package already installed.
+                        # However, we don't want to replace the dependencies of the package,
+                        # since they may contain cross-build files as well.
+                        # For instance, numpy and scipy are both cross-build packages, but scipy depends on numpy.
+                        # Therefore, if we install numpy first and then scipy, installing scipy
+                        # will overwrite the cross build files in numpy.
+                        "--upgrade",
+                        "--no-deps",
+                        "-t",
+                        str(host_site_packages),
+                        f"{name}=={ver}",
+                    ],
+                    check=True,
+                )
 
-                shutil.copy(src_file, dest_file)
+                # Call the same pip command again to install the dependencies
+                # but without the --upgrade flag. This will prevent pip from
+                # overwriting the dependencies in the host environment.
+                subprocess.run(
+                    [
+                        "pip",
+                        "install",
+                        "-t",
+                        str(host_site_packages),
+                        f"{name}=={ver}",
+                    ],
+                    check=True,
+                )
+
+            for cross_build_file in self.build_metadata.cross_build_files:
+                shutil.copy(
+                    (wheel_dir / cross_build_file),
+                    host_site_packages / cross_build_file,
+                )
 
 
 class RecipeBuilderStaticLibrary(RecipeBuilder):

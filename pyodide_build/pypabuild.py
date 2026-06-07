@@ -17,10 +17,12 @@ from packaging.requirements import Requirement
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_current_xbuildenv_manager,
     get_host_build_flag,
     get_pyversion,
     get_unisolated_files,
     get_unisolated_packages,
+    in_xbuildenv,
     platform,
 )
 from pyodide_build.spec import _BuildSpecExports
@@ -207,6 +209,10 @@ def install_reqs(
     ]
     reqs, unisolated = _replace_unisolated_packages(reqs, get_unisolated_packages())
     reqs = remove_avoided_requirements(reqs, IGNORED_BUILD_REQUIREMENTS)
+
+    if in_xbuildenv() and unisolated:
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+
     # propagate PIP config from build_env to current environment
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}

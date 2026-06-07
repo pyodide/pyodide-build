@@ -277,6 +277,41 @@ class TestCrossBuildEnvManager:
         assert (tmp_path / version / ".installed").exists()
         assert manager.current_version == version
 
+    def test_install_cross_build_packages(
+        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        pip_called_with = monkeypatch_subprocess_run_pip
+        manager = CrossBuildEnvManager(tmp_path)
+
+        download_path = tmp_path / "test"
+        download_and_unpack_archive(dummy_xbuildenv_url, download_path, "")
+
+        xbuildenv_root = download_path / "xbuildenv"
+        xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
+        manager._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
+
+        assert len(pip_called_with) == 9
+        assert pip_called_with[0:8] == [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-user",
+            "-r",
+            str(xbuildenv_root / "requirements.txt"),
+            "--target",
+        ]
+        assert pip_called_with[8].startswith(
+            str(xbuildenv_pyodide_root)
+        )  # hostsitepackages
+
+        hostsitepackages = manager._host_site_packages_dir(xbuildenv_pyodide_root)
+        assert hostsitepackages.exists()
+
+        cross_build_files = xbuildenv_root / "site-packages-extras"
+        for file in cross_build_files.iterdir():
+            assert (hostsitepackages / file.name).exists()
+
     def test_create_package_index(self, tmp_path, dummy_xbuildenv_url):
         manager = CrossBuildEnvManager(tmp_path)
 
@@ -363,6 +398,31 @@ class TestCrossBuildEnvManager:
         monkeypatch.setattr(sys, "version_info", VersionInfo(3, 12))
         build_env._init_xbuild_env(xbuildenv_path=tmp_path)
         assert manager.current_version >= "0.27.7"
+
+    def test_ensure_cross_build_packages_installed_idempotent(
+        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        pip_called_with = monkeypatch_subprocess_run_pip
+        manager = CrossBuildEnvManager(tmp_path)
+
+        # Lazy install path: no cross-build packages installed yet
+        manager.install(
+            version=None,
+            url=dummy_xbuildenv_url,
+            skip_install_cross_build_packages=True,
+        )
+        assert pip_called_with == []
+
+        # First ensure installs once
+        manager.ensure_cross_build_packages_installed()
+        assert len(pip_called_with) == 9
+
+        # Second ensure is a no-op
+        manager.ensure_cross_build_packages_installed()
+        assert len(pip_called_with) == 9
+
+        marker = manager.symlink_dir.resolve() / ".cross-build-packages-installed"
+        assert marker.exists()
 
 
 @pytest.mark.parametrize(
