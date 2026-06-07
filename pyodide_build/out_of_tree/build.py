@@ -43,6 +43,7 @@ def run(
     config_settings: ConfigSettingsType,
     isolation: bool = True,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> Path:
     outdir = outdir.resolve()
     cflags = build_env.get_build_flag("SIDE_MODULE_CFLAGS")
@@ -80,6 +81,7 @@ def run(
             config_settings,
             isolation=isolation,
             skip_dependency_check=skip_dependency_check,
+            verbosity=verbosity,
         )
 
     wheel_path = Path(built_wheel)

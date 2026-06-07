@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.35.0] - 2026/XX/XX
 
+### Added
+
+- `CrossBuildEnvReleaseSpec` now has a `published_at` field containing the UTC timestamp
+  when the release was published on GitHub (ISO 8601 format). This is exposed in
+  `pyodide xbuildenv search --all` and `pyodide xbuildenv search --all --json`.
+  [#349](https://github.com/pyodide/pyodide-build/pull/349)
+
+- `pyodide xbuildenv search` and `pyodide xbuildenv install` now support `--nightly`
+  and `--debug` flags to search and install nightly and nightly-debug cross-build
+  environments respectively.
+  [#350](https://github.com/pyodide/pyodide-build/pull/350)
+
+- `pyodide build` now accepts `-v`/`--verbose` flags (stackable twice up to `-vv`)
+  to increase build verbosity. At `-v`, installer commands and
+  backend hook invocations are shown. At `-vv`, the package installers (`uv`/`pip`)
+  additionally receive a `-v` flag for detailed package resolution output.
+  [#363](https://github.com/pyodide/pyodide-build/pull/363)
+
 ### Changed
 
 - Unisolated packages are now installed into the isolated build environment via
@@ -29,20 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   site-packages at package build time, rather than being pre-installed into
   a shared directory inside the xbuildenv at install time.
   [#21](https://github.com/pyodide/pyodide-build/pull/21)
-
-## [0.34.5] - 2026/05/20
-
-### Added
-
-- `CrossBuildEnvReleaseSpec` now has a `published_at` field containing the UTC timestamp
-  when the release was published on GitHub (ISO 8601 format). This is exposed in
-  `pyodide xbuildenv search --all` and `pyodide xbuildenv search --all --json`.
-  [#349](https://github.com/pyodide/pyodide-build/pull/349)
-
-- `pyodide xbuildenv search` and `pyodide xbuildenv install` now support `--nightly`
-  and `--debug` flags to search and install nightly and nightly-debug cross-build
-  environments respectively.
-  [#350](https://github.com/pyodide/pyodide-build/pull/350)
 
 ## [0.34.4] - 2026/05/15
 
@@ -187,12 +191,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `pyodide clean recipes`, a CLI command that deletes build files for chosen packages or tags.
-[#254](https://github.com/pyodide/pyodide-build/pull/254)
+  [#254](https://github.com/pyodide/pyodide-build/pull/254)
 
 ## [0.30.8] - 2025/10/22
 
 - `pyodide config` now exposes `dist_dir` variable.
-[#236](https://github.com/pyodide/pyodide-build/pull/236)
+  [#236](https://github.com/pyodide/pyodide-build/pull/236)
 
 - The CMake toolchain file for Pyodide now sets `CMAKE_SHARED_LINKER_FLAGS_INIT` and `CMAKE_MODULE_LINKER_FLAGS_INIT` and
   unset `CMAKE_SHARED_LINKER_FLAGS` to avoid conflicts with the user's settings.

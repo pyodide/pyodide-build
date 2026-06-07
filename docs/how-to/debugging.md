@@ -170,16 +170,25 @@ pyodide build . --no-isolation
 
 ### Verbose output
 
-Use `export EMCC_DEBUG=1` to get more detailed output from the Emscripten compiler.
+Use `-v` or `-vv` to increase pyodide-build's own verbosity:
 
-This can be useful for debugging linker errors and other build issues.
+```bash
+pyodide build . -v    # show installer commands and backend hook invocations
+pyodide build . -vv   # also pass -v to the package installer (uv/pip)
+```
+
+At `-v`, you will see:
+- `> cmd` lines showing the pyproject_hooks invocations (e.g., `build_wheel`)
+- `> cmd` / `< output` lines for the package installer (`uv`/`pip`) when packages are not cached
+
+For even more detailed output from the Emscripten compiler itself, set `EMCC_DEBUG=1`:
 
 ```bash
 export EMCC_DEBUG=1
 pyodide build .
 ```
 
-Increase verbosity to see exactly what commands are being run:
+For backend-specific verbosity, pass flags via `-C`:
 
 ```bash
 # setuptools

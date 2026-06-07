@@ -440,6 +440,7 @@ def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
         backend_flags: Any,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ) -> str:
         results["srcdir"] = srcdir
         results["outdir"] = outdir
@@ -521,6 +522,7 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
         backend_flags,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         nonlocal exports_
         exports_ = exports
@@ -576,6 +578,7 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         nonlocal config_settings_passed
         config_settings_passed = config_settings
@@ -757,6 +760,7 @@ def test_build_isolation_flags(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -819,6 +823,7 @@ def test_build_skip_dependency_check(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -882,6 +887,7 @@ def test_build_combined_flags(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -920,3 +926,62 @@ def test_build_combined_flags(
     assert len(build_calls) == 1
     assert build_calls[0]["isolation"] == isolation
     assert build_calls[0]["skip_dependency_check"] == skip_check
+
+
+@pytest.mark.parametrize(
+    "verbosity_args,expected_verbosity",
+    [
+        ([], 0),
+        (["-v"], 1),
+        (["-vv"], 2),
+        (["--verbose"], 1),
+        (["-v", "-v"], 2),
+    ],
+)
+def test_build_verbosity_flag(
+    tmp_path,
+    monkeypatch,
+    dummy_xbuildenv,
+    mock_emscripten,
+    verbosity_args,
+    expected_verbosity,
+):
+    """Test that -v/-vv verbosity flags are accepted and propagate correctly."""
+    from pyodide_build import pypabuild
+
+    build_calls = []
+
+    def mocked_build(
+        srcdir,
+        outdir,
+        env,
+        config_settings,
+        isolation=True,
+        skip_dependency_check=False,
+        verbosity=0,
+    ):
+        build_calls.append({"verbosity": verbosity})
+        dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        return str(dummy_wheel)
+
+    monkeypatch.setattr(pypabuild, "build", mocked_build)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
+    monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
+    monkeypatch.setattr(
+        common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
+    )
+
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
+
+    srcdir = tmp_path / "in"
+    outdir = tmp_path / "out"
+    srcdir.mkdir()
+
+    args = [str(srcdir), "--outdir", str(outdir)] + verbosity_args
+    result = runner.invoke(build.main, args)
+
+    assert result.exit_code == 0, result.output
+    assert len(build_calls) == 1
+    assert build_calls[0]["verbosity"] == expected_verbosity
