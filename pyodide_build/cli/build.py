@@ -35,6 +35,7 @@ class BuildArgs:
     config_settings: ConfigSettingsType
     isolation: bool
     skip_dependency_check: bool
+    verbosity: int = 0
 
 
 def _convert_exports(exports: str) -> _BuildSpecExports:
@@ -76,6 +77,7 @@ def _build_from_source(
         args.config_settings,
         isolation=args.isolation,
         skip_dependency_check=args.skip_dependency_check,
+        verbosity=args.verbosity,
     )
 
 
@@ -345,6 +347,13 @@ DEFAULT_PATH = default_xbuildenv_path()
     show_envvar=True,
     help="Skip automatic installation of Emscripten if not found.",
 )
+@click.option(
+    "-v",
+    "--verbose",
+    "verbosity",
+    count=True,
+    help="Increase build verbosity. Use -v for verbose output, -vv for very verbose output.",
+)
 @click.pass_context
 def main(
     ctx: click.Context,
@@ -362,6 +371,7 @@ def main(
     config_setting: tuple[str, ...],
     xbuildenv_path: Path,
     skip_emscripten_install: bool,
+    verbosity: int,
 ) -> None:
     """Use pypa/build to build a Python package from source, pypi or url.
 
@@ -387,6 +397,7 @@ def main(
         config_settings=config_settings,
         isolation=not no_isolation,
         skip_dependency_check=skip_dependency_check,
+        verbosity=verbosity,
     )
 
     skip_dependency_list = list(skip_dependency)
@@ -473,6 +484,7 @@ def source(
     config_settings: ConfigSettingsType,
     isolation: bool = True,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> Path:
     """Use pypa/build to build a Python package from source"""
     args = BuildArgs(
@@ -480,5 +492,6 @@ def source(
         config_settings=config_settings,
         isolation=isolation,
         skip_dependency_check=skip_dependency_check,
+        verbosity=verbosity,
     )
     return _build_from_source(source_location, output_directory, args)

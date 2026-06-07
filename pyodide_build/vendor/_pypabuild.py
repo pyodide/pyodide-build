@@ -27,7 +27,7 @@ import subprocess
 import sys
 import traceback
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import NoReturn, TextIO
 
 from build import (
@@ -102,6 +102,25 @@ def _find_called_process_error(
     if isinstance(inner, subprocess.CalledProcessError):
         return inner
     return None
+
+
+@contextlib.contextmanager
+def _configure_build_verbosity(
+    verbosity: int,
+    logger_fn: Callable[..., None],
+) -> Iterator[None]:
+    """
+    Set build._ctx.VERBOSITY and build._ctx.LOGGER for the duration of a build.
+    """
+    from build import _ctx
+
+    token_verbosity = _ctx.VERBOSITY.set(verbosity)
+    token_logger = _ctx.LOGGER.set(logger_fn)
+    try:
+        yield
+    finally:
+        _ctx.VERBOSITY.reset(token_verbosity)
+        _ctx.LOGGER.reset(token_logger)
 
 
 @contextlib.contextmanager

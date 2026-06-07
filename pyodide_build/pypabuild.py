@@ -27,6 +27,7 @@ from pyodide_build.build_env import (
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
+    _configure_build_verbosity,
     _DefaultIsolatedEnv,
     _error,
     _handle_build_error,
@@ -51,6 +52,7 @@ SYMLINK_ENV_VARS = {
 def _gen_runner(
     cross_build_env: Mapping[str, str],
     isolated_build_env: _DefaultIsolatedEnv = None,
+    verbosity: int = 0,
 ) -> Callable[[Sequence[str], str | None, Mapping[str, str] | None], None]:
     """
     This returns a slightly modified version of default subprocess runner that pypa/build uses.
@@ -66,6 +68,8 @@ def _gen_runner(
         The cross build environment for pywasmcross.
     isolated_build_env
         The isolated build environment created by pypa/build.
+    verbosity
+        Verbosity level. When >= 1, the build backend command is logged.
     """
 
     def _runner(cmd, cwd=None, extra_environ=None):
@@ -85,8 +89,8 @@ def _gen_runner(
             env["BUILD_ENV_SCRIPTS_DIR"] = scripts_dir
 
         env["PATH"] = f"{cross_build_env['COMPILER_WRAPPER_DIR']}:{env['PATH']}"
-        # For debugging: Uncomment the following line to print the build command
-        # print("Build backend call:", " ".join(str(x) for x in cmd), file=sys.stderr)
+        if verbosity >= 1:
+            print(f"> {' '.join(str(x) for x in cmd)}", file=sys.stderr, flush=True)
         sp.check_call(cmd, cwd=cwd, env=env)
 
     return _runner
@@ -161,6 +165,7 @@ def _build_in_isolated_env(
     outdir: str,
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
+    verbosity: int = 0,
 ) -> str:
     # For debugging: The following line disables removal of the isolated venv.
     # It will be left in the /tmp folder and can be inspected or entered as
@@ -172,7 +177,7 @@ def _build_in_isolated_env(
         builder = ProjectBuilder.from_isolated_env(
             env,
             srcdir,
-            runner=_gen_runner(build_env, env),
+            runner=_gen_runner(build_env, env, verbosity=verbosity),
         )
 
         # first install the build dependencies
@@ -218,9 +223,12 @@ def _build_in_current_env(
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> str:
     with common.replace_env(build_env):
-        builder = ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+        builder = ProjectBuilder(
+            srcdir, runner=_gen_runner(build_env, verbosity=verbosity)
+        )
 
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})
@@ -364,6 +372,47 @@ def get_build_env(
         yield env
 
 
+# Based on pypa/build's reference logger implementation. See
+# https://github.com/pypa/build/blob/615d04cfc52ac3c1592a463f0afe484fee1cc368/src/build/__main__.py#L99-L123
+def _make_pypa_build_logger(verbosity: int) -> Callable[[str], None]:
+    """
+    Returns a logger function compatible with build._ctx.LOGGER.
+
+    pypa/build's default _log_default sends messages to logging.getLogger('build')
+    at INFO level, but that logger has no handlers and an effective level of WARNING,
+    so all output is silently dropped when we use pypa/build as a library.
+
+    We mirror pypa/build's CLI logger, where all messages go to stderr. The subprocess
+    commands are prefixed by "> " and subprocess output is prefixed by "< ".
+
+    The ``message`` is a plain string. ``kind`` is a tuple tag that is set by pypa/build:
+      - ``('step',)``                  --> this is a high-level build step (such as "Building wheel...")
+      - ``('subprocess', 'cmd')``      --> the installer command that is being run
+      - ``('subprocess', 'stdout')``   --> a line of the installer's stdout
+      - ``('subprocess', 'stderr')``   --> a line of the installer's stderr
+      - ``None``                       --> some untagged informational message
+
+    pypa/build only calls this logger with the subprocess's content when
+    _ctx.VERBOSITY is greater than zero.
+    """
+
+    def _log(message: str, *, kind: tuple[str, ...] | None = None) -> None:
+        msg = message.rstrip()
+        if not msg:
+            return
+        match kind:
+            case ("subprocess", "cmd") if verbosity >= 1:
+                print(f"> {msg}", file=sys.stderr, flush=True)
+            case ("subprocess", *_) if verbosity >= 1:
+                print(f"< {msg}", file=sys.stderr, flush=True)
+            case ("subprocess", *_):
+                pass  # verbosity=0: installer output is not shown
+            case _:
+                print(msg, file=sys.stderr, flush=True)
+
+    return _log
+
+
 def build(
     srcdir: Path,
     outdir: Path,
@@ -371,30 +420,38 @@ def build(
     config_settings: ConfigSettingsType,
     isolation: bool = True,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> str:
-    try:
-        with _handle_build_error():
-            if isolation:
-                built = _build_in_isolated_env(
-                    build_env, srcdir, str(outdir), "wheel", config_settings
+    with _configure_build_verbosity(verbosity, _make_pypa_build_logger(verbosity)):
+        try:
+            with _handle_build_error():
+                if isolation:
+                    built = _build_in_isolated_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        verbosity=verbosity,
+                    )
+                else:
+                    built = _build_in_current_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        skip_dependency_check,
+                        verbosity=verbosity,
+                    )
+                print(
+                    "{bold}{green}Successfully built {}{reset}".format(
+                        built, **_styles.get()
+                    )
                 )
-            else:
-                built = _build_in_current_env(
-                    build_env,
-                    srcdir,
-                    str(outdir),
-                    "wheel",
-                    config_settings,
-                    skip_dependency_check,
-                )
-            print(
-                "{bold}{green}Successfully built {}{reset}".format(
-                    built, **_styles.get()
-                )
-            )
-            return built
-    except Exception as e:  # pragma: no cover
-        tb = traceback.format_exc().strip("\n")
-        print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
-        _error(str(e))
-        sys.exit(1)
+                return built
+        except Exception as e:  # pragma: no cover
+            tb = traceback.format_exc().strip("\n")
+            print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
+            _error(str(e))
+            sys.exit(1)
