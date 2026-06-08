@@ -35,13 +35,14 @@ from pyodide_build.logger import logger
 IS_WIN = sys.platform == "win32"
 
 
-def xbuildenv_dirname() -> str:
-    try:
-        from pyodide_build import __version__
-    except ImportError:
-        __version__ = "0.0.0"
+def _xbuildenv_installation_id() -> str:
+    package_dir = Path(__file__).resolve().parent
+    installation_scope = f"{Path(sys.prefix).resolve()}\0{package_dir}"
+    return hashlib.sha256(installation_scope.encode()).hexdigest()[:12]
 
-    return f".pyodide-xbuildenv-{__version__}"
+
+def xbuildenv_dirname() -> str:
+    return f".pyodide-xbuildenv-{_xbuildenv_installation_id()}"
 
 
 @cache
@@ -88,7 +89,7 @@ def default_xbuildenv_path() -> Path:
     candidates = []
 
     # 2.1. default cache directory
-    candidates.append(Path(platformdirs.user_cache_dir()) / dirname)
+    candidates.append(Path(platformdirs.user_cache_dir("pyodide-build")) / dirname)
     # 2.2. current working directory
     candidates.append(Path.cwd() / dirname)
 

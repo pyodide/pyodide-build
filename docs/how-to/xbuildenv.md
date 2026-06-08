@@ -99,7 +99,7 @@ pyodide-build resolves the xbuildenv path in this order:
 
 1. `PYODIDE_XBUILDENV_PATH` environment variable
 2. `xbuildenv_path` in `pyproject.toml` under `[tool.pyodide.build]`
-3. Platform cache directory (`~/.cache/pyodide` on Linux, `~/Library/Caches/pyodide` on macOS)
+3. Platform cache directory inside a `pyodide-build` cache folder. The default path is scoped to the current Python environment and `pyodide-build` installation, for example `~/.cache/pyodide-build/.pyodide-xbuildenv-<install-id>/0.29.4` on Linux.
 
 Therefore, to pin a custom location for caching, etc:
 
