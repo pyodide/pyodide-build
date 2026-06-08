@@ -168,7 +168,8 @@ def test_default_xbuildenv_path(tmp_path, reset_cache):
     dirname = xbuildenv_dirname()
 
     assert (
-        default_xbuildenv_path() == Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
+        default_xbuildenv_path()
+        == Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
     )
 
 
@@ -202,7 +203,8 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
     dirname = xbuildenv_dirname()
 
     assert (
-        default_xbuildenv_path() == Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
+        default_xbuildenv_path()
+        == Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
     )
 
     reset_cache()
