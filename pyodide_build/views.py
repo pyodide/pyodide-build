@@ -16,7 +16,7 @@ class MetadataView:
     published_at: str = ""
     source: str = field(
         default="stable"
-    )  # "stable", "nightly", or "nightly-debug" # TODO: add stable-debug builds?
+    )  # "stable", "stable-debug", "nightly", or "nightly-debug"
 
     @classmethod
     def to_table(cls, views: list["MetadataView"], show_source: bool = False) -> str:

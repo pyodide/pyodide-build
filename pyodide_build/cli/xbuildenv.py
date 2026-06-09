@@ -9,6 +9,7 @@ from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
     NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
     NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
@@ -63,7 +64,7 @@ def check_xbuildenv_root(path: Path) -> None:
     "--debug",
     is_flag=True,
     default=False,
-    help="install the debug variant of the cross-build environment (nightly only).",
+    help="install the debug variant of the cross-build environment. Combine with --nightly to install the nightly debug variant.",
 )
 @click.option(
     "--skip-cross-build-packages",
@@ -94,12 +95,12 @@ def _install(
     Arguments:
         VERSION: version of cross-build environment to install (optional)
     """
-    if nightly or debug:
-        metadata_url = (
-            NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
-            if debug
-            else NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
-        )
+    if nightly and debug:
+        metadata_url = NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
+    elif nightly:
+        metadata_url = NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
+    elif debug:
+        metadata_url = STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL
     else:
         metadata_url = None
 
@@ -223,7 +224,7 @@ def _use(version: str, path: Path) -> None:
     "--debug",
     is_flag=True,
     default=False,
-    help="search nightly debug releases instead of stable ones.",
+    help="search debug releases. Searches stable-debug by default. Combine with --nightly to search nightly-debug releases.",
 )
 @click.option(
     "--json",
@@ -275,14 +276,12 @@ def _search(
         )
 
     if nightly or debug:
-        # Nightly and/or debug releases (mutually exclusive with stable)
-        sources = []
-        if nightly:
-            sources.append(("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL))
-        if debug:
-            sources.append(
-                ("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)
-            )
+        if nightly and debug:
+            sources = [("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
+        elif nightly:
+            sources = [("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL)]
+        else:
+            sources = [("stable-debug", STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
         compat = _compat_kwargs()
         views = [
             _make_view(release, source)

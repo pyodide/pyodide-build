@@ -15,9 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [#349](https://github.com/pyodide/pyodide-build/pull/349)
 
 - `pyodide xbuildenv search` and `pyodide xbuildenv install` now support `--nightly`
-  and `--debug` flags to search and install nightly and nightly-debug cross-build
-  environments respectively.
-  [#350](https://github.com/pyodide/pyodide-build/pull/350)
+  and `--debug` flags to search and install stable-debug, nightly, and nightly-debug
+  cross-build environments respectively.
+  [#350](https://github.com/pyodide/pyodide-build/pull/350), [#354](https://github.com/pyodide/pyodide-build/pull/371)
 
 - `pyodide build` now accepts `-v`/`--verbose` flags (stackable twice up to `-vv`)
   to increase build verbosity. At `-v`, installer commands and
