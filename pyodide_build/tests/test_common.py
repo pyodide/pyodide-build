@@ -167,7 +167,26 @@ def test_default_xbuildenv_path(tmp_path, reset_cache):
 
     dirname = xbuildenv_dirname()
 
-    assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
+    assert (
+        default_xbuildenv_path()
+        == Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
+    )
+
+
+def test_xbuildenv_dirname_is_installation_scoped(tmp_path, monkeypatch):
+    import sys
+
+    first_prefix = tmp_path / "venv-1"
+    second_prefix = tmp_path / "venv-2"
+
+    monkeypatch.setattr(sys, "prefix", str(first_prefix))
+    first_dirname = xbuildenv_dirname()
+
+    monkeypatch.setattr(sys, "prefix", str(first_prefix))
+    assert xbuildenv_dirname() == first_dirname
+
+    monkeypatch.setattr(sys, "prefix", str(second_prefix))
+    assert xbuildenv_dirname() != first_dirname
 
 
 def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
@@ -183,13 +202,16 @@ def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
 
     dirname = xbuildenv_dirname()
 
-    assert default_xbuildenv_path() == Path(platformdirs.user_cache_dir()) / dirname
+    assert (
+        default_xbuildenv_path()
+        == Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
+    )
 
     reset_cache()
 
     os.environ["XDG_CACHE_HOME"] = str(tmp_path)
 
-    assert default_xbuildenv_path() == tmp_path / dirname
+    assert default_xbuildenv_path() == tmp_path / "pyodide-build" / dirname
 
     reset_cache()
 
@@ -216,7 +238,7 @@ def test_default_xbuildenv_path_env_var(tmp_path, reset_cache, monkeypatch):
 
     dirname = xbuildenv_dirname()
 
-    baseline_path = Path(platformdirs.user_cache_dir()) / dirname
+    baseline_path = Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
 
     assert default_xbuildenv_path() == baseline_path
 
@@ -254,7 +276,7 @@ def test_default_xbuildenv_path_env_var_non_writable(
     import platformdirs
 
     dirname = xbuildenv_dirname()
-    baseline_path = Path(platformdirs.user_cache_dir()) / dirname
+    baseline_path = Path(platformdirs.user_cache_dir("pyodide-build")) / dirname
 
     non_writable_path = tmp_path / "non_writable"
     non_writable_path.mkdir(exist_ok=True)
