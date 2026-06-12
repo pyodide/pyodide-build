@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
   [#389](https://github.com/pyodide/pyodide-build/pull/389)
 
+- Fixed `pyodide venv --no-download` / `--never-download` being silently ignored,
+  versioned pip scripts (e.g. `pip3.12`) being renamed to `pip3`, and a failed
+  `pyodide venv` deleting a pre-existing destination directory.
+  [#377](https://github.com/pyodide/pyodide-build/pull/377)
+
 ### Changed
 
 - Fixed build-time scripts of unisolated packages (like `f2py` and

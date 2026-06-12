@@ -52,6 +52,20 @@ def dedent(s: str) -> str:
     return textwrap.dedent(s).strip() + "\n"
 
 
+def _pip_script_name(pip: Path, exe_suffix: str) -> Path:
+    """Return the pip script path with *exe_suffix* applied.
+
+    On Unix ``exe_suffix`` is empty and the name is returned unchanged, so
+    versioned names like ``pip3.12`` keep their version (``Path.with_suffix("")``
+    would wrongly strip it to ``pip3``). On Windows the real extension (``.exe``
+    or ``.bat``) is replaced with ``exe_suffix``.
+    """
+    if not exe_suffix:
+        return pip
+    base_name = pip.stem if pip.suffix else pip.name
+    return pip.parent / (base_name + exe_suffix)
+
+
 def get_pyversion() -> str:
     return f"{sys.version_info.major}.{sys.version_info.minor}"
 
@@ -490,7 +504,7 @@ class PyodideVenv(ABC):
                 continue
             pip.unlink(missing_ok=True)
 
-            patched_pip_exe = pip.with_suffix(self.exe_suffix)
+            patched_pip_exe = _pip_script_name(pip, self.exe_suffix)
             if patched_pip_exe != self.pip_patched_path:
                 patched_pip_exe.unlink(missing_ok=True)
                 patched_pip_exe.symlink_to(self.pip_patched_path)
@@ -589,15 +603,24 @@ class PyodideVenv(ABC):
         session = self._create_session()
         self._pyodide_pyversion = check_host_python_version(session)
 
+        dest_path = Path(session.creator.dest)
+        dest_existed_before = dest_path.exists()
+
         try:
             session.run()
-            self._venv_root = Path(session.creator.dest).absolute()
+            self._venv_root = dest_path.absolute()
             self._venv_bin = self._venv_root / self.bin_dir_name
 
             self.configure_virtualenv()
             self._install_stdlib()
         except (Exception, KeyboardInterrupt, SystemExit):
-            shutil.rmtree(session.creator.dest)
+            if dest_existed_before:
+                logger.warning(
+                    "Venv creation failed; leaving pre-existing directory %s intact",
+                    dest_path,
+                )
+            else:
+                shutil.rmtree(dest_path, ignore_errors=True)
             raise
 
         logger.success("Successfully created Pyodide virtual environment!")
