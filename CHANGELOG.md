@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Fixed an include path issue on macOS when homebrew Python is installed:
+  if `sys.prefix` contains a symlink (as is the case with homebrew), resolve it
+  so that host include paths are still replaced by the cross-compile ones
+  [#375](https://github.com/pyodide/pyodide-build/pull/375)
+
 ## [0.35.0] - 2026/06/09
 
 ### Added
