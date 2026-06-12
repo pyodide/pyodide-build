@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updating to the wheel. The fix moves format resolution after the version/newer-than
   check and restores the intended fallback semantics: an explicitly passed `source_fmt`
   is strict; an absent one prefers the existing format with fallback to the other.
-  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
 
 - Fixed `_make_predictable_url` generating an incorrect URL for sdists whose filename
   does not match `{normalized_name}-{version}.tar.gz`: `.zip` sdists and packages with
@@ -26,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   producing a URL that 404s while the stored `sha256` is from the real file, making the
   recipe unbuildable. The fix builds the predictable URL from the actual `filename`
   returned by the PyPI metadata.
-  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
 
 ## [0.35.1] - 2026/06/13
 
