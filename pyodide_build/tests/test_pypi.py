@@ -364,3 +364,176 @@ def test_bad_requirements_text(dummy_xbuildenv, mock_emscripten):
             ["-r", "requirements.txt"],
         )
         assert result.exit_code != 0 and line.strip() in str(result)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for the pypi resolver correctness fixes (issue #376).
+# These do not require a network connection or a real build.
+# ---------------------------------------------------------------------------
+
+from email.message import EmailMessage  # noqa: E402
+
+from packaging.requirements import Requirement  # noqa: E402
+from packaging.version import Version  # noqa: E402
+
+from pyodide_build.cli.build import _extract_extras  # noqa: E402
+from pyodide_build.out_of_tree import pypi  # noqa: E402
+
+
+def _make_candidate(name, version, requires_dist, extras=None):
+    cand = pypi.Candidate(name, Version(version), url=None, extras=extras)
+    meta = EmailMessage()
+    for d in requires_dist:
+        meta["Requires-Dist"] = d
+    cand._metadata = meta
+    return cand
+
+
+def test_extract_extras_preserves_specifier_and_multiple_extras():
+    # Bug 4: name, extras and specifier must all be preserved.
+    name, extras = _extract_extras("pkg[a,b]==1.0")
+    assert name == "pkg==1.0"
+    assert extras == ["a", "b"]
+
+    # single extra with specifier
+    name, extras = _extract_extras("pkg[a]==1.0")
+    assert name == "pkg==1.0"
+    assert extras == ["a"]
+
+    # no extras, specifier preserved
+    name, extras = _extract_extras("pkg>=2.0")
+    assert name == "pkg>=2.0"
+    assert extras == []
+
+    # plain name
+    name, extras = _extract_extras("pkg")
+    assert name == "pkg"
+    assert extras == []
+
+    # non-requirement source locations (urls/paths) returned unchanged
+    name, extras = _extract_extras("https://example.com/pkg.tar.gz")
+    assert name == "https://example.com/pkg.tar.gz"
+    assert extras == []
+
+
+def test_resolve_and_build_forwards_flags(monkeypatch):
+    # Bug 1: isolation / skip_dependency_check must reach download_or_build_wheel.
+    captured = []
+
+    def fake_download_or_build_wheel(url, target_directory, **kwargs):
+        captured.append(kwargs)
+
+    class _FakeResult:
+        class _Entry:
+            url = "http://example.com/foo-1.0.tar.gz"
+            extras: list[str] = []
+            name = "foo"
+            version = Version("1.0")
+
+        mapping = {"foo": _Entry()}
+
+    class _FakeResolver:
+        def __init__(self, *a, **k):
+            pass
+
+        def resolve(self, requirements):
+            return _FakeResult()
+
+    monkeypatch.setattr(pypi, "download_or_build_wheel", fake_download_or_build_wheel)
+    monkeypatch.setattr(
+        pypi, "_import_resolvelib", lambda: (object, lambda *a, **k: _FakeResolver())
+    )
+    monkeypatch.setattr(pypi.build_env, "get_pyversion_major_minor", lambda: "3.12")
+    monkeypatch.setattr(pypi.build_env, "platform", lambda: "emscripten_3_1_0_wasm32")
+
+    pypi._resolve_and_build(
+        deps=[],
+        target_folder=Path(tempfile.mkdtemp()),
+        build_dependencies=False,
+        extras=[],
+        output_lockfile=None,
+        isolation=False,
+        skip_dependency_check=True,
+    )
+
+    assert len(captured) == 1
+    assert captured[0]["isolation"] is False
+    assert captured[0]["skip_dependency_check"] is True
+    # Class-level attributes are set so metadata resolution also honors them.
+    assert pypi.PyPIProvider.BUILD_ISOLATION is False
+    assert pypi.PyPIProvider.BUILD_SKIP_DEPENDENCY_CHECK is True
+
+
+def test_find_matches_unions_extras(monkeypatch):
+    # Bug 2: when foo and foo[bar] are both required, the candidate must carry
+    # the union of all requested extras.
+    seen_extras = []
+
+    def fake_get_project_from_pypi(identifier, extras):
+        seen_extras.append(set(extras))
+        yield pypi.Candidate("foo", Version("1.0"), url=None, extras=extras)
+
+    monkeypatch.setattr(pypi, "get_project_from_pypi", fake_get_project_from_pypi)
+
+    provider = pypi.PyPIProvider(build_dependencies=True)
+    requirements = {"foo": [Requirement("foo"), Requirement("foo[bar]")]}
+    incompatibilities: dict[str, list] = {"foo": []}
+
+    matches = provider.find_matches("foo", requirements, incompatibilities)
+
+    assert len(seen_extras) == 1
+    assert seen_extras[0] == {"bar"}
+    assert len(matches) == 1
+    assert matches[0].extras == {"bar"}
+
+
+def test_candidate_dependencies_match_any_extra():
+    # Bug 2 (related): a Requires-Dist marker must match if ANY requested extra
+    # satisfies it, even when several extras are requested at once.
+    cand = _make_candidate(
+        "foo",
+        "1.0",
+        [
+            'dep-a; extra == "a"',
+            'dep-b; extra == "b"',
+            "dep-base",
+        ],
+        extras={"a", "b"},
+    )
+    dep_names = {d.name for d in cand.dependencies}
+    assert dep_names == {"dep-a", "dep-b", "dep-base"}
+
+
+def test_download_or_build_wheel_unsupported_type_raises(tmp_path):
+    # Bug 3: a non-gz, non-whl URL must raise a clear error, not UnboundLocalError.
+    with pytest.raises(RuntimeError, match="unsupported"):
+        pypi.download_or_build_wheel("http://example.com/pkg-1.0.rar", tmp_path)
+
+
+def test_download_or_build_wheel_routes_zip_sdist_to_builder(monkeypatch, tmp_path):
+    # Bug 3: a .zip sdist must be routed to the builder (not UnboundLocalError).
+    built = tmp_path / "foo-1.0-py3-none-any.whl"
+    built.write_bytes(b"PK\x03\x04dummy")
+    captured = {}
+
+    def fake_get_built_wheel(url, isolation=True, skip_dependency_check=False):
+        captured["url"] = url
+        captured["isolation"] = isolation
+        captured["skip_dependency_check"] = skip_dependency_check
+        return built
+
+    monkeypatch.setattr(pypi, "get_built_wheel", fake_get_built_wheel)
+    monkeypatch.setattr(pypi, "repack_zip_archive", lambda *a, **k: None)
+
+    target = tmp_path / "out"
+    target.mkdir()
+    pypi.download_or_build_wheel(
+        "http://example.com/foo-1.0.zip",
+        target,
+        isolation=False,
+        skip_dependency_check=True,
+    )
+    assert captured["url"] == "http://example.com/foo-1.0.zip"
+    assert captured["isolation"] is False
+    assert captured["skip_dependency_check"] is True
+    assert (target / built.name).exists()

@@ -114,14 +114,21 @@ def get_built_wheel(url, isolation=True, skip_dependency_check=False):
 @cache
 def _get_built_wheel_internal(url, isolation=True, skip_dependency_check=False):
     parsed_url = urlparse(url)
-    gz_name = Path(parsed_url.path).name
+    sdist_name = Path(parsed_url.path).name
+
+    # Preserve the archive's suffix so ``shutil.unpack_archive`` can infer the
+    # right format. PyPI serves ``.zip`` and ``.tar.bz2`` sdists in addition to
+    # ``.tar.gz``; hard-coding ``.tar.gz`` here would corrupt the others.
+    suffix = next(
+        (s for s in _SDIST_SUFFIXES if parsed_url.path.endswith(s)), ".tar.gz"
+    )
 
     cache_entry: dict[str, Any] = {}
     build_dir = tempfile.TemporaryDirectory()
     build_path = Path(build_dir.name)
 
     cache_entry["build_dir"] = build_dir
-    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
         data = requests.get(url).content
         f.write(data)
         f.close()
@@ -132,7 +139,7 @@ def _get_built_wheel_internal(url, isolation=True, skip_dependency_check=False):
             source_path = build_path / files[0]
         else:
             source_path = build_path
-    logger.info("Building wheel for %s...", gz_name)
+    logger.info("Building wheel for %s...", sdist_name)
     with (
         tempfile.NamedTemporaryFile(mode="w+") as logfile,
         stream_redirected(to=logfile, stream=sys.stdout),
@@ -234,6 +241,25 @@ def get_project_from_pypi(package_name, extras):
         yield Candidate(i.name, i.version, url=i.link.url, extras=extras)
 
 
+# Source distribution archive extensions that ``shutil.unpack_archive`` (and
+# therefore our build path) can handle. PyPI still serves ``.zip`` and
+# ``.tar.bz2`` sdists for some older packages, so we must not assume ``.tar.gz``.
+_SDIST_SUFFIXES = (
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tar.xz",
+    ".txz",
+    ".tar",
+    ".zip",
+)
+
+
+def _is_buildable_sdist(path: str) -> bool:
+    return path.endswith(_SDIST_SUFFIXES)
+
+
 def download_or_build_wheel(
     url: str,
     target_directory: Path,
@@ -242,28 +268,38 @@ def download_or_build_wheel(
     skip_dependency_check: bool = False,
 ) -> None:
     parsed_url = urlparse(url)
-    if parsed_url.path.endswith("gz"):
-        wheel_file = get_built_wheel(url, isolation, skip_dependency_check)
-        shutil.copy(wheel_file, target_directory)
-        wheel_path = target_directory / wheel_file.name
-    elif parsed_url.path.endswith(".whl"):
+    if parsed_url.path.endswith(".whl"):
         wheel_path = target_directory / Path(parsed_url.path).name
         with open(wheel_path, "wb") as f:
             f.write(requests.get(url).content)
+    elif _is_buildable_sdist(parsed_url.path):
+        wheel_file = get_built_wheel(
+            url,
+            isolation=isolation,
+            skip_dependency_check=skip_dependency_check,
+        )
+        shutil.copy(wheel_file, target_directory)
+        wheel_path = target_directory / wheel_file.name
+    else:
+        raise RuntimeError(f"Distributions of this type are unsupported: {url}")
 
     repack_zip_archive(wheel_path, compression_level=compression_level)
 
 
 def get_metadata_for_wheel(url):
     parsed_url = urlparse(url)
-    if parsed_url.path.endswith("gz"):
-        wheel_file = get_built_wheel(url)
-        wheel_stream: BinaryIO = open(wheel_file, "rb")
-    elif parsed_url.path.endswith(".whl"):
+    if parsed_url.path.endswith(".whl"):
         data = requests.get(url).content
-        wheel_stream = BytesIO(data)
+        wheel_stream: BinaryIO = BytesIO(data)
+    elif _is_buildable_sdist(parsed_url.path):
+        wheel_file = get_built_wheel(
+            url,
+            isolation=PyPIProvider.BUILD_ISOLATION,
+            skip_dependency_check=PyPIProvider.BUILD_SKIP_DEPENDENCY_CHECK,
+        )
+        wheel_stream = open(wheel_file, "rb")
     else:
-        raise RuntimeError(f"Distributions of this type are unsupported:{url}")
+        raise RuntimeError(f"Distributions of this type are unsupported: {url}")
     with ZipFile(wheel_stream) as z:
         for n in z.namelist():
             if n.endswith(".dist-info/METADATA"):
@@ -278,6 +314,13 @@ class PyPIProvider(_AbstractProvider):
     BUILD_FLAGS: ConfigSettingsType = {}
     BUILD_SKIP: list[str] = []
     BUILD_EXPORTS: _BuildSpecExports = []
+    # Build isolation settings used when an sdist must be built (e.g. to
+    # discover dependency metadata during resolution). These mirror the flags
+    # passed to ``_resolve_and_build`` so that metadata resolution, which goes
+    # through ``Candidate`` -> ``get_metadata_for_wheel`` -> ``get_built_wheel``
+    # and has no direct access to those flags, still honors them.
+    BUILD_ISOLATION: bool = True
+    BUILD_SKIP_DEPENDENCY_CHECK: bool = False
 
     def __init__(self, build_dependencies: bool):
         self.build_dependencies = build_dependencies
@@ -301,24 +344,27 @@ class PyPIProvider(_AbstractProvider):
     def find_matches(self, identifier, requirements, incompatibilities):
         requirements = list(requirements[identifier])
 
-        extra_requirements = {}
+        # The same package may be required both with and without extras (e.g.
+        # ``foo`` and ``foo[bar]``). Union all requested extras so that the
+        # resulting candidate pulls in dependencies for every requested extra.
+        # ``Candidate._get_dependencies`` evaluates each ``extra == "..."``
+        # marker against every extra in this set, so a single candidate carrying
+        # the union is the semantically correct choice.
+        extras: set[str] = set()
         for r in requirements:
-            extra_requirements[tuple(r.extras)] = 1
+            extras |= set(r.extras)
 
         bad_versions = {c.version for c in incompatibilities[identifier]}
 
         # Need to pass the extras to the search, so they
         # are added to the candidate at creation - we
         # treat candidates as immutable once created.
-        for extra_tuple in extra_requirements.keys():
-            extras = set(extra_tuple)
-
-            candidates = (
-                candidate
-                for candidate in get_project_from_pypi(identifier, extras)
-                if candidate.version not in bad_versions
-                and all(candidate.version in r.specifier for r in requirements)
-            )
+        candidates = (
+            candidate
+            for candidate in get_project_from_pypi(identifier, extras)
+            if candidate.version not in bad_versions
+            and all(candidate.version in r.specifier for r in requirements)
+        )
 
         return sorted(candidates, key=attrgetter("version"), reverse=True)
 
@@ -380,18 +426,30 @@ def _resolve_and_build(
     BaseReporter, Resolver = _import_resolvelib()
     requirements = []
 
-    target_env = {
+    base_env = {
         "python_version": build_env.get_pyversion_major_minor(),
         "sys_platform": build_env.platform().split("_")[0],
-        "extra": ",".join(extras),
     }
+    # A marker like ``extra == "a"`` can only ever match a single extra value,
+    # so joining all extras into one string (``"a,b"``) never matches. Evaluate
+    # the marker once per requested extra (plus the empty extra) and include the
+    # requirement if it is satisfied for ANY of them.
+    extras_to_check = [*extras, ""] if extras else [""]
+
+    def _marker_matches(marker: Any) -> bool:
+        return any(marker.evaluate({**base_env, "extra": e}) for e in extras_to_check)
 
     for d in deps:
         r = Requirement(d)
         if (r.name not in PyPIProvider.BUILD_SKIP) and (
-            (not r.marker) or r.marker.evaluate(target_env)
+            (not r.marker) or _marker_matches(r.marker)
         ):
             requirements.append(r)
+
+    # Propagate build isolation settings to the resolver so that any sdist that
+    # must be built to discover its metadata honors these flags.
+    PyPIProvider.BUILD_ISOLATION = isolation
+    PyPIProvider.BUILD_SKIP_DEPENDENCY_CHECK = skip_dependency_check
 
     # Create the (reusable) resolver.
     provider = PyPIProvider(build_dependencies=build_dependencies)
@@ -405,7 +463,13 @@ def _resolve_and_build(
     if output_lockfile is not None and len(output_lockfile) > 0:
         version_file = open(output_lockfile, "w")
     for x in result.mapping.values():
-        download_or_build_wheel(x.url, target_folder, compression_level)
+        download_or_build_wheel(
+            x.url,
+            target_folder,
+            compression_level=compression_level,
+            isolation=isolation,
+            skip_dependency_check=skip_dependency_check,
+        )
         if len(x.extras) > 0:
             extratxt = "[" + ",".join(x.extras) + "]"
         else:

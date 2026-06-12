@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Out-of-tree PyPI dependency resolution now forwards `--no-isolation` and
+  `--skip-dependency-check` to dependency sdist builds (including the sdist
+  builds used to discover dependency metadata during resolution), instead of
+  silently dropping them.
+  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+- `PyPIProvider.find_matches` now unions the extras across all requirements for
+  a package, so dependencies pulled in by extras are resolved even when the same
+  package is required both with and without extras (e.g. `foo` and `foo[bar]`).
+  Dependency markers are now evaluated once per requested extra so that a marker
+  like `extra == "a"` matches when any requested extra satisfies it.
+  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+- Building a non-gzip sdist (e.g. a `.zip` or `.tar.bz2`) from PyPI no longer
+  raises `UnboundLocalError`; supported archive formats are now built and
+  unsupported ones raise a clear error.
+  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+- `pyodide build` now preserves the version specifier and all extras when
+  building a PyPI package such as `pkg[a,b]==1.0`, instead of dropping the
+  specifier and ignoring extras containing commas.
+  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed

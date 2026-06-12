@@ -1,4 +1,3 @@
-import re
 import shutil
 import sys
 import tempfile
@@ -10,6 +9,7 @@ from urllib.parse import urlparse
 import click
 import requests
 from build import ConfigSettingsType
+from packaging.requirements import InvalidRequirement, Requirement
 
 from pyodide_build.build_env import (
     ensure_emscripten,
@@ -227,10 +227,21 @@ def _detect_source_type(source_location: str) -> str:
 
 
 def _extract_extras(source_location: str) -> tuple[str, list[str]]:
-    extras = re.findall(r"\[(\w+)\]", source_location)
-    if extras:
-        source_location = source_location[: source_location.find("[")]
-    return source_location, extras
+    """Split a pypi requirement into a name+specifier string and its extras.
+
+    For example ``"pkg[a,b]==1.0"`` returns ``("pkg==1.0", ["a", "b"])``. The
+    version specifier is preserved so the requested version is actually fetched.
+
+    URLs, directory paths and other non-requirement source locations are
+    returned unchanged with no extras.
+    """
+    try:
+        req = Requirement(source_location)
+    except InvalidRequirement:
+        return source_location, []
+
+    name = req.name + str(req.specifier)
+    return name, sorted(req.extras)
 
 
 DEFAULT_PATH = default_xbuildenv_path()
