@@ -28,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `packaging.tags.cpython_tags` still does not emit this tag as of packaging 26.x,
   so the manual yield is still required.
 
-Part of [#376](https://github.com/pyodide/pyodide-build/issues/376).
+Part of [#376](https://github.com/pyodide/pyodide-build/issues/376)
+([#379](https://github.com/pyodide/pyodide-build/pull/379)).
 
 ## [0.35.1] - 2026/06/13
 
