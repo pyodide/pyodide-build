@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed several bugs in the cross-build-environment (xbuildenv) lifecycle
+  [#376](https://github.com/pyodide/pyodide-build/issues/376):
+  - A Python-version marker mismatch on an already-installed xbuildenv no longer
+    silently overwrites the marker with the current Python version. A reinstall
+    now actually refreshes the host packages (or surfaces the intended error)
+    instead of letting builds proceed with packages installed under the old Python.
+  - Installing via `DEFAULT_CROSS_BUILD_ENV_URL` is now treated like an explicit
+    `--url` install, so it no longer bakes a mangled, URL-derived version into the
+    generated package index.
+  - `use_version()` no longer raises `FileExistsError` when the `xbuildenv`
+    symlink is dangling (its target was removed); the stale symlink is now
+    cleaned up first.
+  - A failure during a later installation step no longer deletes a pre-existing,
+    valid cached xbuildenv: only a directory created by the current `install()`
+    call is removed on failure, and the cleanup no longer masks the original error.
+  - `_find_latest_version()` now reports the correct newest/oldest supported
+    Python versions on a mismatch (sorting by Python version) and raises a clear
+    error instead of an `IndexError` when the releases metadata is empty.
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed
