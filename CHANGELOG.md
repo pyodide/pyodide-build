@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed several bugs in the cross-build-environment (xbuildenv) lifecycle
-  [#376](https://github.com/pyodide/pyodide-build/issues/376):
+  [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#378](https://github.com/pyodide/pyodide-build/pull/378):
   - A Python-version marker mismatch on an already-installed xbuildenv no longer
     silently overwrites the marker with the current Python version. A reinstall
     now actually refreshes the host packages (or surfaces the intended error)
