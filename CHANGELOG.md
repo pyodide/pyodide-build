@@ -12,12 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a hang when a recipe `build/script` or `build/post` ends by exiting the
   shell itself (e.g. `exit 0`). The build no longer blocks forever waiting for an
   environment dump that never runs; the previous environment is kept instead.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
 
 - Fixed per-package build variables (`PKGDIR`, `PKG_VERSION`, `DISTDIR`, ...)
   leaking into the cached build-environment dict, which caused later packages in
   a sequential `build-recipes` run to see the previous package's values.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
 
 ## [0.35.1] - 2026/06/13
 
