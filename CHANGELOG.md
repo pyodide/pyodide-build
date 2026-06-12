@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   candidates for a project are cached by name and the `PackageFinder`/HTTP
   session is shared, and wheel metadata is now read via PEP 658
   (`<wheel-url>.metadata`, falling back to the full wheel) and cached per URL.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#380](https://github.com/pyodide/pyodide-build/pull/380)
 
 ## [0.35.1] - 2026/06/13
 
