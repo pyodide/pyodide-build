@@ -161,14 +161,14 @@ def replay_genargs_handle_dashI(arg: str, target_install_dir: str) -> str | None
     if include_path_str.startswith("/usr"):
         return None
 
-    # Replace local Python include paths with the cross compiled ones
+    # Replace local Python include paths with the cross compiled ones.
+    # (resolve symlinks, since on macOS/homebrew Python sys.prefix will contain a symlink)
     include_path = str(Path(include_path_str).resolve())
 
-    if include_path.startswith(sys.prefix + "/include/python"):
-        return arg.replace("-I" + sys.prefix, "-I" + target_install_dir)
-
-    if include_path.startswith(sys.base_prefix + "/include/python"):
-        return arg.replace("-I" + sys.base_prefix, "-I" + target_install_dir)
+    for prefix in (sys.prefix, sys.base_prefix):
+        prefix = str(Path(prefix).resolve())
+        if include_path.startswith(prefix + "/include/python"):
+            return "-I" + target_install_dir + include_path.removeprefix(prefix)
 
     return arg
 
