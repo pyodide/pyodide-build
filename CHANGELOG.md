@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Archive downloads (xbuildenv, emsdk) now stream directly to a temporary file
+  instead of buffering the entire archive in RAM, reducing peak memory usage for
+  large downloads. Part of [#376](https://github.com/pyodide/pyodide-build/issues/376).
+
+- The default xbuildenv path is now resolved lazily — only when a CLI command
+  body actually needs it — instead of at module import time. This avoids
+  triggering a `ConfigManager` build, filesystem probes, and a potential
+  `RuntimeError` on every `pyodide` invocation, regardless of the subcommand
+  used. Part of [#376](https://github.com/pyodide/pyodide-build/issues/376).
+
+- Out-of-tree builds now skip the wheel unpack/repack step when the built wheel
+  contains no native `.so` extension files (i.e., pure-Python wheels). This
+  eliminates two `python -m wheel` subprocess round-trips that were always a
+  no-op for pure-Python packages. Part of
+  [#376](https://github.com/pyodide/pyodide-build/issues/376).
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed

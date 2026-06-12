@@ -1,4 +1,5 @@
 import os
+import zipfile
 from pathlib import Path
 from textwrap import dedent
 
@@ -6,6 +7,7 @@ from build import ConfigSettingsType
 
 from pyodide_build import build_env, common, pypabuild
 from pyodide_build.build_env import get_pyodide_root, wheel_platform
+from pyodide_build.logger import logger
 from pyodide_build.spec import _BuildSpecExports
 
 
@@ -88,7 +90,30 @@ def run(
     if "emscripten" in wheel_path.name:
         # Retag platformed wheels to pyodide
         wheel_path = common.retag_wheel(wheel_path, wheel_platform())
-    with common.modify_wheel(wheel_path) as wheel_dir:
-        build_env.replace_so_abi_tags(wheel_dir)
+
+    _check_and_maybe_modify_wheel(wheel_path)
 
     return wheel_path
+
+
+def _check_and_maybe_modify_wheel(wheel_path: Path) -> None:
+    """Rewrite .so ABI tags inside *wheel_path*, but only when necessary.
+
+    For pure-Python wheels there are no native extensions, so the unpack/repack
+    round-trip performed by :func:`common.modify_wheel` would be a no-op.
+    We detect that case up-front and skip the two ``python -m wheel`` subprocess
+    calls entirely.
+    """
+    # Only unpack/repack the wheel if it contains native extension files that
+    # need their ABI tags rewritten.  For pure-Python wheels this is always a
+    # no-op, so we skip the two subprocess round-trips entirely.
+    with zipfile.ZipFile(wheel_path) as zf:
+        has_so = any(name.endswith(".so") for name in zf.namelist())
+
+    if has_so:
+        with common.modify_wheel(wheel_path) as wheel_dir:
+            build_env.replace_so_abi_tags(wheel_dir)
+    else:
+        logger.debug(
+            "Skipping ABI-tag rewrite for pure-Python wheel %s", wheel_path.name
+        )
