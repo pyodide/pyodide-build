@@ -16,17 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wheels")` for a single file. Also corrected the implicit-Optional annotation
   `version: str = None` to `version: str | None = None` in `find_matching_wheel`.
   Part of [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
 
 - Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`
   even when those packages were not in the requested target list. The fix passes
   `load_always_tag=False` to `loader.load_recipes` inside `resolve_targets`.
   Part of [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
 
 - Fixed elapsed-time log messages dropping the hours component for builds
   lasting ≥ 1 hour (e.g. 3700 s was shown as "1m 40s" instead of "1h 1m 40s").
   Replaced the `datetime.fromtimestamp` approach with straightforward integer
   `divmod` arithmetic.
   Part of [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
 
 - Fixed a `TypeError: expected string or bytes-like object, got 'bool'` crash
   that occurred whenever `[tool.pyodide.build]` in `pyproject.toml` contained a
@@ -35,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   convention used by `SKIP_EMSCRIPTEN_VERSION_CHECK`); other non-string scalars
   are cast via `str()`.
   Part of [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
 
 ## [0.35.1] - 2026/06/13
 
