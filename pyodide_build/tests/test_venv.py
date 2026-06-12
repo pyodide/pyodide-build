@@ -7,8 +7,11 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from click.testing import CliRunner
 
+from pyodide_build.cli import venv as venv_cli
 from pyodide_build.out_of_tree import app_data, venv
+from pyodide_build.out_of_tree.venv import _pip_script_name
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
@@ -367,3 +370,146 @@ def test_create_app_data_dir(tmp_path, clear_app_data_cache):
             if version_dir.is_dir()
         ), f"{filename} not found in any subdirectory of {py_info_base}"
         clear_app_data_cache(app_data_dir)
+
+
+# ---------------------------------------------------------------------------
+# Bug fix tests (Part of #376)
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_venv_create(tmp_path):
+    """Return a mock for create_pyodide_venv that records passed virtualenv_args."""
+    captured = {}
+
+    def mock_create(dest, virtualenv_args=None):
+        captured["args"] = virtualenv_args or []
+
+    return mock_create, captured
+
+
+@pytest.mark.parametrize(
+    "cli_args,expected_in_args,not_expected_in_args",
+    [
+        # --no-download must propagate (was silently ignored before the fix)
+        (["--no-download"], ["--no-download"], ["--download"]),
+        # --never-download is an alias for --no-download
+        (["--never-download"], ["--no-download"], ["--download"]),
+        # --download must still work
+        (["--download"], ["--download"], ["--no-download"]),
+        # Without either flag nothing is forwarded
+        ([], [], ["--no-download", "--download"]),
+    ],
+)
+def test_venv_cli_download_flags(
+    monkeypatch, tmp_path, cli_args, expected_in_args, not_expected_in_args
+):
+    """Bug 1: --no-download / --never-download must be forwarded to virtualenv.
+
+    Previously both flags were silently swallowed because the click option
+    ``--download/--no-download`` shadowed the ``--no-download`` flag option.
+    """
+    mock_create, captured = _make_mock_venv_create(tmp_path)
+    monkeypatch.setattr("pyodide_build.cli.venv.venv.create_pyodide_venv", mock_create)
+    monkeypatch.setattr("pyodide_build.cli.venv.init_environment", lambda: None)
+
+    runner = CliRunner()
+    result = runner.invoke(venv_cli.main, [str(tmp_path / "venv")] + cli_args)
+    assert result.exit_code == 0, result.output
+
+    forwarded = captured.get("args", [])
+    for expected in expected_in_args:
+        assert expected in forwarded, (
+            f"Expected {expected!r} in forwarded args {forwarded!r} (cli: {cli_args!r})"
+        )
+    for not_expected in not_expected_in_args:
+        assert not_expected not in forwarded, (
+            f"Did not expect {not_expected!r} in forwarded args {forwarded!r} (cli: {cli_args!r})"
+        )
+
+
+@pytest.mark.parametrize(
+    "script_name,exe_suffix,expected_name",
+    [
+        # Unix: no suffix — versioned name must be preserved as-is
+        ("pip3.12", "", "pip3.12"),
+        ("pip3", "", "pip3"),
+        ("pip", "", "pip"),
+        # Windows: .bat suffix must be replaced without eating the version part
+        ("pip3.12.bat", ".bat", "pip3.12.bat"),
+        ("pip3.bat", ".bat", "pip3.bat"),
+        ("pip.bat", ".bat", "pip.bat"),
+    ],
+)
+def test_pip_script_name_helper(tmp_path, script_name, exe_suffix, expected_name):
+    """Bug 2: _pip_script_name must preserve versioned pip names like pip3.12.
+
+    The old implementation used Path.with_suffix('') which stripped the minor
+    version component (turning pip3.12 into pip3 on Unix).
+    """
+    pip_path = tmp_path / script_name
+    result = _pip_script_name(pip_path, exe_suffix)
+    assert result.name == expected_name, (
+        f"_pip_script_name({script_name!r}, {exe_suffix!r}) -> {result.name!r}, want {expected_name!r}"
+    )
+
+
+def test_cleanup_skips_preexisting_directory(monkeypatch, tmp_path):
+    """Bug 3: failure during venv creation must NOT delete a pre-existing directory.
+
+    Before the fix, any exception inside ``create()`` would unconditionally
+    call shutil.rmtree on the destination, destroying contents that existed
+    before ``pyodide venv`` was called.
+    """
+    dest = tmp_path / "existing-venv"
+    dest.mkdir()
+    sentinel = dest / "important-file.txt"
+    sentinel.write_text("do not delete me")
+
+    # Patch _create_session so it returns a session that appears to succeed
+    # (dest already exists) but configure_virtualenv raises an error.
+    class FakeCreator:
+        def __init__(self):
+            self.dest = str(dest)
+
+    class FakeSession:
+        def __init__(self):
+            self.creator = FakeCreator()
+            self.interpreter = type(
+                "FakeInterpreter", (), {"version": "3.12.0 (fake)"}
+            )()
+
+        def run(self):
+            # virtualenv would populate the dir; we just make bin/ exist
+            (dest / "bin").mkdir(exist_ok=True)
+
+    def fake_create_session(self):
+        return FakeSession()
+
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_session",
+        fake_create_session,
+    )
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.check_host_python_version",
+        lambda session: None,
+    )
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.pyodide_dist_dir",
+        lambda: dest / "dist",
+    )
+    (dest / "dist").mkdir(exist_ok=True)
+    (dest / "dist" / "python").touch()
+
+    # Make configure_virtualenv raise so the except branch is triggered
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.PyodideVenv.configure_virtualenv",
+        lambda self: (_ for _ in ()).throw(RuntimeError("simulated failure")),
+    )
+
+    pyodide_venv = venv.UnixPyodideVenv(dest)
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        pyodide_venv.create()
+
+    # The pre-existing directory and its contents must still be there
+    assert dest.exists(), "Pre-existing destination directory was deleted!"
+    assert sentinel.exists(), "Pre-existing file inside destination was deleted!"
