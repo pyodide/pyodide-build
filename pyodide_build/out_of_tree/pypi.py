@@ -6,9 +6,9 @@ import sys
 import tempfile
 from collections.abc import Generator
 from contextlib import contextmanager
-from email.message import EmailMessage
-from email.parser import BytesParser
-from functools import cache
+from email.message import EmailMessage, Message
+from email.parser import BytesParser, Parser
+from functools import cache, lru_cache
 from io import BytesIO
 from operator import attrgetter
 from pathlib import Path
@@ -220,18 +220,44 @@ def get_target_python():
     return tp
 
 
-def get_project_from_pypi(package_name, extras):
-    """Return candidates created from the project name and extras."""
+@cache
+def _get_package_finder() -> "PackageFinder":
+    """Return a shared PackageFinder so the HTTP session/connection is reused.
+
+    A single finder reuses its requests session (and therefore HTTP
+    connections) across the whole resolution, instead of building a fresh
+    session every time resolvelib re-evaluates an identifier.
+    """
     _, PackageFinder = _import_unearth()
-    pf = PackageFinder(
+    return PackageFinder(
         index_urls=_PYPI_INDEX,
         trusted_hosts=_PYPI_TRUSTED_HOSTS,
         target_python=get_target_python(),
     )
+
+
+@lru_cache
+def _get_candidates_for_project(
+    package_name: str,
+) -> tuple[tuple[str, Version, str], ...]:
+    """Return the raw (name, version, url) candidates for a project.
+
+    The discovered distributions for a project do not depend on the requested
+    extras (only the ``Candidate`` objects built from them do), so this can be
+    cached by project name across the whole resolution. resolvelib re-evaluates
+    an identifier whenever a new requirement is merged and on every backtrack,
+    so without this cache the simple index page is re-fetched repeatedly.
+    """
+    pf = _get_package_finder()
     matches = pf.find_all_packages(package_name)
-    for i in matches:
-        # TODO: ignore sourcedists if wheel for same version exists
-        yield Candidate(i.name, i.version, url=i.link.url, extras=extras)
+    # TODO: ignore sourcedists if wheel for same version exists
+    return tuple((i.name, i.version, i.link.url) for i in matches)
+
+
+def get_project_from_pypi(package_name, extras):
+    """Return candidates created from the project name and extras."""
+    for name, version, url in _get_candidates_for_project(package_name):
+        yield Candidate(name, version, url=url, extras=extras)
 
 
 def download_or_build_wheel(
@@ -254,8 +280,31 @@ def download_or_build_wheel(
     repack_zip_archive(wheel_path, compression_level=compression_level)
 
 
+def _get_metadata_from_pep658(url: str) -> Message | None:
+    """Try to fetch wheel metadata via PEP 658 (``<wheel-url>.metadata``).
+
+    PyPI serves the wheel's METADATA file at this URL, which is a few KB
+    instead of the whole (potentially tens-of-MB) wheel. Returns ``None`` if
+    the metadata file is not available (e.g. a 404 from indexes that do not
+    support PEP 658), so the caller can fall back to downloading the wheel.
+    """
+    try:
+        resp = requests.get(url + ".metadata")
+    except requests.RequestException:
+        return None
+    if not resp.ok:
+        return None
+    return Parser().parsestr(resp.content.decode("utf-8", "replace"), headersonly=True)
+
+
+@lru_cache
 def get_metadata_for_wheel(url):
     parsed_url = urlparse(url)
+    if parsed_url.path.endswith(".whl"):
+        metadata = _get_metadata_from_pep658(url)
+        if metadata is not None:
+            return metadata
+
     if parsed_url.path.endswith("gz"):
         wheel_file = get_built_wheel(url)
         wheel_stream: BinaryIO = open(wheel_file, "rb")

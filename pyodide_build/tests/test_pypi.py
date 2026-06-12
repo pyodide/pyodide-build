@@ -1,7 +1,9 @@
+import io
 import re
 import subprocess
 import sys
 import tempfile
+import zipfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from textwrap import dedent
@@ -15,8 +17,123 @@ pytest.importorskip("resolvelib")
 pytest.importorskip("unearth")
 
 from pyodide_build.cli import build
+from pyodide_build.out_of_tree import pypi
 
 runner = CliRunner()
+
+
+_FAKE_METADATA = (
+    "Metadata-Version: 2.1\nName: pkgx\nVersion: 1.0.0\nRequires-Dist: foo>=1\n\n"
+)
+
+
+def _make_wheel_bytes(metadata: str = _FAKE_METADATA) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("pkgx-1.0.0.dist-info/METADATA", metadata)
+    return buf.getvalue()
+
+
+def _resp(body: str):
+    from werkzeug import Response
+
+    return Response(body, content_type="text/plain")
+
+
+def test_get_metadata_for_wheel_pep658(httpserver, reset_cache):
+    """Metadata is fetched via the PEP 658 ``.metadata`` URL when available,
+    without downloading the whole wheel, and is cached per URL."""
+    meta_requests = []
+    httpserver.expect_request(
+        "/files/pkgx-1.0.0-py3-none-any.whl.metadata"
+    ).respond_with_handler(
+        lambda r: (meta_requests.append(1), _resp(_FAKE_METADATA))[1]
+    )
+    # If the full wheel is downloaded the test fails: no handler is registered
+    # for it, so the request would 500.
+
+    url = httpserver.url_for("/files/pkgx-1.0.0-py3-none-any.whl")
+    metadata = pypi.get_metadata_for_wheel(url)
+    assert metadata.get("Name") == "pkgx"
+    assert metadata.get_all("Requires-Dist") == ["foo>=1"]
+
+    # A second call is served from the cache and does not hit the server again.
+    pypi.get_metadata_for_wheel(url)
+    assert len(meta_requests) == 1
+
+
+def test_get_metadata_for_wheel_fallback_to_wheel(httpserver, reset_cache):
+    """When the ``.metadata`` URL 404s, fall back to downloading the wheel."""
+    from werkzeug import Response
+
+    wheel_requests = []
+    httpserver.expect_request(
+        "/files/pkgx-1.0.0-py3-none-any.whl.metadata"
+    ).respond_with_response(Response("missing", status=404))
+    httpserver.expect_request(
+        "/files/pkgx-1.0.0-py3-none-any.whl"
+    ).respond_with_handler(
+        lambda r: (
+            wheel_requests.append(1),
+            Response(_make_wheel_bytes(), content_type="application/octet-stream"),
+        )[1]
+    )
+
+    url = httpserver.url_for("/files/pkgx-1.0.0-py3-none-any.whl")
+    metadata = pypi.get_metadata_for_wheel(url)
+    assert metadata.get("Name") == "pkgx"
+    assert len(wheel_requests) == 1
+
+    # Cached: the wheel is not downloaded a second time.
+    pypi.get_metadata_for_wheel(url)
+    assert len(wheel_requests) == 1
+
+
+def test_get_project_from_pypi_caches_index(httpserver, reset_cache, monkeypatch):
+    """The simple index is fetched once per project even across repeated
+    find_matches-style lookups (with different extras)."""
+    from unearth.evaluator import TargetPython
+    from werkzeug import Response
+
+    monkeypatch.setattr(
+        pypi,
+        "get_target_python",
+        lambda: TargetPython(
+            py_ver=(3, 12),
+            platforms=["emscripten_3_1_46_wasm32"],
+            abis=["cp312"],
+        ),
+    )
+
+    index_requests = []
+    html = (
+        "<!DOCTYPE html><html><body>"
+        '<a href="../../files/pkgx-1.0.0-py3-none-any.whl">'
+        "pkgx-1.0.0-py3-none-any.whl</a>"
+        "</body></html>"
+    )
+    httpserver.expect_request("/simple/pkgx/").respond_with_handler(
+        lambda r: (index_requests.append(1), Response(html, content_type="text/html"))[
+            1
+        ]
+    )
+
+    base = httpserver.url_for("/simple/")
+    monkeypatch.setattr(pypi, "_PYPI_INDEX", [base])
+    monkeypatch.setattr(
+        pypi, "_PYPI_TRUSTED_HOSTS", [f"{httpserver.host}:{httpserver.port}"]
+    )
+    # reset_cache cleared the finder/candidate caches built from a previous index.
+    reset_cache()
+
+    candidates = list(pypi.get_project_from_pypi("pkgx", set()))
+    assert [str(c) for c in candidates] == ["<pkgx==1.0.0>"]
+
+    # A second lookup with different extras reuses the cached candidate list.
+    candidates_extra = list(pypi.get_project_from_pypi("pkgx", {"docs"}))
+    assert [str(c) for c in candidates_extra] == ["<pkgx[docs]==1.0.0>"]
+
+    assert len(index_requests) == 1
 
 
 def _make_fake_package(

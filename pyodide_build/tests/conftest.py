@@ -35,6 +35,15 @@ def reset_cache():
         build_env.pyodide_tags.cache_clear()
         common.default_xbuildenv_path.cache_clear()
 
+        # Caches used by the out-of-tree PyPI resolver. Imported lazily so the
+        # fixture does not depend on the optional [resolve] extras at import
+        # time (the helpers themselves import resolvelib/unearth only on use).
+        from pyodide_build.out_of_tree import pypi
+
+        pypi._get_package_finder.cache_clear()
+        pypi._get_candidates_for_project.cache_clear()
+        pypi.get_metadata_for_wheel.cache_clear()
+
     _reset()
 
     yield _reset
