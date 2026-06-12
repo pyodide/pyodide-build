@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed dead-code control flow in `update_package` (part of `pyodide skeleton pypi`)
+  where the format-fallback branches (`["wheel","sdist"]` / `["sdist","wheel"]`) were
+  unreachable: previously `source_fmt = source_fmt or old_fmt` at the top of the
+  function made `source_fmt` always truthy, so the fallback to the other distribution
+  format never activated. A package whose new release ships only wheels (while the
+  recipe used an sdist) would raise `MkpkgFailedException` rather than transparently
+  updating to the wheel. The fix moves format resolution after the version/newer-than
+  check and restores the intended fallback semantics: an explicitly passed `source_fmt`
+  is strict; an absent one prefers the existing format with fallback to the other.
+  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
+- Fixed `_make_predictable_url` generating an incorrect URL for sdists whose filename
+  does not match `{normalized_name}-{version}.tar.gz`: `.zip` sdists and packages with
+  non-normalized names (e.g. `ruamel.yaml`) had their real filename silently replaced,
+  producing a URL that 404s while the stored `sha256` is from the real file, making the
+  recipe unbuildable. The fix builds the predictable URL from the actual `filename`
+  returned by the PyPI metadata.
+  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376),
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed
