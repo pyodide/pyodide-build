@@ -333,14 +333,7 @@ def find_missing_executables(executables: list[str]) -> list[str]:
     return list(filter(lambda exe: shutil.which(exe) is None, executables))
 
 
-@contextmanager
-def chdir(new_dir: Path) -> Generator[None, None, None]:
-    orig_dir = Path.cwd()
-    try:
-        os.chdir(new_dir)
-        yield
-    finally:
-        os.chdir(orig_dir)
+chdir = contextlib.chdir
 
 
 def get_num_cores() -> int:
@@ -351,6 +344,11 @@ def get_num_cores() -> int:
     from pyodide_build.vendor.loky import cpu_count
 
     return cpu_count()
+
+
+def _zip_compression(compression_level: int) -> int:
+    """Return the zipfile compression constant for the given compression level."""
+    return zipfile.ZIP_DEFLATED if compression_level > 0 else zipfile.ZIP_STORED
 
 
 def make_zip_archive(
@@ -369,10 +367,7 @@ def make_zip_archive(
     compression_level
        compression level of the resulting zip file.
     """
-    if compression_level > 0:
-        compression = zipfile.ZIP_DEFLATED
-    else:
-        compression = zipfile.ZIP_STORED
+    compression = _zip_compression(compression_level)
 
     with zipfile.ZipFile(
         archive_path, "w", compression=compression, compresslevel=compression_level
@@ -383,10 +378,7 @@ def make_zip_archive(
 
 def repack_zip_archive(archive_path: Path, compression_level: int = 6) -> None:
     """Repack zip archive with a different compression level"""
-    if compression_level > 0:
-        compression = zipfile.ZIP_DEFLATED
-    else:
-        compression = zipfile.ZIP_STORED
+    compression = _zip_compression(compression_level)
 
     with TemporaryDirectory() as temp_dir:
         input_path = Path(temp_dir) / archive_path.name
@@ -417,15 +409,8 @@ def _get_sha256_checksum(archive: Path) -> str:
     checksum
          sha256 checksum of the archive
     """
-    CHUNK_SIZE = 1 << 16
-    h = hashlib.sha256()
     with open(archive, "rb") as fd:
-        while True:
-            chunk = fd.read(CHUNK_SIZE)
-            h.update(chunk)
-            if len(chunk) < CHUNK_SIZE:
-                break
-    return h.hexdigest()
+        return hashlib.file_digest(fd, "sha256").hexdigest()
 
 
 def _format_dep_chain(dep_chain: Sequence[str]) -> str:

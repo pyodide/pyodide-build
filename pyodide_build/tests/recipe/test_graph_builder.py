@@ -15,6 +15,28 @@ RECIPE_DIR = Path(__file__).parent / "_test_recipes"
 BUILD_DIR = RECIPE_DIR
 
 
+def test_subclass_hashable_and_eq():
+    """
+    Subclasses of BasePackage must remain hashable and use BasePackage's
+    name/version equality, not a dataclass-generated __eq__ that would
+    reset __hash__ to None.
+    """
+    pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_1", "pkg_2"})
+
+    # All concrete subclass instances must be hashable (usable in sets/dicts).
+    pkg_set: set[graph_builder.BasePackage] = set(pkg_map.values())
+    assert len(pkg_set) == len(pkg_map)
+
+    # Equality is name+version based (inherited from BasePackage.__eq__).
+    pkg1 = pkg_map["pkg_1"]
+    pkg1_copy = graph_builder.BasePackage.from_recipe(pkg1.pkgdir, pkg1.meta)
+    assert pkg1 == pkg1_copy
+    assert hash(pkg1) == hash(pkg1_copy)
+
+    # Instances with different names must not be equal.
+    assert pkg1 != pkg_map["pkg_2"]
+
+
 def test_generate_dependency_graph():
     # beautifulsoup4 has a circular dependency on soupsieve
     pkg_map = graph_builder.generate_dependency_graph(RECIPE_DIR, {"beautifulsoup4"})

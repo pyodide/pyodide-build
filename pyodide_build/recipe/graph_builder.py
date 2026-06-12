@@ -212,7 +212,7 @@ class BasePackage:
         raise NotImplementedError()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class PythonPackage(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)
@@ -229,7 +229,7 @@ class PythonPackage(BasePackage):
         return wheel
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class SharedLibrary(BasePackage):
     install_dir: str = "dynlib"
 
@@ -248,7 +248,7 @@ class SharedLibrary(BasePackage):
         return candidates[0]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class StaticLibrary(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)

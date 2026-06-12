@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Removed dead `_remove_path` helper from `recipe/cleanup.py` (never called; cleanup
+  delegates entirely to `RecipeBuilder.clean()`).
+- Simplified `_create_symlink_dir` in `pypabuild.py`: dropped the unused `env`
+  parameter and converted it from a context manager to a plain function.
+- Replaced the hand-rolled `chdir` context manager in `common.py` with a re-export
+  of `contextlib.chdir` (Python 3.11+).
+- Replaced the manual chunked SHA-256 loop in `common._get_sha256_checksum` with
+  `hashlib.file_digest` (Python 3.11+).
+- Made `PythonPackage`, `SharedLibrary`, and `StaticLibrary` use
+  `@dataclasses.dataclass(eq=False)` so they inherit `BasePackage`'s hand-written
+  `__hash__`/`__eq__` rather than having `__hash__` silently set to `None` by the
+  generated `__eq__`.
+- Extracted `_zip_compression` helper in `common.py` to deduplicate the
+  `compression_level > 0 → ZIP_DEFLATED/ZIP_STORED` logic shared by
+  `make_zip_archive`, `repack_zip_archive`, and `_py_compile._compile`.
+- Updated a stale comment in `build_env.py` about the manual `cpXY-none-any` Tag:
+  `packaging.tags.cpython_tags` still does not emit this tag as of packaging 26.x,
+  so the manual yield is still required.
+
+Part of [#376](https://github.com/pyodide/pyodide-build/issues/376).
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed
