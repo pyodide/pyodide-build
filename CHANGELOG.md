@@ -13,20 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a click option collision with `--download/--no-download`; the off-switch in the
   `--download` boolean pair has been changed to a standalone flag so the
   `--no-download` alias correctly forwards to virtualenv.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#376](https://github.com/pyodide/pyodide-build/issues/376) / [#377](https://github.com/pyodide/pyodide-build/pull/377)
 
 - Versioned pip scripts such as `pip3.12` were being renamed to `pip3` during
   venv creation because `Path.with_suffix("")` strips the minor-version component.
   A new `_pip_script_name` helper uses `str.removesuffix` so the full versioned
   name is preserved.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#376](https://github.com/pyodide/pyodide-build/issues/376) / [#377](https://github.com/pyodide/pyodide-build/pull/377)
 
 - On any failure during venv creation the cleanup code unconditionally called
   `shutil.rmtree` on the destination directory, which could destroy a pre-existing
   directory that the user passed to `pyodide venv`.  The cleanup now checks
   whether the destination existed before the session was started and, if so,
   leaves it intact (emitting a warning) instead of deleting it.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+  [#376](https://github.com/pyodide/pyodide-build/issues/376) / [#377](https://github.com/pyodide/pyodide-build/pull/377)
 
 ## [0.35.1] - 2026/06/13
 
