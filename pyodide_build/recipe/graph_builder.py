@@ -3,7 +3,6 @@ Build all of the packages in a given directory.
 """
 
 import dataclasses
-import datetime
 import shutil
 import subprocess
 import sys
@@ -269,12 +268,15 @@ class PackageStatus:
         self.finished = False
 
     def finish(self, success: bool, elapsed_time: float) -> None:
-        time = datetime.datetime.fromtimestamp(elapsed_time, tz=datetime.UTC)
-        if time.minute == 0:
-            minutes = ""
+        seconds = int(elapsed_time)
+        hours, rem = divmod(seconds, 3600)
+        minutes, secs = divmod(rem, 60)
+        if hours:
+            timestr = f"{hours}h {minutes}m {secs}s"
+        elif minutes:
+            timestr = f"{minutes}m {secs}s"
         else:
-            minutes = f"{time.minute}m "
-        timestr = f"{minutes}{time.second}s"
+            timestr = f"{secs}s"
 
         status = "built" if success else "failed"
         done_message = f"{self.prefix} {status} {self.pkg_name} in {timestr}"

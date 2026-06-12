@@ -145,11 +145,13 @@ def _find_matching_wheels(
         for supported_tag in supported_tags:
             if supported_tag in wheel_tags:
                 yield wheel_path
-                continue
+                break
 
 
 def find_matching_wheel(
-    wheel_paths: Iterable[Path], supported_tags: Sequence[Tag], version: str = None
+    wheel_paths: Iterable[Path],
+    supported_tags: Sequence[Tag],
+    version: str | None = None,
 ) -> Path | None:
     """
     Find a matching wheel or raise an error if none is present.
