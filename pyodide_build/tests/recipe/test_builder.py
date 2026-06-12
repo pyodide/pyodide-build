@@ -342,3 +342,31 @@ def test_extract_tarballname():
 
     for header, tarballname in zip(headers, tarballnames, strict=True):
         assert _builder._extract_tarballname(url, header) == tarballname
+
+
+@pytest.mark.parametrize(
+    "disposition,expected",
+    [
+        # Path traversal with Unix separators: strip to basename only (safe)
+        ('attachment; filename="../../evil.tar.gz"', "evil.tar.gz"),
+        # Absolute Unix path: strip to basename only (safe)
+        ('attachment; filename="/abs/path.tar.gz"', "path.tar.gz"),
+        # Empty filename falls back to URL name
+        ('attachment; filename=""', "ball.tar.gz"),
+        # Windows-style path traversal: strip to basename only (safe)
+        ('attachment; filename="..\\\\..\\\\evil.tar.gz"', "evil.tar.gz"),
+        # Normal safe filename is kept unchanged
+        ('attachment; filename="safe-package-1.0.tar.gz"', "safe-package-1.0.tar.gz"),
+    ],
+)
+def test_extract_tarballname_sanitization(disposition, expected):
+    """
+    Content-Disposition filenames with path components must be reduced to a
+    safe basename that cannot escape the build directory.
+    """
+    url = "https://www.test.com/ball.tar.gz"
+    result = _builder._extract_tarballname(url, {"Content-Disposition": disposition})
+    assert result == expected
+    # Extra invariant: the result must never contain a path separator.
+    assert "/" not in result
+    assert "\\" not in result

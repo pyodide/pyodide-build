@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Sanitize `Content-Disposition: filename=...` header values in `_extract_tarballname`
+  to prevent path traversal: the extracted filename is now reduced to its final path
+  component only (stripping any Unix or Windows directory separators), so a malicious
+  mirror cannot write files outside the build directory.
+  [#376](https://github.com/pyodide/pyodide-build/issues/376)
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed
