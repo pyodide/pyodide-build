@@ -333,9 +333,6 @@ def find_missing_executables(executables: list[str]) -> list[str]:
     return list(filter(lambda exe: shutil.which(exe) is None, executables))
 
 
-chdir = contextlib.chdir
-
-
 def get_num_cores() -> int:
     """
     Return the number of CPUs the current process can use.

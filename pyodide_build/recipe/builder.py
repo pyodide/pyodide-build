@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Iterator
+from contextlib import chdir
 from datetime import datetime
 from email.message import Message
 from functools import cache
@@ -35,7 +36,6 @@ from pyodide_build.build_env import (
 from pyodide_build.common import (
     _environment_substitute_str,
     _get_sha256_checksum,
-    chdir,
     find_matching_wheel,
     make_zip_archive,
     modify_wheel,

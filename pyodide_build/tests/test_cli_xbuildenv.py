@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+from contextlib import chdir
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,6 @@ from pyodide_lock import PyodideLockSpec
 from pyodide_build.cli import (
     xbuildenv,
 )
-from pyodide_build.common import chdir
 from pyodide_build.xbuildenv_releases import CROSS_BUILD_ENV_METADATA_URL_ENV_VAR
 
 
