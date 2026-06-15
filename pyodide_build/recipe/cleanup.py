@@ -24,6 +24,7 @@ def resolve_targets(
     recipes = loader.load_recipes(
         recipe_dir,
         names_or_tags,
+        load_always_tag=False,
     )
     return list(recipes.keys())
 

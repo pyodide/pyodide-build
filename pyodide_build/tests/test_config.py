@@ -58,6 +58,29 @@ class TestConfigManager:
         assert config["xbuildenv_path"] == "my_custom/xbuildenv_path"
         assert config["ignored_build_requirements"] == "cmake foo bar"
 
+    # Bug 4: non-string scalars in [tool.pyodide.build] must not crash with
+    # TypeError when passed to _environment_substitute_str.
+    def test_load_config_from_file_non_string_values(
+        self, tmp_path, reset_env_vars, reset_cache
+    ):
+        pyproject_file = tmp_path / "pyproject.toml"
+        env: dict = {}
+
+        # TOML booleans (true/false) and integers are valid TOML spellings but
+        # would previously cause TypeError inside re.sub.
+        pyproject_file.write_text(
+            "[tool.pyodide.build]\n"
+            "skip_emscripten_version_check = true\n"
+            "use_legacy_platform = false\n"
+        )
+
+        config_manager = ConfigManager()
+        config = config_manager._load_config_file(pyproject_file, env)
+
+        # TOML true -> "1", false -> "0" (matches the env-var convention)
+        assert config["skip_emscripten_version_check"] == "1"
+        assert config["use_legacy_platform"] == "0"
+
 
 class TestCrossBuildEnvConfigManager_OutOfTree:
     def test_default_config(self, dummy_xbuildenv, reset_env_vars, reset_cache):

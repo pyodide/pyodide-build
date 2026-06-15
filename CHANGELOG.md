@@ -7,28 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
-- Archive downloads (xbuildenv, emsdk) now stream directly to a temporary file
-  instead of buffering the entire archive in RAM, reducing peak memory usage for
-  large downloads.
-  [#386](https://github.com/pyodide/pyodide-build/pull/386),
-  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376).
+- Fixed `find_matching_wheel` raising `RuntimeError("Found multiple matching
+  wheels")` for a single file.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
 
-- The default xbuildenv path is now resolved lazily — only when a CLI command
-  body actually needs it — instead of at module import time. This avoids
-  triggering a `ConfigManager` build, filesystem probes, and a potential
-  `RuntimeError` on every `pyodide` invocation, regardless of the subcommand
-  used.
-  [#386](https://github.com/pyodide/pyodide-build/pull/386),
-  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376).
+- Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
 
-- Out-of-tree builds now skip the wheel unpack/repack step when the built wheel
-  contains no native `.so` extension files (i.e., pure-Python wheels). This
-  eliminates two `python -m wheel` subprocess round-trips that were always a
-  no-op for pure-Python packages.
-  [#386](https://github.com/pyodide/pyodide-build/pull/386),
-  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376).
+- Fixed a bug where boolean and non-string values in pyproject.toml crashes pyodide CLI
+  when loading config values
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
+  [#382](https://github.com/pyodide/pyodide-build/pull/382)
 
 ## [0.35.1] - 2026/06/13
 

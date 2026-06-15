@@ -185,3 +185,40 @@ def test_requirements_executable(monkeypatch):
         m.setattr(shutil, "which", lambda exe: "/bin")
 
         graph_builder.generate_dependency_graph(RECIPE_DIR, {"pkg_test_executable"})
+
+
+# Bug 3: elapsed-time formatting should correctly show hours when >= 3600 s.
+@pytest.mark.parametrize(
+    "elapsed_seconds, expected",
+    [
+        (0, "0s"),
+        (1, "1s"),
+        (59, "59s"),
+        (60, "1m 0s"),
+        (90, "1m 30s"),
+        (3599, "59m 59s"),
+        (3600, "1h 0m 0s"),
+        (3700, "1h 1m 40s"),
+        (7322, "2h 2m 2s"),
+    ],
+)
+def test_package_status_elapsed_time_formatting(elapsed_seconds, expected):
+    status = graph_builder.PackageStatus(name="pkg", idx=1, thread=0, total_packages=1)
+
+    captured = []
+
+    def capture(msg, *args, **kwargs):
+        captured.append(msg)
+
+    original_success = graph_builder.logger.success
+    graph_builder.logger.success = capture  # type: ignore[method-assign]
+    try:
+        status.finish(success=True, elapsed_time=float(elapsed_seconds))
+    finally:
+        graph_builder.logger.success = original_success  # type: ignore[method-assign]
+
+    assert captured, "logger.success was not called"
+    message = captured[0]
+    assert message.endswith(f"in {expected}"), (
+        f"For {elapsed_seconds}s expected suffix 'in {expected}', got: {message!r}"
+    )
