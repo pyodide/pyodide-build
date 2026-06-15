@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Sanitize `Content-Disposition: filename=...` header values in `_extract_tarballname`
-  to prevent path traversal: the extracted filename is now reduced to its final path
-  component only (stripping any Unix or Windows directory separators), so a malicious
-  mirror cannot write files outside the build directory.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376),
+- Fixed `find_matching_wheel` raising `RuntimeError("Found multiple matching
+  wheels")` for a single file.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed a bug where boolean and non-string values in pyproject.toml crashes pyodide CLI
+  when loading config values
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
   [#382](https://github.com/pyodide/pyodide-build/pull/382)
 
 ## [0.35.1] - 2026/06/13
