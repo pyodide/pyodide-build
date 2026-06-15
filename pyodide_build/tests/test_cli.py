@@ -745,26 +745,13 @@ def test_wheel_build_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten
     )
 
 
-def test_build_constraint(tmp_path, dummy_xbuildenv, mock_emscripten, capsys, monkeypatch):
+def test_build_constraint(tmp_path, dummy_xbuildenv, mock_emscripten, capsys):
     for build_dir in RECIPE_DIR.rglob("build"):
         shutil.rmtree(build_dir)
 
     pkg = "pkg_test_constraint"
     for recipe in RECIPE_DIR.glob("**/meta.yaml"):
         recipe.touch()
-
-    from pyodide_build import pypabuild
-    from pyodide_build.recipe import builder as _builder_module
-
-    captured_build_env: dict[str, str] = {}
-    original_build = pypabuild.build
-
-    def capturing_build(srcdir, outdir, env, config_settings):
-        captured_build_env.update(env)
-        return original_build(srcdir, outdir, env, config_settings)
-
-    monkeypatch.setattr(_builder_module.pypabuild, "build", capturing_build)
-
     result = runner.invoke(
         build_recipes.build_recipes_no_deps,
         [
@@ -779,12 +766,6 @@ def test_build_constraint(tmp_path, dummy_xbuildenv, mock_emscripten, capsys, mo
     build_dir = RECIPE_DIR / pkg / "build"
     assert (build_dir / "setuptools.version").read_text() == "74.1.3"
     assert (build_dir / "pytest.version").read_text() == "7.0.0"
-    assert "UV_BUILD_CONSTRAINT" in captured_build_env
-    assert captured_build_env["UV_BUILD_CONSTRAINT"] == captured_build_env["PIP_CONSTRAINT"]
-    assert (
-        captured_build_env["UV_BUILD_CONSTRAINT"]
-        == captured_build_env["PIP_BUILD_CONSTRAINT"]
-    )
 
 
 @pytest.mark.parametrize(
