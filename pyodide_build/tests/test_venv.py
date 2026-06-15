@@ -2,6 +2,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from hashlib import sha256
 from pathlib import Path
 from textwrap import dedent
@@ -169,6 +170,24 @@ def test_venv_creation(base_test_dir, options, check_function):
     assert (venv_path / "bin" / "pyodide").exists()
     assert (venv_path / "pip.conf").exists()
     assert check_function(venv_path)
+
+
+@pytest.mark.integration
+def test_pi_aliases(base_test_dir):
+    """pythonπ-style easter egg aliases only show up for Python 3.14 venvs."""
+    venv_path = base_test_dir / "test_venv_pi"
+    venv.create_pyodide_venv(venv_path)
+
+    bin_dir = venv_path / "bin"
+    python_path = (bin_dir / "python").resolve()
+
+    for name in venv.PI_ALIASES:
+        alias_path = bin_dir / name
+        if sys.version_info[:2] == (3, 14):
+            assert alias_path.is_symlink(), f"{name} alias missing"
+            assert alias_path.resolve() == python_path
+        else:
+            assert not alias_path.exists(), f"{name} alias should not exist"
 
 
 @pytest.mark.integration
