@@ -508,6 +508,7 @@ class RecipeBuilder:
             constraints_file = str(self._create_constraints_file())
             build_env["PIP_CONSTRAINT"] = constraints_file
             build_env["PIP_BUILD_CONSTRAINT"] = constraints_file
+            build_env["UV_BUILD_CONSTRAINT"] = constraints_file
 
             wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings

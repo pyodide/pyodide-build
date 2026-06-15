@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
   [#382](https://github.com/pyodide/pyodide-build/pull/382)
 
+- Fixed build constraints not being applied when using `uv` as the installer by
+  setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
+  [#389](https://github.com/pyodide/pyodide-build/pull/389)
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed
