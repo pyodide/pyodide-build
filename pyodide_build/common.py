@@ -632,7 +632,6 @@ def download_and_unpack_archive(
 
     try:
         resp = urlopen(url)
-        data = resp.read()
     except Exception as e:
         raise ValueError(f"Failed to download {descr} from {url}") from e
 
@@ -646,7 +645,11 @@ def download_and_unpack_archive(
 
     with TemporaryDirectory() as temp_dir:
         f_path = Path(temp_dir) / "temp.tar"
-        f_path.write_bytes(data)
+        try:
+            with f_path.open("wb") as f:
+                shutil.copyfileobj(resp, f)
+        except Exception as e:
+            raise ValueError(f"Failed to download {descr} from {url}") from e
         with warnings.catch_warnings():
             # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
             # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.
