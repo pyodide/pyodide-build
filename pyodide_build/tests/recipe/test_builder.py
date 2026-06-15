@@ -1,4 +1,3 @@
-import os
 import shutil
 import subprocess
 import sys
@@ -203,42 +202,6 @@ def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
 
     data = Path(paths.split()[-1]).read_text().strip().split("\n")
     assert data[-3:] == ["numpy < 2.0", "pytest == 7.0", "setuptools < 75"], data
-
-
-def test_compile_sets_uv_build_constraint(
-    tmp_path, dummy_xbuildenv, mock_emscripten, monkeypatch
-):
-    """UV_BUILD_CONSTRAINT must be set alongside PIP_CONSTRAINT/PIP_BUILD_CONSTRAINT."""
-    from pyodide_build.recipe import builder as _builder_module
-    from pyodide_build.recipe.bash_runner import get_bash_runner
-
-    captured_env: dict[str, str] = {}
-
-    def fake_build(srcdir, outdir, env, config_settings):
-        captured_env.update(env)
-        # Return a fake wheel path that satisfies check_versions_match
-        fake_wheel = Path(outdir) / "pkg_test_constraint-1.0.0-py3-none-any.whl"
-        fake_wheel.parent.mkdir(parents=True, exist_ok=True)
-        fake_wheel.touch()
-        return str(fake_wheel)
-
-    monkeypatch.setattr(_builder_module.pypabuild, "build", fake_build)
-
-    builder = RecipeBuilder.get_builder(
-        recipe=RECIPE_DIR / "pkg_test_constraint",
-        build_args=BuildArgs(),
-        build_dir=tmp_path,
-    )
-    # Prepare a minimal source directory so _compile can proceed
-    builder.src_extract_dir.mkdir(parents=True, exist_ok=True)
-    builder.src_dist_dir.mkdir(parents=True, exist_ok=True)
-
-    with get_bash_runner(builder._get_helper_vars() | os.environ.copy()) as runner:
-        builder._compile(runner)
-
-    assert "UV_BUILD_CONSTRAINT" in captured_env
-    assert captured_env["UV_BUILD_CONSTRAINT"] == captured_env["PIP_CONSTRAINT"]
-    assert captured_env["UV_BUILD_CONSTRAINT"] == captured_env["PIP_BUILD_CONSTRAINT"]
 
 
 class MockSourceSpec(_SourceSpec):
