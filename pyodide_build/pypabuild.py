@@ -304,17 +304,12 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     return env
 
 
-# TODO: a context manager is no longer needed here
-@contextmanager
-def _create_symlink_dir(
-    env: dict[str, str],
-    build_dir: Path,
-):
+def _create_symlink_dir(build_dir: Path) -> Path:
     # Leave the symlinks in the build directory. This helps with reproducing.
     symlink_dir = build_dir / "pywasmcross_symlinks"
     shutil.rmtree(symlink_dir, ignore_errors=True)
     symlink_dir.mkdir()
-    yield symlink_dir
+    return symlink_dir
 
 
 @contextmanager
@@ -348,28 +343,28 @@ def get_build_env(
     args["exports"] = exports
     env = env.copy()
 
-    with _create_symlink_dir(env, build_dir) as symlink_dir:
-        env.update(make_command_wrapper_symlinks(symlink_dir))
-        sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
-        args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
-        args["orig__name__"] = __name__
-        args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
-        args["PATH"] = env["PATH"]
-        args["abi"] = get_build_flag("PYODIDE_ABI_VERSION")
+    symlink_dir = _create_symlink_dir(build_dir)
+    env.update(make_command_wrapper_symlinks(symlink_dir))
+    sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
+    args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
+    args["orig__name__"] = __name__
+    args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
+    args["PATH"] = env["PATH"]
+    args["abi"] = get_build_flag("PYODIDE_ABI_VERSION")
 
-        pywasmcross_env = json.dumps(args)
-        # Store into environment variable and to disk. In most cases we will
-        # load from the environment variable but if some other tool filters
-        # environment variables we will load from disk instead.
-        env["PYWASMCROSS_ARGS"] = pywasmcross_env
-        (symlink_dir / "pywasmcross_env.json").write_text(pywasmcross_env)
+    pywasmcross_env = json.dumps(args)
+    # Store into environment variable and to disk. In most cases we will
+    # load from the environment variable but if some other tool filters
+    # environment variables we will load from disk instead.
+    env["PYWASMCROSS_ARGS"] = pywasmcross_env
+    (symlink_dir / "pywasmcross_env.json").write_text(pywasmcross_env)
 
-        env["_PYTHON_HOST_PLATFORM"] = platform()
-        env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
-        env["PYTHONPATH"] = str(sysconfig_dir)
-        env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
+    env["_PYTHON_HOST_PLATFORM"] = platform()
+    env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
+    env["PYTHONPATH"] = str(sysconfig_dir)
+    env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
 
-        yield env
+    yield env
 
 
 # Based on pypa/build's reference logger implementation. See

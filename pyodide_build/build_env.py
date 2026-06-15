@@ -277,7 +277,7 @@ def pyodide_tags_() -> Iterator[Tag]:
     python_version = (int(PYMAJOR), int(PYMINOR))
     yield from cpython_tags(platforms=PLATFORMS, python_version=python_version)
     yield from compatible_tags(platforms=PLATFORMS, python_version=python_version)
-    # Following line can be removed once packaging 22.0 is released and we update to it.
+    # packaging's cpython_tags does not emit cpXY-none-any
     yield Tag(interpreter=f"cp{PYMAJOR}{PYMINOR}", abi="none", platform="any")
 
 
