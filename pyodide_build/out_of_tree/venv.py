@@ -37,6 +37,16 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--no-periodic-update",
 ]
 
+# See https://github.com/python/cpython/issues/119535
+# fmt: off
+PI_ALIASES = (
+    "pythonπ",           # pythonπ U+03C0 GREEK SMALL LETTER PI
+    "python\U0001d70b",  # python𝜋 U+1D70B MATHEMATICAL ITALIC SMALL PI
+    "πthon",             # πthon
+    "\U0001d70bthon",    # 𝜋thon
+)
+# fmt: on
+
 
 def dedent(s: str) -> str:
     return textwrap.dedent(s).strip() + "\n"
@@ -46,13 +56,14 @@ def get_pyversion() -> str:
     return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
-def check_host_python_version(session: Any) -> None:
-    pyodide_version = session.interpreter.version.partition(" ")[0].split(".")[:2]
-    sys_version = [str(sys.version_info.major), str(sys.version_info.minor)]
+def check_host_python_version(session: Any) -> tuple[int, int]:
+    pyodide_version_str = session.interpreter.version.partition(" ")[0].split(".")[:2]
+    pyodide_version = (int(pyodide_version_str[0]), int(pyodide_version_str[1]))
+    sys_version = (sys.version_info.major, sys.version_info.minor)
     if pyodide_version == sys_version:
-        return
-    pyodide_version_fmt = ".".join(pyodide_version)
-    sys_version_fmt = ".".join(sys_version)
+        return pyodide_version
+    pyodide_version_fmt = ".".join(pyodide_version_str)
+    sys_version_fmt = ".".join(str(version) for version in sys_version)
     logger.stderr(
         f"Expected host Python version to be {pyodide_version_fmt} but got version {sys_version_fmt}"
     )
@@ -75,6 +86,7 @@ class PyodideVenv(ABC):
         self.virtualenv_args = virtualenv_args or []
         self._venv_root: Path | None = None
         self._venv_bin: Path | None = None
+        self._pyodide_pyversion: tuple[int, int] | None = None
 
     @property
     def venv_root(self) -> Path | None:
@@ -546,6 +558,21 @@ class PyodideVenv(ABC):
         """Create and return a virtualenv session object."""
         pass
 
+    def _create_pi_aliases(self) -> None:
+        """
+        Create pythonπ-style easter egg aliases for the Python 3.14
+        release. See https://github.com/python/cpython/issues/119535 and
+        https://github.com/python/cpython/pull/119536 for details. This
+        is a no-op for all other versions of Python.
+        """
+        if self._pyodide_pyversion != (3, 14):
+            return
+
+        for name in PI_ALIASES:
+            alias_path = self.venv_bin / f"{name}{self.exe_suffix}"
+            alias_path.unlink(missing_ok=True)
+            alias_path.symlink_to(self.interpreter_path)
+
     def configure_virtualenv(self) -> None:
         """Configure the virtualenv after creation."""
         logger.info("... Configuring virtualenv")
@@ -553,13 +580,14 @@ class PyodideVenv(ABC):
         self._create_pip_conf()
         self._create_pip_script()
         self._create_pyodide_script()
+        self._create_pi_aliases()
 
     def create(self) -> None:
         """Create the Pyodide virtualenv."""
         logger.info("Creating Pyodide virtualenv at %s", self.dest)
         self.validate_interpreter()
         session = self._create_session()
-        check_host_python_version(session)
+        self._pyodide_pyversion = check_host_python_version(session)
 
         try:
             session.run()

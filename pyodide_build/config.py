@@ -69,6 +69,15 @@ class ConfigManager:
                         key,
                     )
                     continue
+                if isinstance(v, bool):
+                    # TOML booleans (true/false) are converted to "1"/"0" to
+                    # match the convention used by env vars (e.g.
+                    # SKIP_EMSCRIPTEN_VERSION_CHECK defaults to "0").
+                    v = "1" if v else "0"
+                elif not isinstance(v, str):
+                    # Other non-string scalars (e.g. integers) are cast to str
+                    # so they can be used in environment-variable substitution.
+                    v = str(v)
                 build_config[key] = _environment_substitute_str(v, env)
 
             return build_config

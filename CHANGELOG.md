@@ -12,14 +12,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a hang when a recipe `build/script` or `build/post` ends by exiting the
   shell itself (e.g. `exit 0`). The build no longer blocks forever waiting for an
   environment dump that never runs; the previous environment is kept instead.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376),
   [#383](https://github.com/pyodide/pyodide-build/pull/383)
 
 - Fixed per-package build variables (`PKGDIR`, `PKG_VERSION`, `DISTDIR`, ...)
   leaking into the cached build-environment dict, which caused later packages in
   a sequential `build-recipes` run to see the previous package's values.
-  [#376](https://github.com/pyodide/pyodide-build/issues/376),
   [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed `find_matching_wheel` raising `RuntimeError("Found multiple matching
+  wheels")` for a single file.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed a bug where boolean and non-string values in pyproject.toml crashes pyodide CLI
+  when loading config values
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
+  [#382](https://github.com/pyodide/pyodide-build/pull/382)
+
+- Fixed build constraints not being applied when using `uv` as the installer by
+  setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
+  [#389](https://github.com/pyodide/pyodide-build/pull/389)
 
 ## [0.35.1] - 2026/06/13
 

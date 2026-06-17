@@ -1,15 +1,13 @@
 import fnmatch
 import os
 import shutil
+from contextlib import chdir
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from packaging.utils import parse_wheel_filename
 
-from pyodide_build.common import (
-    chdir,
-    modify_wheel,
-)
+from pyodide_build.common import modify_wheel
 
 
 def unvendor_tests_in_wheel(
