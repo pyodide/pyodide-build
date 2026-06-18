@@ -1,7 +1,11 @@
+import zipfile
+from contextlib import nullcontext
+from pathlib import Path
 from typing import Literal
 
 import pytest
 
+from pyodide_build import build_env, common
 from pyodide_build.out_of_tree import build
 
 FAKE_PYPROJECT_TOML = """\
@@ -118,3 +122,64 @@ def test_get_requires_for_build_not_retried_on_empty_result(
     assert call_count[0] == 1, (
         f"get_requires_for_build called {call_count[0]} times but expected 1"
     )
+
+
+class TestSoDetectionSkip:
+    """Tests for the .so-detection optimisation in out_of_tree.build.run."""
+
+    def _make_wheel(self, tmp_path: Path, name: str, so_files: list[str]) -> Path:
+        """Create a minimal wheel zip for testing purposes."""
+        whl = tmp_path / name
+        with zipfile.ZipFile(whl, "w") as zf:
+            zf.writestr("pkg/__init__.py", "")
+            for so in so_files:
+                zf.writestr(so, "")
+        return whl
+
+    def test_pure_wheel_skips_modify(self, tmp_path, monkeypatch):
+        """A wheel with no .so files must not call modify_wheel or replace_so_abi_tags."""
+        whl = self._make_wheel(tmp_path, "pkg-1.0-py3-none-any.whl", [])
+
+        replace_called = []
+
+        def _record_replace(wheel_dir):
+            replace_called.append(wheel_dir)
+
+        monkeypatch.setattr(common, "modify_wheel", lambda *a, **kw: nullcontext())
+        monkeypatch.setattr(build_env, "replace_so_abi_tags", _record_replace)
+
+        from pyodide_build.out_of_tree.build import _check_and_maybe_modify_wheel
+
+        _check_and_maybe_modify_wheel(whl)
+
+        assert not replace_called, (
+            "replace_so_abi_tags must not be called for a pure wheel"
+        )
+
+    def test_so_wheel_calls_modify(self, tmp_path, monkeypatch):
+        """A wheel containing a .so file must call modify_wheel and replace_so_abi_tags."""
+        whl = self._make_wheel(
+            tmp_path,
+            "pkg-1.0-cp312-cp312-emscripten_3_1_58_wasm32.whl",
+            ["pkg/ext.cpython-312-x86_64-linux-gnu.so"],
+        )
+
+        replace_called = []
+
+        def _record_replace(wheel_dir):
+            replace_called.append(wheel_dir)
+
+        monkeypatch.setattr(
+            common,
+            "modify_wheel",
+            lambda wheel_path: nullcontext(tmp_path),
+        )
+        monkeypatch.setattr(build_env, "replace_so_abi_tags", _record_replace)
+
+        from pyodide_build.out_of_tree.build import _check_and_maybe_modify_wheel
+
+        _check_and_maybe_modify_wheel(whl)
+
+        assert replace_called, (
+            "replace_so_abi_tags must be called for a wheel with .so files"
+        )

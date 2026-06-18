@@ -145,11 +145,13 @@ def _find_matching_wheels(
         for supported_tag in supported_tags:
             if supported_tag in wheel_tags:
                 yield wheel_path
-                continue
+                break
 
 
 def find_matching_wheel(
-    wheel_paths: Iterable[Path], supported_tags: Sequence[Tag], version: str = None
+    wheel_paths: Iterable[Path],
+    supported_tags: Sequence[Tag],
+    version: str | None = None,
 ) -> Path | None:
     """
     Find a matching wheel or raise an error if none is present.
@@ -333,16 +335,6 @@ def find_missing_executables(executables: list[str]) -> list[str]:
     return list(filter(lambda exe: shutil.which(exe) is None, executables))
 
 
-@contextmanager
-def chdir(new_dir: Path) -> Generator[None, None, None]:
-    orig_dir = Path.cwd()
-    try:
-        os.chdir(new_dir)
-        yield
-    finally:
-        os.chdir(orig_dir)
-
-
 def get_num_cores() -> int:
     """
     Return the number of CPUs the current process can use.
@@ -351,6 +343,11 @@ def get_num_cores() -> int:
     from pyodide_build.vendor.loky import cpu_count
 
     return cpu_count()
+
+
+def _zip_compression(compression_level: int) -> int:
+    """Return the zipfile compression constant for the given compression level."""
+    return zipfile.ZIP_DEFLATED if compression_level > 0 else zipfile.ZIP_STORED
 
 
 def make_zip_archive(
@@ -369,10 +366,7 @@ def make_zip_archive(
     compression_level
        compression level of the resulting zip file.
     """
-    if compression_level > 0:
-        compression = zipfile.ZIP_DEFLATED
-    else:
-        compression = zipfile.ZIP_STORED
+    compression = _zip_compression(compression_level)
 
     with zipfile.ZipFile(
         archive_path, "w", compression=compression, compresslevel=compression_level
@@ -383,10 +377,7 @@ def make_zip_archive(
 
 def repack_zip_archive(archive_path: Path, compression_level: int = 6) -> None:
     """Repack zip archive with a different compression level"""
-    if compression_level > 0:
-        compression = zipfile.ZIP_DEFLATED
-    else:
-        compression = zipfile.ZIP_STORED
+    compression = _zip_compression(compression_level)
 
     with TemporaryDirectory() as temp_dir:
         input_path = Path(temp_dir) / archive_path.name
@@ -417,15 +408,8 @@ def _get_sha256_checksum(archive: Path) -> str:
     checksum
          sha256 checksum of the archive
     """
-    CHUNK_SIZE = 1 << 16
-    h = hashlib.sha256()
     with open(archive, "rb") as fd:
-        while True:
-            chunk = fd.read(CHUNK_SIZE)
-            h.update(chunk)
-            if len(chunk) < CHUNK_SIZE:
-                break
-    return h.hexdigest()
+        return hashlib.file_digest(fd, "sha256").hexdigest()
 
 
 def _format_dep_chain(dep_chain: Sequence[str]) -> str:
@@ -630,7 +614,6 @@ def download_and_unpack_archive(
 
     try:
         resp = urlopen(url)
-        data = resp.read()
     except Exception as e:
         raise ValueError(f"Failed to download {descr} from {url}") from e
 
@@ -644,7 +627,11 @@ def download_and_unpack_archive(
 
     with TemporaryDirectory() as temp_dir:
         f_path = Path(temp_dir) / "temp.tar"
-        f_path.write_bytes(data)
+        try:
+            with f_path.open("wb") as f:
+                shutil.copyfileobj(resp, f)
+        except Exception as e:
+            raise ValueError(f"Failed to download {descr} from {url}") from e
         with warnings.catch_warnings():
             # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
             # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.

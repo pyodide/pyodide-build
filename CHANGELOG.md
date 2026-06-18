@@ -10,24 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed several bugs in the cross-build-environment (xbuildenv) lifecycle
-  [#376](https://github.com/pyodide/pyodide-build/issues/376),
   [#378](https://github.com/pyodide/pyodide-build/pull/378):
-  - A Python-version marker mismatch on an already-installed xbuildenv no longer
-    silently overwrites the marker with the current Python version. A reinstall
-    now actually refreshes the host packages (or surfaces the intended error)
-    instead of letting builds proceed with packages installed under the old Python.
+  - A Python-version marker mismatch on an already-installed xbuildenv will now
+    refreshes the host packages.
   - Installing via `DEFAULT_CROSS_BUILD_ENV_URL` is now treated like an explicit
     `--url` install, so it no longer bakes a mangled, URL-derived version into the
     generated package index.
-  - `use_version()` no longer raises `FileExistsError` when the `xbuildenv`
+  - `pyodide xbuildenv use` no longer raises `FileExistsError` when the `xbuildenv`
     symlink is dangling (its target was removed); the stale symlink is now
     cleaned up first.
   - A failure during a later installation step no longer deletes a pre-existing,
-    valid cached xbuildenv: only a directory created by the current `install()`
-    call is removed on failure, and the cleanup no longer masks the original error.
-  - `_find_latest_version()` now reports the correct newest/oldest supported
-    Python versions on a mismatch (sorting by Python version) and raises a clear
-    error instead of an `IndexError` when the releases metadata is empty.
+    valid cached xbuildenv.
+
+- Fixed a hang when a recipe `build/script` or `build/post` ends by exiting the
+  shell itself (e.g. `exit 0`). The build no longer blocks forever waiting for an
+  environment dump that never runs; the previous environment is kept instead.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed per-package build variables (`PKGDIR`, `PKG_VERSION`, `DISTDIR`, ...)
+  leaking into the cached build-environment dict, which caused later packages in
+  a sequential `build-recipes` run to see the previous package's values.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed `find_matching_wheel` raising `RuntimeError("Found multiple matching
+  wheels")` for a single file.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed a bug where boolean and non-string values in pyproject.toml crashes pyodide CLI
+  when loading config values
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
+  [#382](https://github.com/pyodide/pyodide-build/pull/382)
+
+- Fixed build constraints not being applied when using `uv` as the installer by
+  setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
+  [#389](https://github.com/pyodide/pyodide-build/pull/389)
 
 ## [0.35.1] - 2026/06/13
 

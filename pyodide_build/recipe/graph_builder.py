@@ -3,7 +3,6 @@ Build all of the packages in a given directory.
 """
 
 import dataclasses
-import datetime
 import shutil
 import subprocess
 import sys
@@ -212,7 +211,7 @@ class BasePackage:
         raise NotImplementedError()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class PythonPackage(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)
@@ -229,7 +228,7 @@ class PythonPackage(BasePackage):
         return wheel
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class SharedLibrary(BasePackage):
     install_dir: str = "dynlib"
 
@@ -248,7 +247,7 @@ class SharedLibrary(BasePackage):
         return candidates[0]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class StaticLibrary(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)
@@ -269,12 +268,15 @@ class PackageStatus:
         self.finished = False
 
     def finish(self, success: bool, elapsed_time: float) -> None:
-        time = datetime.datetime.fromtimestamp(elapsed_time, tz=datetime.UTC)
-        if time.minute == 0:
-            minutes = ""
+        seconds = int(elapsed_time)
+        hours, rem = divmod(seconds, 3600)
+        minutes, secs = divmod(rem, 60)
+        if hours:
+            timestr = f"{hours}h {minutes}m {secs}s"
+        elif minutes:
+            timestr = f"{minutes}m {secs}s"
         else:
-            minutes = f"{time.minute}m "
-        timestr = f"{minutes}{time.second}s"
+            timestr = f"{secs}s"
 
         status = "built" if success else "failed"
         done_message = f"{self.prefix} {status} {self.pkg_name} in {timestr}"

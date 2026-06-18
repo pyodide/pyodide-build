@@ -233,9 +233,6 @@ def _extract_extras(source_location: str) -> tuple[str, list[str]]:
     return source_location, extras
 
 
-DEFAULT_PATH = default_xbuildenv_path()
-
-
 @click.command(
     context_settings={
         "ignore_unknown_options": True,
@@ -334,10 +331,10 @@ DEFAULT_PATH = default_xbuildenv_path()
 @click.option(
     "--xbuildenv-path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     envvar="PYODIDE_XBUILDENV_PATH",
     show_envvar=True,
-    help="Path to the cross-build environment directory.",
+    help="Path to the cross-build environment directory (default: resolved from config or platformdirs cache).",
 )
 @click.option(
     "--skip-emscripten-install",
@@ -369,7 +366,7 @@ def main(
     no_isolation: bool,
     skip_dependency_check: bool,
     config_setting: tuple[str, ...],
-    xbuildenv_path: Path,
+    xbuildenv_path: Path | None,
     skip_emscripten_install: bool,
     verbosity: int,
 ) -> None:
@@ -381,6 +378,8 @@ def main(
             or url to a source dist archive or wheel file. If this is blank, it
             will build the current directory.
     """
+    if xbuildenv_path is None:
+        xbuildenv_path = default_xbuildenv_path()
     init_environment(xbuildenv_path=xbuildenv_path)
     try:
         ensure_emscripten(skip_install=skip_emscripten_install)

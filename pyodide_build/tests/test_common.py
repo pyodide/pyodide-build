@@ -2,13 +2,16 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from packaging.tags import Tag
 
 from pyodide_build.common import (
     IS_WIN,
+    _find_matching_wheels,
     check_wasm_magic_number,
     default_xbuildenv_path,
     environment_substitute_args,
     extract_wheel_metadata_file,
+    find_matching_wheel,
     find_missing_executables,
     make_zip_archive,
     parse_top_level_import_name,
@@ -285,3 +288,46 @@ def test_default_xbuildenv_path_env_var_non_writable(
     monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(non_writable_path))
 
     assert default_xbuildenv_path() == baseline_path
+
+
+# Bug 1: _find_matching_wheels should yield each wheel at most once even if its
+# compressed tag set matches multiple entries in supported_tags.
+def test_find_matching_wheels_no_duplicate_yield(tmp_path):
+    # A wheel with two platform tags in its filename (compressed tag set).
+    # packaging will expand "pyodide_2024_0_wasm32.pyemscripten_2024_0_wasm32"
+    # into two separate Tag objects, both of which appear in supported_tags.
+    wheel_name = (
+        "example-1.0-cp312-cp312-pyodide_2024_0_wasm32.pyemscripten_2024_0_wasm32.whl"
+    )
+    wheel_path = tmp_path / wheel_name
+    wheel_path.write_bytes(b"")
+
+    supported_tags = [
+        Tag("cp312", "cp312", "pyodide_2024_0_wasm32"),
+        Tag("cp312", "cp312", "pyemscripten_2024_0_wasm32"),
+    ]
+
+    matches = list(_find_matching_wheels([wheel_path], supported_tags))
+    assert matches == [wheel_path], (
+        f"Expected exactly one match but got {len(matches)}: {matches}"
+    )
+
+
+def test_find_matching_wheel_compressed_tags_no_runtime_error(tmp_path):
+    # Regression: when a single wheel matches two supported tags (compressed tag
+    # set), find_matching_wheel used to raise RuntimeError("Found multiple
+    # matching wheels") because the same path was yielded twice.
+    wheel_name = (
+        "example-1.0-cp312-cp312-pyodide_2024_0_wasm32.pyemscripten_2024_0_wasm32.whl"
+    )
+    wheel_path = tmp_path / wheel_name
+    wheel_path.write_bytes(b"")
+
+    supported_tags = [
+        Tag("cp312", "cp312", "pyodide_2024_0_wasm32"),
+        Tag("cp312", "cp312", "pyemscripten_2024_0_wasm32"),
+    ]
+
+    # Should return the single wheel, not raise RuntimeError.
+    result = find_matching_wheel([wheel_path], supported_tags)
+    assert result == wheel_path
