@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed several bugs in the cross-build-environment (xbuildenv) lifecycle
+  [#378](https://github.com/pyodide/pyodide-build/pull/378):
+  - A Python-version marker mismatch on an already-installed xbuildenv will now
+    refreshes the host packages.
+  - Installing via `DEFAULT_CROSS_BUILD_ENV_URL` is now treated like an explicit
+    `--url` install, so it no longer bakes a mangled, URL-derived version into the
+    generated package index.
+  - `pyodide xbuildenv use` no longer raises `FileExistsError` when the `xbuildenv`
+    symlink is dangling (its target was removed); the stale symlink is now
+    cleaned up first.
+  - A failure during a later installation step no longer deletes a pre-existing,
+    valid cached xbuildenv.
+
 - Fixed a hang when a recipe `build/script` or `build/post` ends by exiting the
   shell itself (e.g. `exit 0`). The build no longer blocks forever waiting for an
   environment dump that never runs; the previous environment is kept instead.

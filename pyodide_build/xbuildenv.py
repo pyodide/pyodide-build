@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from packaging.version import Version
 from pyodide_lock import PyodideLockSpec
 
 from pyodide_build import build_env, uv_helper
@@ -157,17 +158,21 @@ class CrossBuildEnvManager:
 
         symlink_dir = self.symlink_dir
 
-        if symlink_dir.exists():
-            if symlink_dir.is_symlink():
-                # symlink to a directory, expected case
-                symlink_dir.unlink()
-            elif symlink_dir.is_dir():
-                # real directory, for backwards compatibility
-                shutil.rmtree(symlink_dir)
-            else:
-                # file. This should not happen unless the user manually created a file
-                # but we will remove it anyway
-                symlink_dir.unlink()
+        # Use is_symlink() / exists() with lexists semantics so that a dangling
+        # symlink (one whose target no longer exists) is also removed. A plain
+        # exists() check follows the link and returns False for dangling links,
+        # which would leave the stale symlink in place and make symlink_to()
+        # raise FileExistsError.
+        if symlink_dir.is_symlink():
+            # symlink (possibly dangling), expected case
+            symlink_dir.unlink()
+        elif symlink_dir.is_dir():
+            # real directory, for backwards compatibility
+            shutil.rmtree(symlink_dir)
+        elif symlink_dir.exists():
+            # file. This should not happen unless the user manually created a file
+            # but we will remove it anyway
+            symlink_dir.unlink()
 
         symlink_dir.symlink_to(version_path)
 
@@ -208,13 +213,20 @@ class CrossBuildEnvManager:
         if url and version:
             raise ValueError("Cannot specify both version and url")
 
+        # Whether we are installing from an arbitrary URL (explicit or default).
+        # In that case the "version" is a mangled URL string rather than a real
+        # release version, so we must not bake it into the package index.
+        installed_from_url = False
+
         if url:
             version = _url_to_version(url)
             download_url = url
+            installed_from_url = True
         # if default version is specified in the configuration, use that
         elif not version and (default_url := self._get_default_xbuildenv_url()):
             version = _url_to_version(default_url)
             download_url = default_url
+            installed_from_url = True
         else:
             version = version or self._find_latest_version()
 
@@ -232,7 +244,11 @@ class CrossBuildEnvManager:
 
         download_path = self._path_for_version(version)
 
-        if download_path.exists():
+        # Track whether THIS call created the directory, so that a failure later
+        # in this method does not delete a previously-good cached installation.
+        download_path_preexisted = download_path.exists()
+
+        if download_path_preexisted:
             logger.info(
                 "The cross-build environment already exists at '%s', skipping download",
                 download_path,
@@ -248,28 +264,54 @@ class CrossBuildEnvManager:
             xbuildenv_root = download_path / "xbuildenv"
             xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
             install_marker = download_path / ".installed"
-            if not install_marker.exists():
+
+            # Detect a Python-version mismatch on an already-installed env so we
+            # can refresh the host packages that were installed under the old
+            # Python version.
+            version_marker_mismatch = False
+            if install_marker.exists():
+                matches, _ = self._version_marker_matches_for(download_path)
+                version_marker_mismatch = not matches
+
+            did_install_work = False
+            if not install_marker.exists() or version_marker_mismatch:
                 logger.info(
                     "Installing Pyodide cross-build environment to %s", download_path
+                )
+                did_install_work = True
+
+                cross_build_packages_marker = self._cross_build_packages_marker_path(
+                    download_path
                 )
 
                 if not skip_install_cross_build_packages:
                     self._install_cross_build_packages(
                         xbuildenv_root, xbuildenv_pyodide_root
                     )
-                    self._cross_build_packages_marker_path(download_path).touch()
+                    cross_build_packages_marker.touch()
+                elif version_marker_mismatch:
+                    # The host packages were installed under a different Python
+                    # version. Drop the marker so they get reinstalled lazily.
+                    cross_build_packages_marker.unlink(missing_ok=True)
 
-                if not url:
-                    # If installed from url, skip creating the PyPI index (version is not known)
+                if not installed_from_url:
+                    # If installed from url, skip creating the PyPI index
+                    # (version is a mangled URL string, not a real version)
                     self._create_package_index(xbuildenv_pyodide_root, version)
 
             install_marker.touch()
             self.use_version(version)
-            self._add_version_marker()
-        except Exception as e:
-            # if the installation failed, remove the downloaded directory
-            shutil.rmtree(download_path)
-            raise e
+            # Only (re)write the Python version marker when we actually performed
+            # installation work, so a mismatch on a skipped install is not
+            # silently masked by overwriting the marker with the current Python.
+            if did_install_work:
+                self._add_version_marker()
+        except Exception:
+            # If THIS call created the download directory and the installation
+            # failed, remove it. Do not delete a pre-existing cached install.
+            if not download_path_preexisted:
+                shutil.rmtree(download_path, ignore_errors=True)
+            raise
 
         return xbuildenv_pyodide_root
 
@@ -285,21 +327,37 @@ class CrossBuildEnvManager:
         )
 
         if not latest:
-            # Check for Python version mismatch
-            python_versions = [
-                v.python_version_tuple[:2] for v in metadata.list_compatible_releases()
-            ]
+            # Check for Python version mismatch. The releases are sorted by
+            # Pyodide version, so we must re-sort the Python versions explicitly
+            # (by Python version) before comparing newest/oldest.
+            python_versions = sorted(
+                {
+                    release.python_version_tuple[:2]
+                    for release in metadata.list_compatible_releases()
+                },
+                key=lambda v: Version(".".join(str(x) for x in v)),
+            )
+
+            if not python_versions:
+                raise ValueError(
+                    "No cross-build environment releases are available in the "
+                    f"metadata at {self.metadata_url}."
+                )
+
             pyver = tuple(int(x) for x in local["python"].split("."))
-            if pyver > python_versions[0]:
-                latest_supported = ".".join(str(x) for x in python_versions[0])
+            newest_supported = python_versions[-1]
+            oldest_supported = python_versions[0]
+
+            if pyver > newest_supported:
+                latest_supported = ".".join(str(x) for x in newest_supported)
                 raise ValueError(
                     f"Python version {local['python']} is not yet supported. The newest supported version of Python is {latest_supported}."
                 )
 
-            if pyver < python_versions[-1]:
-                oldest_supported = ".".join(str(x) for x in python_versions[-1])
+            if pyver < oldest_supported:
+                oldest_supported_str = ".".join(str(x) for x in oldest_supported)
                 raise ValueError(
-                    f"Python version {local['python']} is too old. The oldest supported version of Python is {oldest_supported}."
+                    f"Python version {local['python']} is too old. The oldest supported version of Python is {oldest_supported_str}."
                 )
 
             raise ValueError(
@@ -602,7 +660,21 @@ class CrossBuildEnvManager:
         if not self.symlink_dir.is_dir():
             return False, "cross-build env directory does not exist"
 
-        version_file = self.symlink_dir / PYTHON_VERSION_MARKER_FILE
+        return self._version_marker_matches_for(self.symlink_dir)
+
+    def _version_marker_matches_for(
+        self, version_path: Path
+    ) -> tuple[bool, str | None]:
+        """
+        Check whether the Python version marker stored in ``version_path``
+        matches the local Python version.
+
+        Parameters
+        ----------
+        version_path
+            Path to an xbuildenv version directory (or the active symlink).
+        """
+        version_file = version_path / PYTHON_VERSION_MARKER_FILE
         if not version_file.exists():
             return False, "Python version marker file not found"
 
