@@ -186,6 +186,9 @@ def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
     for name in unisolated:
         package_dir = get_cross_build_files_dir(name)
         if not package_dir.is_dir():
+            # Not every unisolated package has cross-build files. The package
+            # may only need to be pinned to the cross-build version (for its
+            # console scripts, for instance) without any file overlay.
             continue
         shutil.copytree(package_dir, sitepackagesdir / name, dirs_exist_ok=True)
 
