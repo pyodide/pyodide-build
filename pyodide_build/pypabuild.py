@@ -140,7 +140,7 @@ def _replace_unisolated_packages(
 
     new_reqs = reqs.copy()
     unisolated: set[str] = set()
-    for reqstr in list(reqs):
+    for reqstr in reqs:
         req = Requirement(reqstr)
         match = canonical_unisolated.get(canonicalize_name(req.name))
         if match is not None:
