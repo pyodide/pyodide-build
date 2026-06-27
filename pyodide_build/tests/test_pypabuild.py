@@ -60,17 +60,15 @@ def test_replace_unisolated_packages_normalizes_names():
 
 
 def test_replace_unisolated_packages_version_mismatch():
-    """
-    FIXME: This is not an ideal behavior, but for now we just ignore the version mismatch.
-    """
     requires = {"baz==1.0"}
     unisolated = {
         "baz": "1.1",
     }
 
-    new_requires, replaced = pypabuild._replace_unisolated_packages(
-        requires, unisolated
-    )
+    with pytest.warns(UserWarning, match=r"cross-build version is baz==1\.1"):
+        new_requires, replaced = pypabuild._replace_unisolated_packages(
+            requires, unisolated
+        )
     assert new_requires == {"baz==1.1"}
     assert replaced == {"baz"}
 
