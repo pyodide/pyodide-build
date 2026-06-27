@@ -243,6 +243,19 @@ def install_reqs(
     _install_cross_build_files(env.path, unisolated)
 
 
+# So far among all packages in pyodide-recipes, only NumPy ships
+# a .pc file, but I don't want to hardcode that here as such
+def _get_unisolated_pkgconfig_dirs(venv_path: str) -> list[str]:
+    """
+    Find directories containing .pc files shipped by packages installed in the
+    isolated build environment. These need to be added to PKG_CONFIG_LIBDIR so
+    that meson can discover unisolated packages (like numpy) via pkg-config
+    during cross-compilation.
+    """
+    _, _, purelib = _find_executable_and_scripts(venv_path)
+    return list({str(pc.parent) for pc in Path(purelib).rglob("*.pc") if pc.is_file()})
+
+
 def _build_in_isolated_env(
     build_env: Mapping[str, str],
     srcdir: Path,
@@ -291,6 +304,14 @@ def _build_in_isolated_env(
                 )
 
         install_reqs(build_env, env, build_reqs)
+
+        pkgconfig_dirs = _get_unisolated_pkgconfig_dirs(env.path)
+        if pkgconfig_dirs:
+            build_env = dict(build_env)
+            existing = build_env.get("PKG_CONFIG_LIBDIR", "")
+            build_env["PKG_CONFIG_LIBDIR"] = ":".join(
+                [existing, *pkgconfig_dirs] if existing else pkgconfig_dirs
+            )
 
         with common.replace_env(build_env):
             return builder.build(
