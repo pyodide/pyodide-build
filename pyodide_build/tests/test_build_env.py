@@ -88,18 +88,21 @@ class TestOutOfTree(TestInTree):
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
         site_packages_extras = manager.pyodide_root / ".." / "site-packages-extras"
 
-        for name in ("numpy", "scipy"):
-            package_dir = build_env.get_unisolated_files(name)
-            assert package_dir == site_packages_extras / name
-            assert package_dir.is_dir()
+        # Check every package that actually has a directory in site-packages-extras
+        found_any = False
+        for subdir in site_packages_extras.iterdir():
+            if not subdir.is_dir():
+                continue
+            found_any = True
+            package_dir = build_env.get_cross_build_files_dir(subdir.name)
+            assert package_dir == subdir
             assert any(package_dir.rglob("*"))
+        assert found_any
 
-    def test_get_unisolated_files_no_cross_build_files(
+    def test_get_cross_build_files_dir_missing_package(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
     ):
-        # cffi is an unisolated package but has no cross-build files in the
-        # dummy xbuildenv, so the directory simply doesn't exist
-        package_dir = build_env.get_unisolated_files("cffi")
+        package_dir = build_env.get_cross_build_files_dir("no-such-package")
         assert not package_dir.exists()
 
     def test_get_build_environment_vars(

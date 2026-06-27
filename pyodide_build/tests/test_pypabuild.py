@@ -232,14 +232,13 @@ def test_install_cross_build_files_skips_packages_without_cross_build_files(
         "_find_executable_and_scripts",
         lambda venv_path: ("python", "scripts", str(purelib)),
     )
-    # cffi has no cross-build files, so its directory does not exist
     monkeypatch.setattr(
         pypabuild,
         "get_cross_build_files_dir",
         lambda name: tmp_path / "does-not-exist" / name,
     )
 
-    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"cffi"})
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"some-package"})
 
     assert list(purelib.iterdir()) == []
 
