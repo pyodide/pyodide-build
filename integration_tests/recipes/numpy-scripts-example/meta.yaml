@@ -1,0 +1,23 @@
+package:
+  name: numpy-scripts-example
+  version: 0.1.0
+  top-level:
+    - numpy_scripts_example
+
+source:
+  path: source
+
+requirements:
+  host:
+    - numpy
+  run:
+    - numpy
+
+about:
+  home: https://github.com/pyodide/pyodide-build
+  summary: Minimal integration test that verifies f2py and numpy-config are on PATH during the build
+  license: MIT
+
+extra:
+  recipe-maintainers:
+    - agriyakhetarpal
