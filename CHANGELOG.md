@@ -27,18 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Unisolated packages are now installed into the isolated build environment via
-  pip, with their cross-build files replaced by WASM-compatible versions from
-  the cross-build environment. This makes build-time scripts exposed by these
-  packages available on `PATH` during the build process.
+- Fixed build-time scripts of unisolated packages (like `f2py` and
+  `numpy-config` from NumPy) not being available on `PATH` during builds.
   [#21](https://github.com/pyodide/pyodide-build/pull/21)
 
 - `oldest-supported-numpy` is no longer silently ignored when encountered as a
-  build-time dependency. It will now be installed as any other package. Since
+  build-time dependency. It will now be installed like any other package. Since
   `oldest-supported-numpy` is deprecated since NumPy 2.0, packages that still
-  list it should migrate to a direct `numpy` dependency. If you need to ignore
-  it (or any other build requirement), set it via
-  `pyodide config set ignored_build_requirements "patchelf oldest-supported-numpy"`
+  list it should migrate to a direct `numpy` dependency.
   [#21](https://github.com/pyodide/pyodide-build/pull/21)
 
 ## [0.34.4] - 2026/05/15
