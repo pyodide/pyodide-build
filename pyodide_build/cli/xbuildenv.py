@@ -9,11 +9,10 @@ from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
     NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
     NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
-
-DEFAULT_PATH = default_xbuildenv_path()
 
 
 @click.group(invoke_without_command=True)
@@ -35,10 +34,10 @@ def check_xbuildenv_root(path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     envvar="PYODIDE_XBUILDENV_PATH",
     show_envvar=True,
-    help="destination to download cross-build environment directory to.",
+    help="destination to download cross-build environment directory to (default: resolved from config or platformdirs cache).",
 )
 @click.option(
     "--url",
@@ -63,7 +62,7 @@ def check_xbuildenv_root(path: Path) -> None:
     "--debug",
     is_flag=True,
     default=False,
-    help="install the debug variant of the cross-build environment (nightly only).",
+    help="install the debug variant of the cross-build environment. Combine with --nightly to install the nightly debug variant.",
 )
 @click.option(
     "--skip-cross-build-packages",
@@ -76,7 +75,7 @@ def check_xbuildenv_root(path: Path) -> None:
 )
 def _install(
     version: str | None,
-    path: Path,
+    path: Path | None,
     url: str | None,
     force_install: bool,
     nightly: bool,
@@ -94,12 +93,14 @@ def _install(
     Arguments:
         VERSION: version of cross-build environment to install (optional)
     """
-    if nightly or debug:
-        metadata_url = (
-            NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
-            if debug
-            else NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
-        )
+    if path is None:
+        path = default_xbuildenv_path()
+    if nightly and debug:
+        metadata_url = NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
+    elif nightly:
+        metadata_url = NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
+    elif debug:
+        metadata_url = STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL
     else:
         metadata_url = None
 
@@ -117,11 +118,13 @@ def _install(
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _version(path: Path) -> None:
+def _version(path: Path | None) -> None:
     """Print current version of cross-build environment."""
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     version = manager.current_version
@@ -136,11 +139,13 @@ def _version(path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _versions(path: Path) -> None:
+def _versions(path: Path | None) -> None:
     """Print all installed versions of cross-build environment."""
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     versions = manager.list_versions()
@@ -158,16 +163,18 @@ def _versions(path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _uninstall(version: str | None, path: Path) -> None:
+def _uninstall(version: str | None, path: Path | None) -> None:
     """Uninstall cross-build environment.
 
     \b
     Arguments:
         VERSION: version of cross-build environment to uninstall (optional)
     """
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     v = manager.uninstall_version(version)
@@ -179,16 +186,18 @@ def _uninstall(version: str | None, path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _use(version: str, path: Path) -> None:
+def _use(version: str, path: Path | None) -> None:
     """Select a version of cross-build environment to use.
 
     \b
     Arguments:
         VERSION: version of cross-build environment to use (required)
     """
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     manager.use_version(version)
@@ -223,7 +232,7 @@ def _use(version: str, path: Path) -> None:
     "--debug",
     is_flag=True,
     default=False,
-    help="search nightly debug releases instead of stable ones.",
+    help="search debug releases. Searches stable-debug by default. Combine with --nightly to search nightly-debug releases.",
 )
 @click.option(
     "--json",
@@ -275,14 +284,12 @@ def _search(
         )
 
     if nightly or debug:
-        # Nightly and/or debug releases (mutually exclusive with stable)
-        sources = []
-        if nightly:
-            sources.append(("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL))
-        if debug:
-            sources.append(
-                ("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)
-            )
+        if nightly and debug:
+            sources = [("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
+        elif nightly:
+            sources = [("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL)]
+        else:
+            sources = [("stable-debug", STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
         compat = _compat_kwargs()
         views = [
             _make_view(release, source)
@@ -329,7 +336,7 @@ def _search(
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="Pyodide cross-env path",
 )
 @click.option(
@@ -341,7 +348,7 @@ def _search(
 )
 def _install_emscripten(
     version: str | None,
-    path: Path,
+    path: Path | None,
     force: bool,
 ) -> None:
     """Install Emscripten SDK into the cross-build environment.
@@ -352,6 +359,8 @@ def _install_emscripten(
     If the requested version is already installed, the command is a no-op unless
     --force is passed.
     """
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
 

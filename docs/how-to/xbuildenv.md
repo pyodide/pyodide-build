@@ -31,8 +31,11 @@ pyodide xbuildenv install --nightly
 # Install a specific nightly version
 pyodide xbuildenv install 20260520 --nightly
 
-# Install the debug variant of the latest nightly release
+# Install the debug variant of the latest stable release
 pyodide xbuildenv install --debug
+
+# Install the debug variant of the latest nightly release
+pyodide xbuildenv install --nightly --debug
 ```
 
 ## Listing installed versions
@@ -83,10 +86,13 @@ pyodide xbuildenv search --all
 # Search nightly releases
 pyodide xbuildenv search --nightly
 
-# Search nightly debug releases
+# Search stable debug releases
 pyodide xbuildenv search --debug
 
-# Combine flags: show all nightly and debug releases
+# Search nightly debug releases
+pyodide xbuildenv search --nightly --debug
+
+# Search all nightly debug releases, including incompatible ones
 pyodide xbuildenv search --nightly --debug --all
 
 # Output as JSON (useful for scripting)
@@ -99,7 +105,7 @@ pyodide-build resolves the xbuildenv path in this order:
 
 1. `PYODIDE_XBUILDENV_PATH` environment variable
 2. `xbuildenv_path` in `pyproject.toml` under `[tool.pyodide.build]`
-3. Platform cache directory (`~/.cache/pyodide` on Linux, `~/Library/Caches/pyodide` on macOS)
+3. Platform cache directory inside a `pyodide-build` cache folder. The default path is scoped to the current Python environment and `pyodide-build` installation, for example `~/.cache/pyodide-build/.pyodide-xbuildenv-<install-id>/0.29.4` on Linux.
 
 Therefore, to pin a custom location for caching, etc:
 

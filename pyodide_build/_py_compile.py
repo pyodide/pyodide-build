@@ -11,7 +11,7 @@ from typing import Any
 from packaging.tags import Tag
 from packaging.utils import parse_wheel_filename
 
-from pyodide_build.common import _get_sha256_checksum
+from pyodide_build.common import _get_sha256_checksum, _zip_compression
 from pyodide_build.logger import logger, set_log_level
 
 
@@ -116,10 +116,7 @@ def _compile(
     with set_log_level(logger, verbose):
         logger.debug("Running py-compile on %s to %s", input_path, output_path)
 
-        if compression_level > 0:
-            compression = zipfile.ZIP_DEFLATED
-        else:
-            compression = zipfile.ZIP_STORED
+        compression = _zip_compression(compression_level)
 
         with (
             zipfile.ZipFile(input_path) as fh_zip_in,

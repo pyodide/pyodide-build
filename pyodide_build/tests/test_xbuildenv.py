@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 from collections import namedtuple
 
@@ -423,6 +424,194 @@ class TestCrossBuildEnvManager:
 
         marker = manager.symlink_dir.resolve() / ".cross-build-packages-installed"
         assert marker.exists()
+
+    def test_use_version_dangling_symlink(self, tmp_path):
+        # Regression test: a dangling xbuildenv symlink (target removed) must be
+        # cleaned up so that use_version() does not raise FileExistsError.
+        manager = CrossBuildEnvManager(tmp_path)
+
+        (tmp_path / "0.25.0").mkdir()
+        (tmp_path / "0.26.0").mkdir()
+
+        # Point the symlink at a directory and then delete that directory,
+        # leaving a dangling symlink behind.
+        manager.use_version("0.25.0")
+        shutil.rmtree(tmp_path / "0.25.0")
+
+        assert manager.symlink_dir.is_symlink()
+        assert not manager.symlink_dir.exists()  # dangling
+
+        # This previously raised FileExistsError.
+        manager.use_version("0.26.0")
+
+        assert manager.symlink_dir.is_symlink()
+        assert manager.symlink_dir.resolve() == tmp_path / "0.26.0"
+
+    def test_install_preexisting_not_deleted_on_failure(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+    ):
+        # Regression test: if a valid xbuildenv is already installed and a later
+        # step (e.g. use_version) of a subsequent install() fails, the existing
+        # installation must NOT be deleted.
+        manager = CrossBuildEnvManager(tmp_path)
+
+        manager.install(version=None, url=dummy_xbuildenv_url)
+        version = _url_to_version(dummy_xbuildenv_url)
+        download_path = tmp_path / version
+        assert download_path.exists()
+
+        # Make a later step fail on the second install() call.
+        def boom(_version):
+            raise OSError("simulated symlink failure (e.g. Windows privilege)")
+
+        monkeypatch.setattr(manager, "use_version", boom)
+
+        with pytest.raises(OSError, match="simulated symlink failure"):
+            manager.install(version=None, url=dummy_xbuildenv_url)
+
+        # The pre-existing installation must still be present.
+        assert download_path.exists()
+        assert (download_path / ".installed").exists()
+
+    def test_install_new_deleted_on_failure(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+    ):
+        # Complement: when THIS call created the directory and a later step
+        # fails, the freshly downloaded directory should be removed.
+        manager = CrossBuildEnvManager(tmp_path)
+        version = _url_to_version(dummy_xbuildenv_url)
+        download_path = tmp_path / version
+
+        def boom(_version):
+            raise OSError("simulated symlink failure")
+
+        monkeypatch.setattr(manager, "use_version", boom)
+
+        with pytest.raises(OSError, match="simulated symlink failure"):
+            manager.install(version=None, url=dummy_xbuildenv_url)
+
+        assert not download_path.exists()
+
+    def test_install_url_default_no_mangled_package_index(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+        reset_cache,
+        reset_env_vars,
+    ):
+        # Regression test: installing via DEFAULT_CROSS_BUILD_ENV_URL must be
+        # treated like an explicit-url install and NOT create a package index
+        # baked with a mangled (URL-derived) version string.
+        manager = CrossBuildEnvManager(tmp_path)
+
+        os.environ["DEFAULT_CROSS_BUILD_ENV_URL"] = dummy_xbuildenv_url
+        manager.install(version=None)
+
+        assert not (
+            manager.symlink_dir / "xbuildenv" / "pyodide-root" / "package_index"
+        ).exists()
+
+    def test_install_version_marker_mismatch_triggers_reinstall(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+    ):
+        # Regression test: when an already-installed xbuildenv has a Python
+        # version marker that does not match the current Python, a subsequent
+        # install() must rewrite the marker (and refresh host packages) rather
+        # than skipping work and leaving the stale marker / silently passing.
+        manager = CrossBuildEnvManager(tmp_path)
+
+        manager.install(
+            version=None,
+            url=dummy_xbuildenv_url,
+            skip_install_cross_build_packages=True,
+        )
+        version = _url_to_version(dummy_xbuildenv_url)
+        download_path = tmp_path / version
+
+        # Simulate the env having been installed under a different Python and
+        # mark cross-build packages as already installed.
+        marker_file = download_path / ".build-python-version"
+        marker_file.write_text("2.7.10")
+        cross_build_marker = download_path / ".cross-build-packages-installed"
+        cross_build_marker.touch()
+
+        matches, _ = manager.version_marker_matches()
+        assert not matches
+
+        # Reinstall should rewrite the marker to the current Python version.
+        manager.install(
+            version=None,
+            url=dummy_xbuildenv_url,
+            skip_install_cross_build_packages=True,
+        )
+
+        matches, err = manager.version_marker_matches()
+        assert matches, err
+        assert (
+            marker_file.read_text()
+            == f"{sys.version_info.major}.{sys.version_info.minor}"
+        )
+        # Host-package marker dropped so packages get reinstalled lazily.
+        assert not cross_build_marker.exists()
+
+    def test_install_version_marker_match_no_marker_rewrite(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+    ):
+        # When the marker already matches, a repeat install() should be a no-op
+        # and must not re-run installation work or drop the cross-build marker.
+        manager = CrossBuildEnvManager(tmp_path)
+
+        manager.install(
+            version=None,
+            url=dummy_xbuildenv_url,
+            skip_install_cross_build_packages=True,
+        )
+        version = _url_to_version(dummy_xbuildenv_url)
+        download_path = tmp_path / version
+        cross_build_marker = download_path / ".cross-build-packages-installed"
+        cross_build_marker.touch()
+
+        manager.install(
+            version=None,
+            url=dummy_xbuildenv_url,
+            skip_install_cross_build_packages=True,
+        )
+
+        # Marker preserved (install did no work).
+        assert cross_build_marker.exists()
+
+    def test_find_latest_version_empty_releases(self, tmp_path):
+        # Regression test: empty releases metadata must produce a clear error,
+        # not an IndexError.
+        import json
+
+        metadata_path = tmp_path / "empty-metadata.json"
+        metadata_path.write_text(json.dumps({"releases": {}}))
+
+        manager = CrossBuildEnvManager(tmp_path, str(metadata_path))
+
+        with pytest.raises(
+            ValueError, match="No cross-build environment releases are available"
+        ):
+            manager._find_latest_version()
 
 
 @pytest.mark.parametrize(

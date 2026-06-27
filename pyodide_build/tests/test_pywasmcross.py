@@ -147,6 +147,27 @@ def test_replay_genargs_handle_dashI(monkeypatch):
     )
 
 
+def test_replay_genargs_handle_dashI_symlinked_prefix(monkeypatch, tmp_path):
+    # sys.prefix may contain a symlink (e.g. homebrew Python on macOS:
+    # /opt/homebrew/opt/python@X.Y -> ../Cellar/...); the include path must be
+    # recognized nonetheless.
+    import sys
+
+    real_prefix = tmp_path / "Cellar" / "python3.11"
+    (real_prefix / "include" / "python3.11").mkdir(parents=True)
+    link_prefix = tmp_path / "opt" / "python3.11"
+    link_prefix.parent.mkdir()
+    link_prefix.symlink_to(real_prefix)
+
+    monkeypatch.setattr(sys, "prefix", str(link_prefix))
+    monkeypatch.setattr(sys, "base_prefix", str(link_prefix))
+
+    assert (
+        replay_genargs_handle_dashI(f"-I{link_prefix}/include/python3.11", "/target")
+        == "-I/target/include/python3.11"
+    )
+
+
 def test_conda_unsupported_args(build_args):
     # Check that compile arguments that are not supported by emcc and are sometimes
     # used in conda are removed.

@@ -5,7 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.35.0] - 2026/XX/XX
+## [Unreleased]
+
+### Fixed
+
+- Fixed several bugs in the cross-build-environment (xbuildenv) lifecycle
+  [#378](https://github.com/pyodide/pyodide-build/pull/378):
+  - A Python-version marker mismatch on an already-installed xbuildenv will now
+    refreshes the host packages.
+  - Installing via `DEFAULT_CROSS_BUILD_ENV_URL` is now treated like an explicit
+    `--url` install, so it no longer bakes a mangled, URL-derived version into the
+    generated package index.
+  - `pyodide xbuildenv use` no longer raises `FileExistsError` when the `xbuildenv`
+    symlink is dangling (its target was removed); the stale symlink is now
+    cleaned up first.
+  - A failure during a later installation step no longer deletes a pre-existing,
+    valid cached xbuildenv.
+
+- Fixed a hang when a recipe `build/script` or `build/post` ends by exiting the
+  shell itself (e.g. `exit 0`). The build no longer blocks forever waiting for an
+  environment dump that never runs; the previous environment is kept instead.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed per-package build variables (`PKGDIR`, `PKG_VERSION`, `DISTDIR`, ...)
+  leaking into the cached build-environment dict, which caused later packages in
+  a sequential `build-recipes` run to see the previous package's values.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed `find_matching_wheel` raising `RuntimeError("Found multiple matching
+  wheels")` for a single file.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed a bug where boolean and non-string values in pyproject.toml crashes pyodide CLI
+  when loading config values
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
+  [#382](https://github.com/pyodide/pyodide-build/pull/382)
+
+- Fixed build constraints not being applied when using `uv` as the installer by
+  setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
+  [#389](https://github.com/pyodide/pyodide-build/pull/389)
+
+## [0.35.1] - 2026/06/13
+
+### Fixed
+
+- Fixed an include path issue on macOS when homebrew Python is installed:
+  if `sys.prefix` contains a symlink (as is the case with homebrew), resolve it
+  so that host include paths are still replaced by the cross-compile ones
+  [#375](https://github.com/pyodide/pyodide-build/pull/375)
+
+## [0.35.0] - 2026/06/09
 
 ### Added
 
@@ -15,9 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [#349](https://github.com/pyodide/pyodide-build/pull/349)
 
 - `pyodide xbuildenv search` and `pyodide xbuildenv install` now support `--nightly`
-  and `--debug` flags to search and install nightly and nightly-debug cross-build
-  environments respectively.
-  [#350](https://github.com/pyodide/pyodide-build/pull/350)
+  and `--debug` flags to search and install stable-debug, nightly, and nightly-debug
+  cross-build environments respectively.
+  [#350](https://github.com/pyodide/pyodide-build/pull/350), [#354](https://github.com/pyodide/pyodide-build/pull/371)
 
 - `pyodide build` now accepts `-v`/`--verbose` flags (stackable twice up to `-vv`)
   to increase build verbosity. At `-v`, installer commands and
