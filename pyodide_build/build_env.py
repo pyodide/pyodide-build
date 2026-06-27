@@ -241,17 +241,21 @@ def get_unisolated_packages() -> dict[str, str]:
     if in_xbuildenv():
         unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
 
-        if unisolated_packages_file.exists():
-            for line in unisolated_packages_file.read_text().splitlines():
-                line = line.strip()
-                # The xbuildenv requirements.txt is machine-generated and always
-                # uses pinned name==version entries, but we skip blank lines,
-                # comments, and any non-pinned specs just in case. Shouldn't
-                # really happen though.
-                if not line or line.startswith("#") or "==" not in line:
-                    continue
-                name, version = line.split("==", 1)
-                unisolated_packages[name] = version
+        if not unisolated_packages_file.exists():
+            raise FileNotFoundError(
+                f"Expected {unisolated_packages_file} to exist in the xbuildenv. "
+                "The xbuildenv archive may be corrupt or from an incompatible version."
+            )
+        for line in unisolated_packages_file.read_text().splitlines():
+            line = line.strip()
+            # The xbuildenv requirements.txt is machine-generated and always
+            # uses pinned name==version entries, but we skip blank lines,
+            # comments, and any non-pinned specs just in case. Shouldn't
+            # really happen though.
+            if not line or line.startswith("#") or "==" not in line:
+                continue
+            name, version = line.split("==", 1)
+            unisolated_packages[name] = version
     else:
         from pyodide_build.recipe.loader import load_all_recipes
 

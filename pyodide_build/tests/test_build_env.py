@@ -80,7 +80,8 @@ class TestOutOfTree(TestInTree):
         requirements_file = manager.pyodide_root / ".." / "requirements.txt"
         requirements_file.unlink()
 
-        assert build_env.get_unisolated_packages() == {}
+        with pytest.raises(FileNotFoundError, match="Expected .* to exist"):
+            build_env.get_unisolated_packages()
 
     def test_get_cross_build_files_dir(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
