@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.36.0] - 2026/MM/DD
 
 ### Fixed
 
@@ -50,6 +50,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
   [#389](https://github.com/pyodide/pyodide-build/pull/389)
 
+### Changed
+
+- Fixed build-time scripts of unisolated packages (like `f2py` and
+  `numpy-config` from NumPy) not being available on `PATH` during builds.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
+- `oldest-supported-numpy` is now explicitly rejected when encountered as a
+  build-time dependency. It is deprecated since NumPy 2.0, and packages that
+  still list it should migrate to a direct `numpy` dependency.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed
@@ -78,17 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backend hook invocations are shown. At `-vv`, the package installers (`uv`/`pip`)
   additionally receive a `-v` flag for detailed package resolution output.
   [#363](https://github.com/pyodide/pyodide-build/pull/363)
-
-### Changed
-
-- Fixed build-time scripts of unisolated packages (like `f2py` and
-  `numpy-config` from NumPy) not being available on `PATH` during builds.
-  [#21](https://github.com/pyodide/pyodide-build/pull/21)
-
-- `oldest-supported-numpy` is now explicitly rejected when encountered as a
-  build-time dependency. It is deprecated since NumPy 2.0, and packages that
-  still list it should migrate to a direct `numpy` dependency.
-  [#21](https://github.com/pyodide/pyodide-build/pull/21)
 
 ## [0.34.4] - 2026/05/15
 
