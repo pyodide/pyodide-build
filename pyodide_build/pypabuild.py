@@ -18,10 +18,10 @@ from packaging.utils import canonicalize_name
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_cross_build_files_dir,
     get_current_xbuildenv_manager,
     get_host_build_flag,
     get_pyversion,
-    get_unisolated_files,
     get_unisolated_packages,
     in_xbuildenv,
     platform,
@@ -178,7 +178,7 @@ def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
     _, _, purelib = _find_executable_and_scripts(venv_path)
     sitepackagesdir = Path(purelib)
     for name in unisolated:
-        package_dir = get_unisolated_files(name)
+        package_dir = get_cross_build_files_dir(name)
         if not package_dir.is_dir():
             continue
         shutil.copytree(package_dir, sitepackagesdir / name, dirs_exist_ok=True)

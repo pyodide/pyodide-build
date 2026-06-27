@@ -209,7 +209,9 @@ def test_install_cross_build_files(tmp_path, monkeypatch):
         "_find_executable_and_scripts",
         lambda venv_path: ("python", "scripts", str(purelib)),
     )
-    monkeypatch.setattr(pypabuild, "get_unisolated_files", lambda name: extras / name)
+    monkeypatch.setattr(
+        pypabuild, "get_cross_build_files_dir", lambda name: extras / name
+    )
 
     pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"numpy", "scipy"})
 
@@ -233,7 +235,7 @@ def test_install_cross_build_files_skips_packages_without_cross_build_files(
     # cffi has no cross-build files, so its directory does not exist
     monkeypatch.setattr(
         pypabuild,
-        "get_unisolated_files",
+        "get_cross_build_files_dir",
         lambda name: tmp_path / "does-not-exist" / name,
     )
 
@@ -249,7 +251,7 @@ def test_install_cross_build_files_skips_when_no_unisolated_packages(
         raise AssertionError("should not be called when there are no unisolated reqs")
 
     monkeypatch.setattr(pypabuild, "_find_executable_and_scripts", _unexpected_call)
-    monkeypatch.setattr(pypabuild, "get_unisolated_files", _unexpected_call)
+    monkeypatch.setattr(pypabuild, "get_cross_build_files_dir", _unexpected_call)
 
     pypabuild._install_cross_build_files(str(tmp_path / "venv"), set())
 

@@ -82,7 +82,9 @@ class TestOutOfTree(TestInTree):
 
         assert build_env.get_unisolated_packages() == {}
 
-    def test_get_unisolated_files(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+    def test_get_cross_build_files_dir(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
         site_packages_extras = manager.pyodide_root / ".." / "site-packages-extras"
 

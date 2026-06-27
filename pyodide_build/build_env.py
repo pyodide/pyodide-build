@@ -264,7 +264,7 @@ def get_unisolated_packages() -> dict[str, str]:
     return unisolated_packages
 
 
-def get_unisolated_files(package_name: str) -> Path:
+def get_cross_build_files_dir(package_name: str) -> Path:
     """
     Get the directory containing an unisolated package's cross-build files
     (such as headers, .a libs, .pxd files, and so on).
