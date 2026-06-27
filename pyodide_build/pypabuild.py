@@ -142,6 +142,12 @@ def _replace_unisolated_packages(
     unisolated: set[str] = set()
     for reqstr in reqs:
         req = Requirement(reqstr)
+        if canonicalize_name(req.name) == "oldest-supported-numpy":
+            raise ValueError(
+                f"Build dependency '{reqstr}' is not supported. "
+                "oldest-supported-numpy is deprecated since NumPy 2.0. "
+                "Use a direct 'numpy' dependency instead."
+            )
         match = canonical_unisolated.get(canonicalize_name(req.name))
         if match is None:
             continue
