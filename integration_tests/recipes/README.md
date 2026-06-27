@@ -11,6 +11,7 @@ This directory contains a few curated recipes to test the build process of pyodi
 - `pydoc_data`: Unvendored cpython module
 - `boost-histogram``: Tests scikit-build-core and cmake build system.
 - `colorama`: Uses prebuilt wheel as source to check test file unvendoring capabilities.
+- `numpy-scripts-example`: Tests that unisolated package scripts (say, `f2py` or `numpy-config` from NumPy as a build dependency) are available on PATH during builds.
 
 ### For maintainers
 

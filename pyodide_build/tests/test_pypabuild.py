@@ -30,7 +30,51 @@ def test_remove_avoided_requirements():
     ) == {"baz"}
 
 
-def test_install_reqs(tmp_path, dummy_xbuildenv):
+def test_replace_unisolated_packages():
+    requires = {"foo", "bar<1.0", "baz==1.0", "qux"}
+    unisolated = {
+        "foo": "2.0",
+        "bar": "0.5",
+        "baz": "1.0",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"foo==2.0", "bar==0.5", "baz==1.0", "qux"}
+    assert replaced == {"foo", "bar", "baz"}
+
+
+def test_replace_unisolated_packages_normalizes_names():
+    requires = {"NumPy>=1.20", "Ruamel-YAML"}
+    unisolated = {
+        "numpy": "2.0.3",
+        "ruamel.yaml": "0.18.6",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"numpy==2.0.3", "ruamel.yaml==0.18.6"}
+    assert replaced == {"numpy", "ruamel.yaml"}
+
+
+def test_replace_unisolated_packages_version_mismatch():
+    requires = {"baz==1.0"}
+    unisolated = {
+        "baz": "1.1",
+    }
+
+    with pytest.warns(UserWarning, match=r"cross-build version is baz==1\.1"):
+        new_requires, replaced = pypabuild._replace_unisolated_packages(
+            requires, unisolated
+        )
+    assert new_requires == {"baz==1.1"}
+    assert replaced == {"baz"}
+
+
+def test_install_reqs(tmp_path, dummy_xbuildenv, monkeypatch):
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
     env = MockIsolatedEnv(tmp_path)
 
     reqs = {"foo", "bar", "baz"}
@@ -110,28 +154,103 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "exports" in wasmcross_args
 
 
-def test_symlink_unisolated_packages_triggers_lazy_install(
-    tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
-):
+def test_install_reqs_triggers_lazy_install(tmp_path, monkeypatch):
     called = {"count": 0}
 
-    def _ensure(self):
-        called["count"] += 1
+    class DummyManager:
+        def ensure_cross_build_packages_installed(self):
+            called["count"] += 1
 
-    monkeypatch.setattr(
-        "pyodide_build.xbuildenv.CrossBuildEnvManager.ensure_cross_build_packages_installed",
-        _ensure,
-    )
-    monkeypatch.setattr(
-        "pyodide_build.build_env.get_unisolated_packages",
-        lambda: ["numpy"],
-    )
+    monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: True)
+    monkeypatch.setattr(pypabuild, "get_current_xbuildenv_manager", DummyManager)
+    monkeypatch.setattr(pypabuild, "get_unisolated_packages", lambda: {"numpy": "1.0"})
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
 
-    class DummyEnv:
-        path = str(tmp_path / "venv")
+    env = MockIsolatedEnv(tmp_path)
+    pypabuild.install_reqs({}, env, {"numpy>=1.0"})
 
-    pypabuild.symlink_unisolated_packages(DummyEnv(), reqs={"numpy>=1.0"})
     assert called["count"] == 1
+
+
+def test_install_reqs_skips_lazy_install_when_not_unisolated(tmp_path, monkeypatch):
+    called = {"count": 0}
+
+    class DummyManager:
+        def ensure_cross_build_packages_installed(self):
+            called["count"] += 1
+
+    monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: True)
+    monkeypatch.setattr(pypabuild, "get_current_xbuildenv_manager", DummyManager)
+    monkeypatch.setattr(pypabuild, "get_unisolated_packages", lambda: {"numpy": "1.0"})
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
+
+    env = MockIsolatedEnv(tmp_path)
+    pypabuild.install_reqs({}, env, {"foo>=1.0"})
+
+    assert called["count"] == 0
+
+
+def test_install_cross_build_files(tmp_path, monkeypatch):
+    purelib = tmp_path / "venv" / "lib" / "site-packages"
+    purelib.mkdir(parents=True)
+
+    extras = tmp_path / "site-packages-extras"
+    numpy_header = extras / "numpy" / "_core" / "include" / "numpy" / "ndarrayobject.h"
+    numpy_header.parent.mkdir(parents=True)
+    numpy_header.write_text("// header")
+    scipy_pxd = extras / "scipy" / "linalg" / "cython_blas.pxd"
+    scipy_pxd.parent.mkdir(parents=True)
+    scipy_pxd.write_text("# pxd")
+
+    monkeypatch.setattr(
+        pypabuild,
+        "_find_executable_and_scripts",
+        lambda venv_path: ("python", "scripts", str(purelib)),
+    )
+    monkeypatch.setattr(
+        pypabuild, "get_cross_build_files_dir", lambda name: extras / name
+    )
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"numpy", "scipy"})
+
+    assert (
+        purelib / "numpy" / "_core" / "include" / "numpy" / "ndarrayobject.h"
+    ).read_text() == "// header"
+    assert (purelib / "scipy" / "linalg" / "cython_blas.pxd").read_text() == "# pxd"
+
+
+def test_install_cross_build_files_skips_packages_without_cross_build_files(
+    tmp_path, monkeypatch
+):
+    purelib = tmp_path / "venv" / "lib" / "site-packages"
+    purelib.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        pypabuild,
+        "_find_executable_and_scripts",
+        lambda venv_path: ("python", "scripts", str(purelib)),
+    )
+    monkeypatch.setattr(
+        pypabuild,
+        "get_cross_build_files_dir",
+        lambda name: tmp_path / "does-not-exist" / name,
+    )
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"some-package"})
+
+    assert list(purelib.iterdir()) == []
+
+
+def test_install_cross_build_files_skips_when_no_unisolated_packages(
+    tmp_path, monkeypatch
+):
+    def _unexpected_call(*args, **kwargs):
+        raise AssertionError("should not be called when there are no unisolated reqs")
+
+    monkeypatch.setattr(pypabuild, "_find_executable_and_scripts", _unexpected_call)
+    monkeypatch.setattr(pypabuild, "get_cross_build_files_dir", _unexpected_call)
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), set())
 
 
 def _make_cpe(

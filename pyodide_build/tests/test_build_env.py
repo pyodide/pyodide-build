@@ -59,6 +59,53 @@ class TestOutOfTree(TestInTree):
     def test_in_xbuildenv(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         assert build_env.in_xbuildenv()
 
+    def test_get_unisolated_packages(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        requirements_file = manager.pyodide_root / ".." / "requirements.txt"
+
+        expected = {}
+        for line in requirements_file.read_text().splitlines():
+            name, version = line.strip().split("==", 1)
+            expected[name] = version
+
+        assert expected
+        assert build_env.get_unisolated_packages() == expected
+
+    def test_get_unisolated_packages_no_requirements_file(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        requirements_file = manager.pyodide_root / ".." / "requirements.txt"
+        requirements_file.unlink()
+
+        with pytest.raises(FileNotFoundError, match="Expected .* to exist"):
+            build_env.get_unisolated_packages()
+
+    def test_get_cross_build_files_dir(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        site_packages_extras = manager.pyodide_root / ".." / "site-packages-extras"
+
+        # Check every package that actually has a directory in site-packages-extras
+        found_any = False
+        for subdir in site_packages_extras.iterdir():
+            if not subdir.is_dir():
+                continue
+            found_any = True
+            package_dir = build_env.get_cross_build_files_dir(subdir.name)
+            assert package_dir == subdir
+            assert any(package_dir.rglob("*"))
+        assert found_any
+
+    def test_get_cross_build_files_dir_missing_package(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache
+    ):
+        package_dir = build_env.get_cross_build_files_dir("no-such-package")
+        assert not package_dir.exists()
+
     def test_get_build_environment_vars(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
     ):
@@ -66,7 +113,7 @@ class TestOutOfTree(TestInTree):
         build_vars = build_env.get_build_environment_vars(manager.pyodide_root)
 
         # extra variables that does not come from config files.
-        extra_vars = {"PYODIDE", "PYODIDE_PACKAGE_ABI", "PYTHONPATH"}
+        extra_vars = {"PYODIDE", "PYODIDE_PACKAGE_ABI"}
 
         all_keys = set(BUILD_KEY_TO_VAR.values()) | extra_vars
         for var in build_vars:
