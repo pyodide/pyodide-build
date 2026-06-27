@@ -143,19 +143,20 @@ def _replace_unisolated_packages(
     for reqstr in reqs:
         req = Requirement(reqstr)
         match = canonical_unisolated.get(canonicalize_name(req.name))
-        if match is not None:
-            name, version = match
-            # TODO: find a better way to handle this case
-            if not req.specifier.contains(version):
-                warnings.warn(
-                    f"Found build dependency {req} but the only supported "
-                    f"cross-build version is {name}=={version}; "
-                    f"using {name}=={version} instead.",
-                    stacklevel=2,
-                )
-            new_reqs.discard(reqstr)
-            new_reqs.add(f"{name}=={version}")
-            unisolated.add(name)
+        if match is None:
+            continue
+        name, version = match
+        # TODO: find a better way to handle this case
+        if not req.specifier.contains(version):
+            warnings.warn(
+                f"Found build dependency {req} but the only supported "
+                f"cross-build version is {name}=={version}; "
+                f"using {name}=={version} instead.",
+                stacklevel=2,
+            )
+        new_reqs.discard(reqstr)
+        new_reqs.add(f"{name}=={version}")
+        unisolated.add(name)
     return new_reqs, unisolated
 
 
