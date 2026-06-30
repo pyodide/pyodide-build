@@ -150,6 +150,40 @@ def test_check_executables(tmp_path, monkeypatch):
         builder._check_executables()
 
 
+def test_ensure_cross_build_packages_for_host_requirements(tmp_path, monkeypatch):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_1",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+    )
+    assert builder.recipe.requirements.host == ["pkg_1_1", "pkg_3", "libtest_shared"]
+
+    called = {"count": 0}
+
+    class DummyManager:
+        def ensure_cross_build_packages_installed(self) -> None:
+            called["count"] += 1
+
+    monkeypatch.setattr(_builder, "in_xbuildenv", lambda: True)
+    monkeypatch.setattr(_builder, "get_current_xbuildenv_manager", DummyManager)
+
+    # one of the host requirements is an unisolated package, so the install is triggered
+    monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: ["pkg_3"])
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert called["count"] == 1
+
+    # none of the host requirements are unisolated packages, so nothing should happen
+    monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: ["numpy"])
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert called["count"] == 1
+
+    # outside of an xbuildenv, the install is never triggered
+    monkeypatch.setattr(_builder, "in_xbuildenv", lambda: False)
+    monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: ["pkg_3"])
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert called["count"] == 1
+
+
 def test_get_helper_vars(tmp_path):
     builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "pkg_1",

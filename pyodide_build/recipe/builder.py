@@ -26,9 +26,12 @@ from pyodide_build.build_env import (
     _create_constraints_file,
     get_build_environment_vars,
     get_build_flag,
+    get_current_xbuildenv_manager,
     get_pyodide_root,
     get_pyversion_major,
     get_pyversion_minor,
+    get_unisolated_packages,
+    in_xbuildenv,
     pyodide_tags,
     replace_so_abi_tags,
     wheel_platform,
@@ -309,11 +312,35 @@ class RecipeBuilder:
             self._prepare_source()
             self._patch()
 
+        self._ensure_cross_build_packages_for_host_requirements()
+
         with (
             chdir(self.pkg_root),
             get_bash_runner(self._get_helper_vars() | os.environ.copy()) as bash_runner,
         ):
             self._build_package(bash_runner)
+
+    # Some packages such as RobotRaconteur and opencv-python reach into
+    # $HOSTINSTALLDIR/host site-packages directly from their build scripts
+    # which run before the isolated build environment is set up. The lazy
+    # install normally triggered from there would be too late for them, so
+    # we trigger it here instead, based on the package's declared host
+    # requirements. See https://github.com/pyodide/pyodide-build/issues/365
+    # for reference.
+    def _ensure_cross_build_packages_for_host_requirements(self) -> None:
+        """
+        Make sure cross-build packages (numpy, scipy, etc.) are installed into
+        the host site-packages before the build starts, if this package's host
+        requirements need them.
+        """
+        if not in_xbuildenv():
+            return
+
+        unisolated_packages = set(get_unisolated_packages())
+        host_requirements = {req.lower() for req in self.recipe.requirements.host}
+
+        if unisolated_packages & host_requirements:
+            get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
 
     def _check_executables(self) -> None:
         """
