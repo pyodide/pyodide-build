@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.36.0] - 2026/MM/DD
 
 ### Fixed
 
@@ -49,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed build constraints not being applied when using `uv` as the installer by
   setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
   [#389](https://github.com/pyodide/pyodide-build/pull/389)
+
+### Changed
+
+- Fixed build-time scripts of unisolated packages (like `f2py` and
+  `numpy-config` from NumPy) not being available on `PATH` during builds.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
 
 ## [0.35.1] - 2026/06/13
 
@@ -222,12 +228,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `pyodide clean recipes`, a CLI command that deletes build files for chosen packages or tags.
-[#254](https://github.com/pyodide/pyodide-build/pull/254)
+  [#254](https://github.com/pyodide/pyodide-build/pull/254)
 
 ## [0.30.8] - 2025/10/22
 
 - `pyodide config` now exposes `dist_dir` variable.
-[#236](https://github.com/pyodide/pyodide-build/pull/236)
+  [#236](https://github.com/pyodide/pyodide-build/pull/236)
 
 - The CMake toolchain file for Pyodide now sets `CMAKE_SHARED_LINKER_FLAGS_INIT` and `CMAKE_MODULE_LINKER_FLAGS_INIT` and
   unset `CMAKE_SHARED_LINKER_FLAGS` to avoid conflicts with the user's settings.

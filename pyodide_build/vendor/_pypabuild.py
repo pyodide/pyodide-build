@@ -1,30 +1,14 @@
 # This file contains private functions taken from pypa/build.
-
-# Copyright © 2019 Filipe Laíns <filipe.lains@gmail.com>
-
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice (including the next
-# paragraph) shall be included in all copies or substantial portions of the
-# Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
+# See license at LICENSE next to this file and as defined in
+# pyproject.toml. For built distributions of pyodide-build,
+# you may obtain a copy of the license in the
+# .dist-info/licenses directory.
 import contextlib
 import contextvars
 import os
 import subprocess
 import sys
+import sysconfig
 import traceback
 import warnings
 from collections.abc import Callable, Iterator
@@ -151,3 +135,52 @@ def _handle_build_error() -> Iterator[None]:
             _log_subprocess_output(cpe)
 
         _error(str(e))
+
+
+# Vendored from pypa/build v1.5.0. See source at:
+# https://github.com/pypa/build/blob/615d04cfc52ac3c1592a463f0afe484fee1cc368/src/build/env.py#L461-L501
+def _find_executable_and_scripts(path: str) -> tuple[str, str, str]:
+    """
+    Detect the Python executable and script folder of a virtual environment.
+
+    :param path: The location of the virtual environment
+    :return: The Python executable, script folder, and purelib folder
+    """
+    config_vars = (
+        sysconfig.get_config_vars().copy()
+    )  # globally cached, copy before altering it
+    config_vars["base"] = path
+    scheme_names = sysconfig.get_scheme_names()
+    if "venv" in scheme_names:
+        # Python distributors with custom default installation scheme can set a
+        # scheme that can't be used to expand the paths in a venv.
+        # This can happen if build itself is not installed in a venv.
+        # The distributors are encouraged to set a "venv" scheme to be used for this.
+        # See https://bugs.python.org/issue45413
+        # and https://github.com/pypa/virtualenv/issues/2208
+        paths = sysconfig.get_paths(scheme="venv", vars=config_vars)  # pragma: no cover
+    elif "posix_local" in scheme_names:
+        # The Python that ships on Debian/Ubuntu varies the default scheme to
+        # install to /usr/local
+        # But it does not (yet) set the "venv" scheme.
+        # If we're the Debian "posix_local" scheme is available, but "venv"
+        # is not, we use "posix_prefix" instead which is venv-compatible there.
+        paths = sysconfig.get_paths(scheme="posix_prefix", vars=config_vars)
+    elif "osx_framework_library" in scheme_names:
+        # The Python that ships with the macOS developer tools varies the
+        # default scheme depending on whether the ``sys.prefix`` is part of a framework.
+        # But it does not (yet) set the "venv" scheme.
+        # If the Apple-custom "osx_framework_library" scheme is available but "venv"
+        # is not, we use "posix_prefix" instead which is venv-compatible there.
+        paths = sysconfig.get_paths(scheme="posix_prefix", vars=config_vars)
+    else:
+        paths = sysconfig.get_paths(vars=config_vars)
+
+    executable = os.path.join(
+        paths["scripts"], "python.exe" if os.name == "nt" else "python"
+    )
+    if not os.path.exists(executable):
+        msg = f"Virtual environment creation failed, executable {executable} missing"
+        raise RuntimeError(msg)
+
+    return executable, paths["scripts"], paths["purelib"]
