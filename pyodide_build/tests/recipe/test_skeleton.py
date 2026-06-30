@@ -3,6 +3,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
+from typing import Any
 
 import pytest
 from packaging import version
@@ -10,9 +11,11 @@ from packaging import version
 from pyodide_build.recipe import skeleton
 from pyodide_build.recipe.skeleton import (
     MetadataDict,
+    MkpkgFailedException,
     URLDict,
     _find_dist,
     _make_predictable_url,
+    update_package,
 )
 from pyodide_build.recipe.spec import MetaConfig
 
@@ -262,13 +265,13 @@ def test_mkpkg_update_pinned(tmpdir):
             "example-1.0.0-1-py3-none-any.whl",
             "https://files.pythonhosted.org/packages/py3/e/example/example-1.0.0-1-py3-none-any.whl",
         ),
-        # test package with a dash in the name
+        # test package with a dash in the name (real filename has dash, not underscore)
         (
             "scikit-learn",
             "1.6.1",
             "sdist",
             "scikit-learn-1.6.1.tar.gz",
-            "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit_learn-1.6.1.tar.gz",
+            "https://files.pythonhosted.org/packages/source/s/scikit_learn/scikit-learn-1.6.1.tar.gz",
         ),
         # test universal wheel with py2.py3 tags
         (
@@ -414,3 +417,262 @@ def test_find_dist_falls_back_to_original_url(monkeypatch):
     result = _find_dist(mock_metadata, ["wheel"])
 
     assert result["url"] == original_url
+
+
+# ---------------------------------------------------------------------------
+# Bug 1 tests: update_package format-fallback control flow
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_metadata(
+    name: str,
+    version_str: str,
+    has_sdist: bool = True,
+    has_wheel: bool = True,
+) -> MetadataDict:
+    """Build minimal PyPI metadata with the requested distribution types."""
+    urls: list[Any] = []
+    if has_sdist:
+        urls.append(
+            URLDict(
+                comment_text="",
+                digests={"sha256": f"sdist-sha256-{version_str}"},
+                downloads=0,
+                filename=f"{name}-{version_str}.tar.gz",
+                has_sig=False,
+                md5_digest="",
+                packagetype="sdist",
+                python_version="source",
+                requires_python="",
+                size=0,
+                upload_time="",
+                upload_time_iso_8601="",
+                url=f"https://files.pythonhosted.org/packages/source/f/{name}/{name}-{version_str}.tar.gz",
+                yanked=False,
+                yanked_reason=None,
+            )
+        )
+    if has_wheel:
+        urls.append(
+            URLDict(
+                comment_text="",
+                digests={"sha256": f"wheel-sha256-{version_str}"},
+                downloads=0,
+                filename=f"{name}-{version_str}-py3-none-any.whl",
+                has_sig=False,
+                md5_digest="",
+                packagetype="bdist_wheel",
+                python_version="py3",
+                requires_python="",
+                size=0,
+                upload_time="",
+                upload_time_iso_8601="",
+                url=f"https://files.pythonhosted.org/packages/py3/f/{name}/{name}-{version_str}-py3-none-any.whl",
+                yanked=False,
+                yanked_reason=None,
+            )
+        )
+    return MetadataDict(
+        info={
+            "name": name,
+            "version": version_str,
+            "home_page": "",
+            "summary": "",
+            "license": "",
+            "package_url": f"https://pypi.org/project/{name}/",
+        },
+        last_serial=0,
+        releases={},
+        urls=urls,
+        vulnerabilities=[],
+    )
+
+
+def _write_recipe(base_dir: Path, name: str, ver: str, url: str, sha256: str) -> Path:
+    """Write a minimal meta.yaml for the given package."""
+    db = MetaConfig(
+        package={"name": name, "version": ver},
+        source={"sha256": sha256, "url": url},
+        test={"imports": [name]},
+    )
+    pkg_dir = base_dir / name
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    meta_path = pkg_dir / "meta.yaml"
+    db.to_yaml(meta_path)
+    return meta_path
+
+
+def test_update_package_sdist_falls_back_to_wheel(tmp_path, monkeypatch):
+    """When the new release has no sdist, update_package should fall back to wheel."""
+    name = "fakepkg"
+    old_ver = "1.0.0"
+    new_ver = "2.0.0"
+
+    # Existing recipe uses sdist
+    meta_path = _write_recipe(
+        tmp_path,
+        name,
+        old_ver,
+        f"https://example.com/{name}-{old_ver}.tar.gz",
+        "old-sdist-sha256",
+    )
+
+    # New release only has a wheel, not an sdist
+    new_metadata = _make_mock_metadata(name, new_ver, has_sdist=False, has_wheel=True)
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata", lambda *_: new_metadata
+    )
+    # Skip the prettier call to avoid needing npx
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    # Should NOT raise even though there's no sdist for the new version
+    update_package(tmp_path, name)
+
+    db = MetaConfig.from_yaml(meta_path)
+    assert db.package.version == new_ver
+    # Should have fallen back to wheel
+    assert db.source.url is not None
+    assert db.source.url.endswith(".whl")
+
+
+def test_update_package_wheel_falls_back_to_sdist(tmp_path, monkeypatch):
+    """When the new release has no wheel, update_package should fall back to sdist."""
+    name = "fakepkg"
+    old_ver = "1.0.0"
+    new_ver = "2.0.0"
+
+    # Existing recipe uses wheel
+    meta_path = _write_recipe(
+        tmp_path,
+        name,
+        old_ver,
+        f"https://example.com/{name}-{old_ver}-py3-none-any.whl",
+        "old-wheel-sha256",
+    )
+
+    # New release only has an sdist, not a wheel
+    new_metadata = _make_mock_metadata(name, new_ver, has_sdist=True, has_wheel=False)
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata", lambda *_: new_metadata
+    )
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    update_package(tmp_path, name)
+
+    db = MetaConfig.from_yaml(meta_path)
+    assert db.package.version == new_ver
+    # Should have fallen back to sdist
+    assert db.source.url is not None
+    assert db.source.url.endswith(".tar.gz")
+
+
+def test_update_package_explicit_source_fmt_is_strict(tmp_path, monkeypatch):
+    """When source_fmt is explicitly given, it must be respected with no fallback."""
+    name = "fakepkg"
+    old_ver = "1.0.0"
+    new_ver = "2.0.0"
+
+    # Existing recipe uses sdist
+    _write_recipe(
+        tmp_path,
+        name,
+        old_ver,
+        f"https://example.com/{name}-{old_ver}.tar.gz",
+        "old-sdist-sha256",
+    )
+
+    # New release only has a wheel, not an sdist
+    new_metadata = _make_mock_metadata(name, new_ver, has_sdist=False, has_wheel=True)
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata", lambda *_: new_metadata
+    )
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    # Explicitly requesting "sdist" must raise, not fall back to wheel
+    with pytest.raises(MkpkgFailedException, match="sdist"):
+        update_package(tmp_path, name, source_fmt="sdist")
+
+
+# ---------------------------------------------------------------------------
+# Bug 2 tests: _make_predictable_url uses actual filename for sdists
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "package,ver,filename,expected_url",
+    [
+        # Standard .tar.gz — filename must be preserved as-is
+        (
+            "numpy",
+            "2.0.0",
+            "numpy-2.0.0.tar.gz",
+            "https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.0.0.tar.gz",
+        ),
+        # .zip sdist — must NOT be silently rewritten to .tar.gz
+        (
+            "myzip",
+            "1.0.0",
+            "myzip-1.0.0.zip",
+            "https://files.pythonhosted.org/packages/source/m/myzip/myzip-1.0.0.zip",
+        ),
+        # Non-normalized name (dots instead of underscores, as in ruamel.yaml)
+        (
+            "ruamel.yaml",
+            "0.18.6",
+            "ruamel.yaml-0.18.6.tar.gz",
+            "https://files.pythonhosted.org/packages/source/r/ruamel_yaml/ruamel.yaml-0.18.6.tar.gz",
+        ),
+    ],
+    ids=["standard-tar-gz", "zip-sdist", "non-normalized-name"],
+)
+def test_make_predictable_url_sdist_uses_real_filename(
+    package, ver, filename, expected_url
+):
+    """Predictable URL for sdists must be built from the actual filename."""
+    result = _make_predictable_url(package, ver, "sdist", filename)
+    assert result == expected_url
+
+
+def test_find_dist_sdist_zip_url_correct(monkeypatch):
+    """_find_dist must produce a correct URL when the sdist is a .zip file."""
+    package = "myzip"
+    ver = "1.0.0"
+    filename = "myzip-1.0.0.zip"
+    original_url = f"https://files.pythonhosted.org/packages/ab/cd/{filename}"
+
+    mock_metadata = MetadataDict(
+        info={"name": package, "version": ver, "package_url": ""},
+        urls=[],
+        releases={},
+        last_serial=0,
+        vulnerabilities=[],
+    )
+    mock_entry = URLDict(
+        comment_text="",
+        digests={"sha256": "fakehash"},
+        downloads=0,
+        filename=filename,
+        has_sig=False,
+        md5_digest="",
+        packagetype="sdist",
+        python_version="source",
+        requires_python="",
+        size=0,
+        upload_time="",
+        upload_time_iso_8601="",
+        url=original_url,
+        yanked=False,
+        yanked_reason=None,
+    )
+
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._find_sdist", lambda _: mock_entry
+    )
+
+    result = _find_dist(mock_metadata, ["sdist"])
+
+    # URL must end with .zip, not .tar.gz
+    assert result["url"].endswith(".zip"), result["url"]
+    assert result["url"] == (
+        "https://files.pythonhosted.org/packages/source/m/myzip/myzip-1.0.0.zip"
+    )

@@ -50,6 +50,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
   [#389](https://github.com/pyodide/pyodide-build/pull/389)
 
+### Fixed
+
+- Fixed a dead-code control flow in `pyodide skeleton pypi` where a package
+  whose new release ships only wheels (while the recipe used an sdist) would
+  raise an exception rather than updating to the wheel.
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
+- `skeleton`: fixed incorrect predictable URLs sdists for `.zip`-style sdists
+  and packages with non-normalised names (such as `ruamel.yaml`).
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
 ### Changed
 
 - Fixed build-time scripts of unisolated packages (like `f2py` and
