@@ -8,8 +8,11 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from click.testing import CliRunner
 
+from pyodide_build.cli import venv as venv_cli
 from pyodide_build.out_of_tree import app_data, venv
+from pyodide_build.out_of_tree.venv import _pip_script_name
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 
 
@@ -386,3 +389,124 @@ def test_create_app_data_dir(tmp_path, clear_app_data_cache):
             if version_dir.is_dir()
         ), f"{filename} not found in any subdirectory of {py_info_base}"
         clear_app_data_cache(app_data_dir)
+
+
+def _make_mock_venv_create(tmp_path):
+    """Return a mock for create_pyodide_venv that records passed virtualenv_args."""
+    captured = {}
+
+    def mock_create(dest, virtualenv_args=None):
+        captured["args"] = virtualenv_args or []
+
+    return mock_create, captured
+
+
+@pytest.mark.parametrize(
+    "cli_args,expected_in_args,not_expected_in_args",
+    [
+        # --no-download must propagate (was silently ignored before the fix)
+        (["--no-download"], ["--no-download"], ["--download"]),
+        # --never-download is an alias for --no-download
+        (["--never-download"], ["--no-download"], ["--download"]),
+        # --download must still work
+        (["--download"], ["--download"], ["--no-download"]),
+        # Without either flag nothing is forwarded
+        ([], [], ["--no-download", "--download"]),
+    ],
+)
+def test_venv_cli_download_flags(
+    monkeypatch, tmp_path, cli_args, expected_in_args, not_expected_in_args
+):
+    """The download flags must be forwarded to virtualenv."""
+    mock_create, captured = _make_mock_venv_create(tmp_path)
+    monkeypatch.setattr("pyodide_build.cli.venv.venv.create_pyodide_venv", mock_create)
+    monkeypatch.setattr("pyodide_build.cli.venv.init_environment", lambda: None)
+
+    runner = CliRunner()
+    result = runner.invoke(venv_cli.main, [str(tmp_path / "venv")] + cli_args)
+    assert result.exit_code == 0, result.output
+
+    forwarded = captured.get("args", [])
+    for expected in expected_in_args:
+        assert expected in forwarded, (
+            f"Expected {expected!r} in forwarded args {forwarded!r} (cli: {cli_args!r})"
+        )
+    for not_expected in not_expected_in_args:
+        assert not_expected not in forwarded, (
+            f"Did not expect {not_expected!r} in forwarded args {forwarded!r} (cli: {cli_args!r})"
+        )
+
+
+@pytest.mark.parametrize(
+    "script_name,exe_suffix,expected_name",
+    [
+        # Unix: no suffix — versioned name must be preserved as-is
+        ("pip3.12", "", "pip3.12"),
+        ("pip3", "", "pip3"),
+        ("pip", "", "pip"),
+        # Windows: .exe executables are replaced with .bat
+        ("pip3.12.exe", ".bat", "pip3.12.bat"),
+        ("pip3.exe", ".bat", "pip3.bat"),
+        ("pip.exe", ".bat", "pip.bat"),
+        # Windows: already-.bat input is idempotent
+        ("pip3.12.bat", ".bat", "pip3.12.bat"),
+        ("pip3.bat", ".bat", "pip3.bat"),
+        ("pip.bat", ".bat", "pip.bat"),
+    ],
+)
+def test_pip_script_name_helper(tmp_path, script_name, exe_suffix, expected_name):
+    """``_pip_script_name`` must preserve versioned pip names like ``pip3.12``."""
+    result = _pip_script_name(tmp_path / script_name, exe_suffix)
+    assert result.name == expected_name
+
+
+def test_cleanup_skips_preexisting_directory(monkeypatch, tmp_path):
+    """A failed venv creation must not delete a pre-existing destination."""
+    dest = tmp_path / "existing-venv"
+    dest.mkdir()
+    sentinel = dest / "important-file.txt"
+    sentinel.write_text("do not delete me")
+
+    class FakeCreator:
+        def __init__(self):
+            self.dest = str(dest)
+
+    class FakeSession:
+        def __init__(self):
+            self.creator = FakeCreator()
+            self.interpreter = type(
+                "FakeInterpreter", (), {"version": "3.12.0 (fake)"}
+            )()
+
+        def run(self):
+            (dest / "bin").mkdir(exist_ok=True)
+
+    def fake_create_session(self):
+        return FakeSession()
+
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.UnixPyodideVenv._create_session",
+        fake_create_session,
+    )
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.check_host_python_version",
+        lambda session: None,
+    )
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.pyodide_dist_dir",
+        lambda: dest / "dist",
+    )
+    (dest / "dist").mkdir(exist_ok=True)
+    (dest / "dist" / "python").touch()
+
+    monkeypatch.setattr(
+        "pyodide_build.out_of_tree.venv.PyodideVenv.configure_virtualenv",
+        lambda self: (_ for _ in ()).throw(RuntimeError("simulated failure")),
+    )
+
+    pyodide_venv = venv.UnixPyodideVenv(dest)
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        pyodide_venv.create()
+
+    assert dest.exists()
+    assert sentinel.exists()
