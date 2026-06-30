@@ -50,9 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
   [#389](https://github.com/pyodide/pyodide-build/pull/389)
 
-- Fixed `pyodide venv --no-download` / `--never-download` being silently ignored,
-  versioned pip scripts (e.g. `pip3.12`) being renamed to `pip3`, and a failed
-  `pyodide venv` deleting a pre-existing destination directory.
+- Fixed a dead-code control flow in `pyodide skeleton pypi` where a package
+  whose new release ships only wheels (while the recipe used an sdist) would
+  raise an exception rather than updating to the wheel.
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
+- `skeleton`: fixed incorrect predictable URLs sdists for `.zip`-style sdists
+  and packages with non-normalised names (such as `ruamel.yaml`).
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
+- Fixed three bugs in `pyodide venv`: `pyodide venv --no-download` / `--never-download`
+  being silently ignored, versioned pip scripts (e.g., `pip3.12`) being renamed
+  to `pip3`, and a failed `pyodide venv` invocation deleting a pre-existing
+  destination directory.
   [#377](https://github.com/pyodide/pyodide-build/pull/377)
 
 ### Changed
