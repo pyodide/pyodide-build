@@ -142,6 +142,8 @@ def _replace_unisolated_packages(
     unisolated: set[str] = set()
     for reqstr in reqs:
         req = Requirement(reqstr)
+        # Evaluate the PEP 508 marker to see if the requirement
+        # is applicable in the current environment or not.
         if req.marker and not req.marker.evaluate():
             continue
         match = canonical_unisolated.get(canonicalize_name(req.name))
@@ -208,6 +210,8 @@ def remove_avoided_requirements(
     """
     for reqstr in list(requires):
         req = Requirement(reqstr)
+        # Evaluate the PEP 508 marker to see if the requirement
+        # is applicable in the current environment or not.
         if req.marker and not req.marker.evaluate():
             continue
         for avoid_name in set(avoided_requirements):
