@@ -73,6 +73,27 @@ def test_replace_unisolated_packages_version_mismatch():
     assert replaced == {"baz"}
 
 
+@pytest.mark.parametrize(
+    "reqstr",
+    [
+        "oldest-supported-numpy",
+        "oldest-supported-numpy>=2021.6.17",
+        "Oldest-Supported-NumPy",
+    ],
+)
+def test_replace_unisolated_packages_rejects_oldest_supported_numpy(reqstr):
+    with pytest.raises(ValueError, match="oldest-supported-numpy is deprecated"):
+        pypabuild._replace_unisolated_packages({reqstr}, {"numpy": "2.0.3"})
+
+
+def test_replace_unisolated_packages_oldest_supported_numpy_marker_not_applicable():
+    requires = {"oldest-supported-numpy; python_version<'3.0'"}
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(requires, {})
+    assert new_requires == requires
+    assert replaced == set()
+
+
 def test_install_reqs(tmp_path, dummy_xbuildenv, monkeypatch):
     monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
     env = MockIsolatedEnv(tmp_path)

@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `numpy-config` from NumPy) not being available on `PATH` during builds.
   [#21](https://github.com/pyodide/pyodide-build/pull/21)
 
+- `oldest-supported-numpy` is now explicitly rejected when encountered as a
+  build-time dependency. It is deprecated since NumPy 2.0, and packages that
+  still list it should migrate to a direct `numpy` dependency.
+  [#392](https://github.com/pyodide/pyodide-build/pull/392)
+
 ## [0.35.1] - 2026/06/13
 
 ### Fixed
