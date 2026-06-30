@@ -87,7 +87,8 @@ def dummy_xbuildenv(
 
     manager = CrossBuildEnvManager(default_xbuildenv_path())
     manager.install(
-        version=None, url=dummy_xbuildenv_url, skip_install_cross_build_packages=True
+        version=None,
+        url=dummy_xbuildenv_url,
     )
 
     cur_dir = os.getcwd()

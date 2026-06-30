@@ -9,10 +9,11 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Iterator
+from contextlib import chdir
 from datetime import datetime
 from email.message import Message
 from functools import cache
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, cast
 
 import requests
@@ -35,7 +36,6 @@ from pyodide_build.build_env import (
 from pyodide_build.common import (
     _environment_substitute_str,
     _get_sha256_checksum,
-    chdir,
     find_matching_wheel,
     make_zip_archive,
     modify_wheel,
@@ -70,6 +70,26 @@ except shutil.RegistryError:
     pass
 
 
+def _sanitize_filename(filename: str) -> str | None:
+    """
+    Return the safe basename of *filename*, or None if it is unusable.
+
+    Strips Unix and Windows path separators so that a server-supplied
+    Content-Disposition value like ``../../evil.tar.gz`` or
+    ``..\\..\\evil.tar.gz`` cannot escape the build directory.
+    """
+    # Strip Windows-style separators so PurePosixPath sees only the leaf.
+    name = filename.replace("\\", "/")
+    # Take only the final component (handles both absolute and relative paths).
+    name = PurePosixPath(name).name
+    # Also guard against Windows absolute paths on the last component.
+    name = PureWindowsPath(name).name
+    # Reject empty, dot, or dot-dot.
+    if not name or name in (".", ".."):
+        return None
+    return name
+
+
 def _extract_tarballname(url: str, headers: dict) -> str:
     tarballname = url.rsplit("/", 1)[-1]
 
@@ -79,7 +99,16 @@ def _extract_tarballname(url: str, headers: dict) -> str:
 
         filename = msg.get_filename()
         if filename is not None:
-            tarballname = filename
+            safe = _sanitize_filename(filename)
+            if safe is not None:
+                tarballname = safe
+            else:
+                logger.warning(
+                    "Ignoring unsafe Content-Disposition filename %r; "
+                    "falling back to URL-derived name %r",
+                    filename,
+                    tarballname,
+                )
 
     return tarballname
 
@@ -479,6 +508,7 @@ class RecipeBuilder:
             constraints_file = str(self._create_constraints_file())
             build_env["PIP_CONSTRAINT"] = constraints_file
             build_env["PIP_BUILD_CONSTRAINT"] = constraints_file
+            build_env["UV_BUILD_CONSTRAINT"] = constraints_file
 
             wheel_path = pypabuild.build(
                 self.src_extract_dir, self.src_dist_dir, build_env, config_settings

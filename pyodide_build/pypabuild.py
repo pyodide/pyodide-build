@@ -4,22 +4,23 @@ import shutil
 import subprocess as sp
 import sys
 import traceback
+import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from itertools import chain
 from pathlib import Path
 from typing import Literal, cast
 
 from build import BuildBackendException, ConfigSettingsType, ProjectBuilder
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_cross_build_files_dir,
     get_current_xbuildenv_manager,
     get_host_build_flag,
-    get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
     in_xbuildenv,
@@ -30,6 +31,7 @@ from pyodide_build.vendor._pypabuild import (
     _configure_build_verbosity,
     _DefaultIsolatedEnv,
     _error,
+    _find_executable_and_scripts,
     _handle_build_error,
     _styles,
 )
@@ -96,11 +98,11 @@ def _gen_runner(
     return _runner
 
 
-def symlink_unisolated_packages(
-    env: DefaultIsolatedEnv, reqs: set[str] | None = None
-) -> None:
-    from pyodide_build.build_env import get_build_flag, get_unisolated_packages
-
+def _copy_sysconfigdata_to_isolated_env(env: DefaultIsolatedEnv) -> None:
+    """
+    Copy the sysconfigdata module into the isolated build environment's
+    site-packages so that builds can pick up Pyodide's build configuration.
+    """
     pyversion = get_pyversion()
     site_packages_path = f"lib/{pyversion}/site-packages"
     env_site_packages = Path(env.path) / site_packages_path
@@ -112,29 +114,112 @@ def symlink_unisolated_packages(
 
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
-    host_site_packages = Path(get_hostsitepackages())
-    unisolated_packages = set(get_unisolated_packages())
 
-    required = {Requirement(req).name.lower() for req in (reqs or set())}
 
-    needs_cross_build_install = bool(unisolated_packages & required)
+def _replace_unisolated_packages(
+    reqs: set[str], unisolated_packages: dict[str, str]
+) -> tuple[set[str], set[str]]:
+    """
+    Replace unisolated packages with the correct version.
 
-    if in_xbuildenv() and needs_cross_build_install:
-        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+    Parameters
+    ----------
+    reqs
+        The set of requirements to filter.
+    unisolated_packages
+        The dictionary of unisolated packages [name: version].
 
-    for name in get_unisolated_packages():
-        for path in chain(
-            host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
-        ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
+    Returns
+    -------
+    A tuple of (the filtered set of requirements, the set of unisolated requirements)
+    """
+    canonical_unisolated = {
+        canonicalize_name(name): (name, version)
+        for name, version in unisolated_packages.items()
+    }
+
+    new_reqs = reqs.copy()
+    unisolated: set[str] = set()
+    for reqstr in reqs:
+        req = Requirement(reqstr)
+        # Evaluate the PEP 508 marker to see if the requirement
+        # is applicable in the current environment or not.
+        if req.marker and not req.marker.evaluate():
+            continue
+        if canonicalize_name(req.name) == "oldest-supported-numpy":
+            raise ValueError(
+                f"Build dependency '{reqstr}' is not supported. "
+                "oldest-supported-numpy is deprecated since NumPy 2.0. "
+                "Use a direct 'numpy' dependency instead."
+            )
+        match = canonical_unisolated.get(canonicalize_name(req.name))
+        if match is None:
+            continue
+        name, version = match
+        # TODO: find a better way to handle this case
+        if not req.specifier.contains(version):
+            warnings.warn(
+                f"Found build dependency {req} but the only supported "
+                f"cross-build version is {name}=={version}; "
+                f"using {name}=={version} instead.",
+                stacklevel=2,
+            )
+        new_reqs.discard(reqstr)
+        new_reqs.add(f"{name}=={version}")
+        unisolated.add(name)
+    return new_reqs, unisolated
+
+
+def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
+    """
+    Install the cross build files (headers, .a libs, .pxd files) to the
+    isolated environment's site packages.
+
+    Parameters
+    ----------
+    venv_path
+        The path to the isolated environment.
+
+    unisolated
+        The set of unisolated packages.
+    """
+    if not unisolated:
+        return
+    _, _, purelib = _find_executable_and_scripts(venv_path)
+    sitepackagesdir = Path(purelib)
+    for name in unisolated:
+        package_dir = get_cross_build_files_dir(name)
+        if not package_dir.is_dir():
+            # Not every unisolated package has cross-build files. The package
+            # may only need to be pinned to the cross-build version (for its
+            # console scripts, for instance) without any file overlay.
+            continue
+        shutil.copytree(package_dir, sitepackagesdir / name, dirs_exist_ok=True)
 
 
 def remove_avoided_requirements(
     requires: set[str], avoided_requirements: set[str] | list[str]
 ) -> set[str]:
+    """
+    Remove requirements that are in the list of avoided requirements.
+
+    Parameters
+    ----------
+    requires
+        The set of requirements to filter.
+    avoided_requirements
+        The set of requirements to avoid.
+
+    Returns
+    -------
+    The filtered set of requirements.
+    """
     for reqstr in list(requires):
         req = Requirement(reqstr)
+        # Evaluate the PEP 508 marker to see if the requirement
+        # is applicable in the current environment or not.
+        if req.marker and not req.marker.evaluate():
+            continue
         for avoid_name in set(avoided_requirements):
             if avoid_name == req.name.lower():
                 requires.remove(reqstr)
@@ -147,16 +232,32 @@ def install_reqs(
     IGNORED_BUILD_REQUIREMENTS = [
         pkg.strip() for pkg in get_host_build_flag("IGNORED_BUILD_REQUIREMENTS").split()
     ]
+    reqs, unisolated = _replace_unisolated_packages(reqs, get_unisolated_packages())
+    reqs = remove_avoided_requirements(reqs, IGNORED_BUILD_REQUIREMENTS)
+
+    if in_xbuildenv() and unisolated:
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+
     # propagate PIP config from build_env to current environment
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
     ):
-        env.install(
-            remove_avoided_requirements(
-                reqs,
-                get_unisolated_packages() + IGNORED_BUILD_REQUIREMENTS,
-            )
-        )
+        env.install(reqs)
+
+    _install_cross_build_files(env.path, unisolated)
+
+
+# So far among all packages in pyodide-recipes, only NumPy ships
+# a .pc file, but I don't want to hardcode that here as such
+def _get_unisolated_pkgconfig_dirs(venv_path: str) -> list[str]:
+    """
+    Find directories containing .pc files shipped by packages installed in the
+    isolated build environment. These need to be added to PKG_CONFIG_LIBDIR so
+    that meson can discover unisolated packages (like numpy) via pkg-config
+    during cross-compilation.
+    """
+    _, _, purelib = _find_executable_and_scripts(venv_path)
+    return list({str(pc.parent) for pc in Path(purelib).rglob("*.pc") if pc.is_file()})
 
 
 def _build_in_isolated_env(
@@ -181,7 +282,7 @@ def _build_in_isolated_env(
         )
 
         # first install the build dependencies
-        symlink_unisolated_packages(env, builder.build_system_requires)
+        _copy_sysconfigdata_to_isolated_env(env)
         install_reqs(build_env, env, builder.build_system_requires)
         build_reqs: set[str] | None = None
         try:
@@ -207,6 +308,14 @@ def _build_in_isolated_env(
                 )
 
         install_reqs(build_env, env, build_reqs)
+
+        pkgconfig_dirs = _get_unisolated_pkgconfig_dirs(env.path)
+        if pkgconfig_dirs:
+            build_env = dict(build_env)
+            existing = build_env.get("PKG_CONFIG_LIBDIR", "")
+            build_env["PKG_CONFIG_LIBDIR"] = ":".join(
+                [existing, *pkgconfig_dirs] if existing else pkgconfig_dirs
+            )
 
         with common.replace_env(build_env):
             return builder.build(
@@ -304,17 +413,12 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     return env
 
 
-# TODO: a context manager is no longer needed here
-@contextmanager
-def _create_symlink_dir(
-    env: dict[str, str],
-    build_dir: Path,
-):
+def _create_symlink_dir(build_dir: Path) -> Path:
     # Leave the symlinks in the build directory. This helps with reproducing.
     symlink_dir = build_dir / "pywasmcross_symlinks"
     shutil.rmtree(symlink_dir, ignore_errors=True)
     symlink_dir.mkdir()
-    yield symlink_dir
+    return symlink_dir
 
 
 @contextmanager
@@ -348,28 +452,28 @@ def get_build_env(
     args["exports"] = exports
     env = env.copy()
 
-    with _create_symlink_dir(env, build_dir) as symlink_dir:
-        env.update(make_command_wrapper_symlinks(symlink_dir))
-        sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
-        args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
-        args["orig__name__"] = __name__
-        args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
-        args["PATH"] = env["PATH"]
-        args["abi"] = get_build_flag("PYODIDE_ABI_VERSION")
+    symlink_dir = _create_symlink_dir(build_dir)
+    env.update(make_command_wrapper_symlinks(symlink_dir))
+    sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
+    args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
+    args["orig__name__"] = __name__
+    args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
+    args["PATH"] = env["PATH"]
+    args["abi"] = get_build_flag("PYODIDE_ABI_VERSION")
 
-        pywasmcross_env = json.dumps(args)
-        # Store into environment variable and to disk. In most cases we will
-        # load from the environment variable but if some other tool filters
-        # environment variables we will load from disk instead.
-        env["PYWASMCROSS_ARGS"] = pywasmcross_env
-        (symlink_dir / "pywasmcross_env.json").write_text(pywasmcross_env)
+    pywasmcross_env = json.dumps(args)
+    # Store into environment variable and to disk. In most cases we will
+    # load from the environment variable but if some other tool filters
+    # environment variables we will load from disk instead.
+    env["PYWASMCROSS_ARGS"] = pywasmcross_env
+    (symlink_dir / "pywasmcross_env.json").write_text(pywasmcross_env)
 
-        env["_PYTHON_HOST_PLATFORM"] = platform()
-        env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
-        env["PYTHONPATH"] = str(sysconfig_dir)
-        env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
+    env["_PYTHON_HOST_PLATFORM"] = platform()
+    env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
+    env["PYTHONPATH"] = str(sysconfig_dir)
+    env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
 
-        yield env
+    yield env
 
 
 # Based on pypa/build's reference logger implementation. See

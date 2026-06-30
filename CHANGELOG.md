@@ -5,30 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.36.0] - 2026/MM/DD
 
 ### Fixed
 
-- Fixed dead-code control flow in `update_package` (part of `pyodide skeleton pypi`)
-  where the format-fallback branches (`["wheel","sdist"]` / `["sdist","wheel"]`) were
-  unreachable: previously `source_fmt = source_fmt or old_fmt` at the top of the
-  function made `source_fmt` always truthy, so the fallback to the other distribution
-  format never activated. A package whose new release ships only wheels (while the
-  recipe used an sdist) would raise `MkpkgFailedException` rather than transparently
-  updating to the wheel. The fix moves format resolution after the version/newer-than
-  check and restores the intended fallback semantics: an explicitly passed `source_fmt`
-  is strict; an absent one prefers the existing format with fallback to the other.
-  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376),
+- Fixed several bugs in the cross-build-environment (xbuildenv) lifecycle
+  [#378](https://github.com/pyodide/pyodide-build/pull/378):
+  - A Python-version marker mismatch on an already-installed xbuildenv will now
+    refreshes the host packages.
+  - Installing via `DEFAULT_CROSS_BUILD_ENV_URL` is now treated like an explicit
+    `--url` install, so it no longer bakes a mangled, URL-derived version into the
+    generated package index.
+  - `pyodide xbuildenv use` no longer raises `FileExistsError` when the `xbuildenv`
+    symlink is dangling (its target was removed); the stale symlink is now
+    cleaned up first.
+  - A failure during a later installation step no longer deletes a pre-existing,
+    valid cached xbuildenv.
+
+- Fixed a hang when a recipe `build/script` or `build/post` ends by exiting the
+  shell itself (e.g. `exit 0`). The build no longer blocks forever waiting for an
+  environment dump that never runs; the previous environment is kept instead.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed per-package build variables (`PKGDIR`, `PKG_VERSION`, `DISTDIR`, ...)
+  leaking into the cached build-environment dict, which caused later packages in
+  a sequential `build-recipes` run to see the previous package's values.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed `find_matching_wheel` raising `RuntimeError("Found multiple matching
+  wheels")` for a single file.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed a bug where boolean and non-string values in pyproject.toml crashes pyodide CLI
+  when loading config values
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
+  [#382](https://github.com/pyodide/pyodide-build/pull/382)
+
+- Fixed build constraints not being applied when using `uv` as the installer by
+  setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
+  [#389](https://github.com/pyodide/pyodide-build/pull/389)
+
+### Fixed
+
+- Fixed a dead-code control flow in `pyodide skeleton pypi` where a package
+  whose new release ships only wheels (while the recipe used an sdist) would
+  raise an exception rather than updating to the wheel.
   [#384](https://github.com/pyodide/pyodide-build/pull/384)
 
-- Fixed `_make_predictable_url` generating an incorrect URL for sdists whose filename
-  does not match `{normalized_name}-{version}.tar.gz`: `.zip` sdists and packages with
-  non-normalized names (e.g. `ruamel.yaml`) had their real filename silently replaced,
-  producing a URL that 404s while the stored `sha256` is from the real file, making the
-  recipe unbuildable. The fix builds the predictable URL from the actual `filename`
-  returned by the PyPI metadata.
-  Part of [#376](https://github.com/pyodide/pyodide-build/issues/376),
+- `skeleton`: fixed incorrect predictable URLs sdists for `.zip`-style sdists
+  and packages with non-normalised names (such as `ruamel.yaml`).
   [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
+### Changed
+
+- Fixed build-time scripts of unisolated packages (like `f2py` and
+  `numpy-config` from NumPy) not being available on `PATH` during builds.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
+- `oldest-supported-numpy` is now explicitly rejected when encountered as a
+  build-time dependency. It is deprecated since NumPy 2.0, and packages that
+  still list it should migrate to a direct `numpy` dependency.
+  [#392](https://github.com/pyodide/pyodide-build/pull/392)
 
 ## [0.35.1] - 2026/06/13
 
@@ -202,12 +244,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `pyodide clean recipes`, a CLI command that deletes build files for chosen packages or tags.
-[#254](https://github.com/pyodide/pyodide-build/pull/254)
+  [#254](https://github.com/pyodide/pyodide-build/pull/254)
 
 ## [0.30.8] - 2025/10/22
 
 - `pyodide config` now exposes `dist_dir` variable.
-[#236](https://github.com/pyodide/pyodide-build/pull/236)
+  [#236](https://github.com/pyodide/pyodide-build/pull/236)
 
 - The CMake toolchain file for Pyodide now sets `CMAKE_SHARED_LINKER_FLAGS_INIT` and `CMAKE_MODULE_LINKER_FLAGS_INIT` and
   unset `CMAKE_SHARED_LINKER_FLAGS` to avoid conflicts with the user's settings.

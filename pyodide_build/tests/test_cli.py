@@ -33,6 +33,33 @@ def assert_runner_succeeded(result):
     assert result.exit_code == 0
 
 
+def test_cli_import_does_not_resolve_xbuildenv_path(monkeypatch):
+    """Importing the build/xbuildenv CLI modules must NOT call default_xbuildenv_path.
+
+    Resolving the default path does a ConfigManager build, filesystem probes,
+    and can even raise RuntimeError when no writable directory exists.  All of
+    that should be deferred until the command body runs, not happen at import
+    time on every ``pyodide`` invocation.
+    """
+    called = []
+    monkeypatch.setattr(
+        common, "default_xbuildenv_path", lambda: called.append(1) or None
+    )
+
+    # Re-import the modules so module-level code runs again under the monkeypatch.
+    import importlib
+
+    import pyodide_build.cli.build as _build_mod
+    import pyodide_build.cli.xbuildenv as _xbuildenv_mod
+
+    importlib.reload(_build_mod)
+    importlib.reload(_xbuildenv_mod)
+
+    assert not called, (
+        "default_xbuildenv_path must not be called at CLI module import time"
+    )
+
+
 def test_skeleton_pypi(tmp_path):
     test_pkg = "pytest-pyodide"
     old_version = "0.21.0"
@@ -446,6 +473,9 @@ def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
         results["outdir"] = outdir
         results["backend_flags"] = backend_flags
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     from contextlib import nullcontext
@@ -770,6 +800,9 @@ def test_build_isolation_flags(
             }
         )
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
@@ -833,6 +866,9 @@ def test_build_skip_dependency_check(
             }
         )
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
@@ -897,6 +933,9 @@ def test_build_combined_flags(
             }
         )
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
@@ -962,6 +1001,9 @@ def test_build_verbosity_flag(
     ):
         build_calls.append({"verbosity": verbosity})
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)

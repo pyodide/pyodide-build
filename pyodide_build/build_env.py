@@ -163,7 +163,6 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
             "PYODIDE": "1",
             # This is the legacy environment variable used for the aforementioned purpose
             "PYODIDE_PACKAGE_ABI": "1",
-            "PYTHONPATH": env["HOSTSITEPACKAGES"],
         }
     )
 
@@ -220,27 +219,80 @@ def get_hostsitepackages() -> str:
     return get_build_flag("HOSTSITEPACKAGES")
 
 
+# TODO: Remove this function (and use remote package index)
+# https://github.com/pyodide/pyodide-build/issues/43
 @functools.cache
-def get_unisolated_packages() -> list[str]:
-    # TODO: Remove this function (and use remote package index)
-    # https://github.com/pyodide/pyodide-build/issues/43
+def get_unisolated_packages() -> dict[str, str]:
+    """
+    Get a map of unisolated packages.
+
+    Unisolated packages are packages that are used during the build process
+    and have some platform-specific files. When these packages are used
+    during the build process, their platform-specific files are replaced with
+    WASM-compatible versions to build the package correctly.
+
+    Returns
+    -------
+    A dictionary of package names and versions.
+    """
     PYODIDE_ROOT = get_pyodide_root()
 
-    unisolated_file = PYODIDE_ROOT / "unisolated.txt"
-    if unisolated_file.exists():
-        # in xbuild env, read from file
-        unisolated_packages = unisolated_file.read_text().splitlines()
+    unisolated_packages: dict[str, str] = {}
+    if in_xbuildenv():
+        unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
+
+        if not unisolated_packages_file.exists():
+            raise FileNotFoundError(
+                f"Expected {unisolated_packages_file} to exist in the xbuildenv. "
+                "The xbuildenv archive may be corrupt or from an incompatible version."
+            )
+        for line in unisolated_packages_file.read_text().splitlines():
+            line = line.strip()
+            # The xbuildenv requirements.txt is machine-generated and always
+            # uses pinned name==version entries, but we skip blank lines,
+            # comments, and any non-pinned specs just in case. Shouldn't
+            # really happen though.
+            if not line or line.startswith("#") or "==" not in line:
+                continue
+            name, version = line.split("==", 1)
+            unisolated_packages[name] = version
     else:
         from pyodide_build.recipe.loader import load_all_recipes
 
-        unisolated_packages = []
         recipe_dir = PYODIDE_ROOT / "packages"
         recipes = load_all_recipes(recipe_dir)
         for name, config in recipes.items():
             if config.build.cross_build_env:
-                unisolated_packages.append(name)
+                unisolated_packages[name] = config.package.version
 
     return unisolated_packages
+
+
+def get_cross_build_files_dir(package_name: str) -> Path:
+    """
+    Get the directory containing an unisolated package's cross-build files
+    (such as headers, .a libs, .pxd files, and so on).
+
+    Parameters
+    ----------
+    package_name
+        The name of the package
+
+    Returns
+    -------
+    The directory containing the package's cross-build files, relative to
+    which they should be laid out in site-packages. The directory may not
+    exist if the package has no cross-build files.
+    """
+    PYODIDE_ROOT = get_pyodide_root()
+
+    # TODO: unify libdir for in-tree and out-of-tree builds
+    if in_xbuildenv():
+        libdir = PYODIDE_ROOT / ".." / "site-packages-extras"
+    else:
+        libdir = Path(get_hostsitepackages())
+
+    return libdir / package_name
 
 
 def platform() -> str:
@@ -277,7 +329,7 @@ def pyodide_tags_() -> Iterator[Tag]:
     python_version = (int(PYMAJOR), int(PYMINOR))
     yield from cpython_tags(platforms=PLATFORMS, python_version=python_version)
     yield from compatible_tags(platforms=PLATFORMS, python_version=python_version)
-    # Following line can be removed once packaging 22.0 is released and we update to it.
+    # packaging's cpython_tags does not emit cpXY-none-any
     yield Tag(interpreter=f"cp{PYMAJOR}{PYMINOR}", abi="none", platform="any")
 
 
