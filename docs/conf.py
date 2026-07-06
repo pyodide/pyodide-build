@@ -44,10 +44,13 @@ html_css_files = [
 ]
 
 html_theme = "sphinx_book_theme"
-html_logo = "_static/img/pyodide-logo.png"
 html_static_path = ["_static"]
 
 html_theme_options = {
+    "logo": {
+        "image_light": "_static/img/pyodide-logo-light.svg",
+        "image_dark": "_static/img/pyodide-logo-dark.svg",
+    },
     "show_toc_level": 2,
     "show_navbar_depth": 2,
     "home_page_in_toc": True,
