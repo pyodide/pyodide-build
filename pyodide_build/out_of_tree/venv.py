@@ -364,28 +364,52 @@ class PyodideVenv(ABC):
                 return sys.executable.removesuffix(EXECUTABLE_SUFFIX)
 
             scripts.get_executable = get_executable
+            """
+            # Patch packaging.tags.
+            # Packaging < 26.2 needs to be taught about _emscripten_platforms
+            # TODO: Can we assume Pip >= 26.1 and delete this?
+            """
+            from pip._vendor.packaging import __version__ as _packaging_version
+
+            try:
+                _packaging_version = tuple(int(x) for x in _packaging_version.split("."))
+                should_patch = _packaging_version < (26, 2)
+            except ValueError:
+                should_patch = False
+
+
+            if should_patch:
+                from pip._vendor.packaging import tags
+
+                orig_platform_tags = tags.platform_tags
+
+                def platform_tags():
+                    if platform.system() == "Emscripten":
+                        yield from _emscripten_platforms()
+                        return
+                    return orig_platform_tags()
+
+                tags.platform_tags = platform_tags
+            """
+            # Pip >= 26.1 has an _emscripten_platforms function but it does not
+            # produce the legacy pyodide_xxx_wasm32 tag.
+            """
+            from pip._vendor.packaging.tags import _generic_platforms
+            from typing import Iterator
+
+            def _emscripten_platforms() -> Iterator[str]:
+                pyemscripten_platform_version = sysconfig.get_config_var(
+                    "PYEMSCRIPTEN_PLATFORM_VERSION"
+                ) or sysconfig.get_config_var("PYODIDE_ABI_VERSION")
+                if pyemscripten_platform_version:
+                    yield f"pyodide_{pyemscripten_platform_version}_wasm32"
+                    yield f"pyemscripten_{pyemscripten_platform_version}_wasm32"
+                yield from _generic_platforms()
 
             from pip._vendor.packaging import tags
-            orig_platform_tags = tags.platform_tags
+            tags._emscripten_platforms = _emscripten_platforms
             """
-            # TODO: Remove the following monkeypatch when we merge and pull in
-            # https://github.com/pypa/packaging/pull/804
-            """
-            def _emscripten_platforms():
-                pyodide_abi_version = sysconfig.get_config_var("PYODIDE_ABI_VERSION")
-                if pyodide_abi_version:
-                    yield f"pyemscripten_{pyodide_abi_version}_wasm32"
-                    yield f"pyodide_{pyodide_abi_version}_wasm32"
-                yield from tags._generic_platforms()
-
-            def platform_tags():
-                if platform.system() == "Emscripten":
-                    yield from _emscripten_platforms()
-                    return
-                return orig_platform_tags()
-
-            tags.platform_tags = platform_tags
-            """
+            # Check version and maybe patch packaging.tags
             f"""
             os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
 
