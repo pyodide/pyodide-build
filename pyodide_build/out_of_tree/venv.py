@@ -410,7 +410,6 @@ class PyodideVenv(ABC):
             tags._emscripten_platforms = _emscripten_platforms
             """
             # Check version and maybe patch packaging.tags
-
             f"""
             os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
 
