@@ -365,6 +365,7 @@ PYODIDE_CLI_CONFIGS = {
     "emsdk_dir": "PYODIDE_EMSDK_DIR",
     "emscripten_dir": "PYODIDE_EMSCRIPTEN_DIR",
     "pyodide_abi_version": "PYODIDE_ABI_VERSION",
+    "pyemscripten_platform_version": "PYODIDE_ABI_VERSION",
     "pyodide_root": "PYODIDE_ROOT",
     "dist_dir": "PYODIDE_DIST_DIR",
     "python_include_dir": "PYTHONINCLUDE",
