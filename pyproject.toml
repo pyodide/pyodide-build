@@ -168,6 +168,7 @@ lint.ignore = [
   "E501",    # Line too long
   "E731",    # Do not assign a lambda expression, use a def
   "E741",    # Ambiguous variable name (l, O, I)
+  "C408",    # Unnecessary `dict()` call
   "PERF401", # Replace for loops that build lists with list comprehension
   "PLW2901", # Redefined loop variable
   "PLR0912", # Too many branches in function
