@@ -370,6 +370,7 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
     assert which_emcc
     emcc = Path(which_emcc)
     readobj = (emcc / "../../bin/llvm-readobj").resolve()
+    readobj_path: str | None
     if readobj.exists():
         readobj_path = str(readobj)
     else:

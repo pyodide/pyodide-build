@@ -526,15 +526,15 @@ class CrossBuildEnvManager:
 
         if emsdk_dir is None:
             xbuild_root = self.symlink_dir.resolve()
-            emsdk_dir = xbuild_root / "emsdk"
+            emsdk_path = xbuild_root / "emsdk"
         else:
-            emsdk_dir = Path(emsdk_dir)
+            emsdk_path = Path(emsdk_dir)
 
-        logger.info("Cloning Emscripten SDK into %s", emsdk_dir)
+        logger.info("Cloning Emscripten SDK into %s", emsdk_path)
 
-        if emsdk_dir.exists():
-            logger.info("Removing existing emsdk directory %s", emsdk_dir)
-            shutil.rmtree(emsdk_dir, onexc=remove_readonly)
+        if emsdk_path.exists():
+            logger.info("Removing existing emsdk directory %s", emsdk_path)
+            shutil.rmtree(emsdk_path, onexc=remove_readonly)
 
         subprocess.run(
             [
@@ -543,12 +543,12 @@ class CrossBuildEnvManager:
                 "--depth",
                 "1",
                 "https://github.com/emscripten-core/emsdk.git",
-                str(emsdk_dir),
+                str(emsdk_path),
             ],
             check=True,
         )
 
-        return emsdk_dir
+        return emsdk_path
 
     def install_emscripten(
         self, emscripten_version: str = "latest", *, force: bool = False

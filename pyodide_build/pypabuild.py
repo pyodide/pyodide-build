@@ -8,9 +8,14 @@ import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
-from build import BuildBackendException, ConfigSettingsType, ProjectBuilder
+from build import (
+    BuildBackendException,
+    ConfigSettingsType,
+    ProjectBuilder,
+    RunnerType,
+)
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
@@ -53,9 +58,9 @@ SYMLINK_ENV_VARS = {
 
 def _gen_runner(
     cross_build_env: Mapping[str, str],
-    isolated_build_env: _DefaultIsolatedEnv = None,
+    isolated_build_env: _DefaultIsolatedEnv | None = None,
     verbosity: int = 0,
-) -> Callable[[Sequence[str], str | None, Mapping[str, str] | None], None]:
+) -> RunnerType:
     """
     This returns a slightly modified version of default subprocess runner that pypa/build uses.
     pypa/build prepends the virtual environment's bin directory to the PATH environment variable.
@@ -74,14 +79,18 @@ def _gen_runner(
         Verbosity level. When >= 1, the build backend command is logged.
     """
 
-    def _runner(cmd, cwd=None, extra_environ=None):
+    def _runner(
+        cmd: Sequence[str],
+        cwd: str | None = None,
+        extra_environ: Mapping[str, str] | None = None,
+    ) -> None:
         env = os.environ.copy()
         if extra_environ:
             env.update(extra_environ)
 
         # Some build dependencies like cmake, meson installs binaries to this directory
         # and we should add it to the PATH so that they can be found.
-        if isolated_build_env:
+        if isolated_build_env is not None:
             env["BUILD_ENV_SCRIPTS_DIR"] = isolated_build_env.scripts_dir
         else:
             # For non-isolated builds, set a fallback path or use the current Python path
@@ -272,9 +281,8 @@ def _build_in_isolated_env(
     # It will be left in the /tmp folder and can be inspected or entered as
     # needed.
     # _DefaultIsolatedEnv.__exit__ = lambda self, *args: print("Skipping removing isolated env in", self.path)
-    installer = "uv" if uv_helper.should_use_uv() else "pip"
+    installer: Literal["uv", "pip"] = "uv" if uv_helper.should_use_uv() else "pip"
     with _DefaultIsolatedEnv(installer=installer) as env:
-        env = cast(_DefaultIsolatedEnv, env)
         builder = ProjectBuilder.from_isolated_env(
             env,
             srcdir,
@@ -452,7 +460,7 @@ def get_build_env(
     args["exports"] = exports
     env = env.copy()
 
-    symlink_dir = _create_symlink_dir(build_dir)
+    symlink_dir = _create_symlink_dir(build_dir or Path.cwd())
     env.update(make_command_wrapper_symlinks(symlink_dir))
     sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
     args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]

@@ -33,7 +33,8 @@ try:
 except ImportError:
 
     class _AbstractProvider:  # type: ignore[no-redef]
-        pass
+        def __class_getitem__(cls, _item: Any) -> type:
+            return cls
 
 
 from pyodide_build import build_env
@@ -66,7 +67,9 @@ def _import_unearth() -> tuple[type["TargetPython"], type["PackageFinder"]]:
     return TargetPython, PackageFinder
 
 
-def _import_resolvelib() -> tuple[type["BaseReporter"], type["Resolver"]]:
+def _import_resolvelib() -> tuple[
+    type["BaseReporter[Any, Any, Any]"], type["Resolver[Any, Any, Any]"]
+]:
     try:
         from resolvelib import BaseReporter, Resolver
     except ImportError as e:
@@ -274,7 +277,7 @@ def get_metadata_for_wheel(url):
     return EmailMessage()
 
 
-class PyPIProvider(_AbstractProvider):
+class PyPIProvider(_AbstractProvider[Any, Any, Any]):
     BUILD_FLAGS: ConfigSettingsType = {}
     BUILD_SKIP: list[str] = []
     BUILD_EXPORTS: _BuildSpecExports = []

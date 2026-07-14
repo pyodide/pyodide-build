@@ -1,5 +1,6 @@
 import os
 import sys
+from collections.abc import Sequence
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 
@@ -82,7 +83,7 @@ class PyodideCLIReference(SphinxDirective):
     # to most users building out-of-tree packages.
     _EXCLUDE = {"build-recipes", "build-recipes-no-deps", "skeleton"}
 
-    def run(self) -> list[nodes.Node]:
+    def run(self) -> Sequence[nodes.Node]:
         entry_points = sorted(
             (
                 entry_point
@@ -107,7 +108,7 @@ class PyodideCLIReference(SphinxDirective):
 
         result = statemachine.ViewList(rst, source="<pyodide-cli-reference>")
         node: nodes.Node = nodes.section()
-        self.state.nested_parse(result, self.content_offset, node)
+        self.state.nested_parse(result, self.content_offset, node)  # type: ignore[arg-type]
         return node.children
 
 

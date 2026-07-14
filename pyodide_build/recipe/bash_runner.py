@@ -42,6 +42,7 @@ class BashRunnerWithSharedEnvironment:
         # block forever, since it would still hold the write end open and never
         # see EOF. See https://github.com/pyodide/pyodide-build/issues/376.
         fd_read, fd_write = os.pipe()
+        fd_write_open = True
         try:
             write_env_pycode = ";".join(
                 [
@@ -64,7 +65,7 @@ class BashRunnerWithSharedEnvironment:
                 # Close the parent's copy of the write end before reading so we
                 # can observe EOF when the child never wrote the env dump.
                 os.close(fd_write)
-                fd_write = None
+                fd_write_open = False
                 if result.returncode == 0:
                     env_dump = reader.readline()
                     if env_dump:
@@ -78,7 +79,7 @@ class BashRunnerWithSharedEnvironment:
                             "environment; keeping the previous environment."
                         )
         finally:
-            if fd_write is not None:
+            if fd_write_open:
                 os.close(fd_write)
         return result
 
