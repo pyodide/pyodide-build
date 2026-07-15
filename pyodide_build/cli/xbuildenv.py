@@ -4,7 +4,7 @@ import click
 
 from pyodide_build.build_env import get_build_flag, local_versions
 from pyodide_build.common import IS_WIN, default_xbuildenv_path
-from pyodide_build.views import MetadataView
+from pyodide_build.views import MetadataView, SourceType
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
     NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
@@ -268,7 +268,8 @@ def _search(
         }
 
     def _make_view(
-        release: CrossBuildEnvReleaseSpec, source: str = "stable"
+        release: CrossBuildEnvReleaseSpec,
+        source: SourceType = "stable",
     ) -> MetadataView:
         return MetadataView(
             version=release.version,
@@ -287,6 +288,7 @@ def _search(
         )
 
     if nightly or debug:
+        sources: list[tuple[SourceType, str]]
         if nightly and debug:
             sources = [("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
         elif nightly:
