@@ -51,7 +51,7 @@ class BashRunnerWithSharedEnvironment:
         )
         write_env_shell_cmd = f"{sys.executable} -c '{write_env_pycode}'"
         full_cmd = f"{cmd}\n{write_env_shell_cmd}"
-        with os.fdopen(fd_write) as writer,  os.fdopen(fd_read, "r") as reader:
+        with os.fdopen(fd_write) as writer, os.fdopen(fd_read, "r") as reader:
             result = subprocess.run(
                 ["bash", "-ce", full_cmd],
                 check=False,
