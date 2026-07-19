@@ -137,7 +137,6 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# Vendored third-party code is frozen; do not type-check it.
 module = ["pyodide_build.vendor.*"]
 ignore_errors = true
 
