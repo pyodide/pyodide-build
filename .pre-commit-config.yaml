@@ -50,8 +50,7 @@ repos:
     rev: "v2.1.0"
     hooks:
       - id: mypy
-        files: ^(pyodide-build/pyodide_build)
-        exclude: (.*test.*)
+        exclude: (.*test.*|pyodide_build/vendor)
         args: []
         additional_dependencies: &mypy-deps
           - packaging
@@ -68,11 +67,8 @@ repos:
           - rich
           - auditwheel_emscripten
           - pyodide-lock==0.1.0a5
-      - id: mypy
-        name: mypy-tests
-        args: [--ignore-missing-imports]
-        files: ^(conftest.py|src/tests|pyodide-build/pyodide_build/tests)
-        additional_dependencies: *mypy-deps
+          - virtualenv
+          - sphinx
 
 ci:
   autoupdate_schedule: "quarterly"

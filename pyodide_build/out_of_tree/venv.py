@@ -103,7 +103,7 @@ class PyodideVenv(ABC):
         self._pyodide_pyversion: tuple[int, int] | None = None
 
     @property
-    def venv_root(self) -> Path | None:
+    def venv_root(self) -> Path:
         """Get the path to the virtualenv's root directory."""
         if self._venv_root is None:
             raise RuntimeError("venv_root is not set")
@@ -111,7 +111,7 @@ class PyodideVenv(ABC):
         return self._venv_root
 
     @property
-    def venv_bin(self) -> Path | None:
+    def venv_bin(self) -> Path:
         """Get the path to the virtualenv's bin directory."""
         if self._venv_bin is None:
             raise RuntimeError("venv_bin is not set")
@@ -668,7 +668,8 @@ class UnixPyodideVenv(PyodideVenv):
         """Get the content of the host python wrapper script.
         This script allows invoking the host python with the correct PYTHONHOME.
         """
-        pythonhome = Path(sys._base_executable).parents[1]
+        base_executable = getattr(sys, "_base_executable", sys.executable)
+        pythonhome = Path(base_executable).parents[1]
         return dedent(
             f"""\
             #!/bin/sh

@@ -100,7 +100,6 @@ markers = [
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = ["pyodide_build"]
 show_error_codes = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
@@ -124,19 +123,22 @@ strict_equality = true
 
 [[tool.mypy.overrides]]
 module = [
-  "loky",
+  "_f2c_fixes",
   "resolvelib",
   "ruamel.yaml",
-  "termcolor",
-  "test",
-  "tomli",
   "tomllib",
   "unearth",
   "unearth.*",
-  "virtualenv>=20.31.2",
+  "uv",
+  "virtualenv",
+  "virtualenv.*",
   "auditwheel_emscripten.*"
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyodide_build.vendor.*"]
+ignore_errors = true
 
 
 [tool.ruff]

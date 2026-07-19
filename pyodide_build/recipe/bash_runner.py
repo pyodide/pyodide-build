@@ -42,44 +42,39 @@ class BashRunnerWithSharedEnvironment:
         # block forever, since it would still hold the write end open and never
         # see EOF. See https://github.com/pyodide/pyodide-build/issues/376.
         fd_read, fd_write = os.pipe()
-        try:
-            write_env_pycode = ";".join(
-                [
-                    "import os",
-                    "import json",
-                    f'os.write({fd_write}, json.dumps(dict(os.environ)).encode() + b"\\n")',
-                ]
+        write_env_pycode = ";".join(
+            [
+                "import os",
+                "import json",
+                f'os.write({fd_write}, json.dumps(dict(os.environ)).encode() + b"\\n")',
+            ]
+        )
+        write_env_shell_cmd = f"{sys.executable} -c '{write_env_pycode}'"
+        full_cmd = f"{cmd}\n{write_env_shell_cmd}"
+        with os.fdopen(fd_write) as writer, os.fdopen(fd_read, "r") as reader:
+            result = subprocess.run(
+                ["bash", "-ce", full_cmd],
+                check=False,
+                pass_fds=[fd_write],
+                env=self.env,
+                encoding="utf8",
+                **opts,
             )
-            write_env_shell_cmd = f"{sys.executable} -c '{write_env_pycode}'"
-            full_cmd = f"{cmd}\n{write_env_shell_cmd}"
-            with os.fdopen(fd_read, "r") as reader:
-                result = subprocess.run(
-                    ["bash", "-ce", full_cmd],
-                    check=False,
-                    pass_fds=[fd_write],
-                    env=self.env,
-                    encoding="utf8",
-                    **opts,
-                )
-                # Close the parent's copy of the write end before reading so we
-                # can observe EOF when the child never wrote the env dump.
-                os.close(fd_write)
-                fd_write = None
-                if result.returncode == 0:
-                    env_dump = reader.readline()
-                    if env_dump:
-                        self.env = json.loads(env_dump)
-                    else:
-                        # The script exited the shell itself (e.g. ``exit 0``)
-                        # before the env-dump command ran, so there is no
-                        # updated environment to capture. Keep the current env.
-                        logger.debug(
-                            "Script exited the shell before dumping its "
-                            "environment; keeping the previous environment."
-                        )
-        finally:
-            if fd_write is not None:
-                os.close(fd_write)
+            # Close the parent's copy of the write end before reading so we
+            # can observe EOF when the child never wrote the env dump.
+            writer.close()
+            if result.returncode == 0:
+                env_dump = reader.readline()
+                if env_dump:
+                    self.env = json.loads(env_dump)
+                else:
+                    # The script exited the shell itself (e.g. ``exit 0``)
+                    # before the env-dump command ran, so there is no
+                    # updated environment to capture. Keep the current env.
+                    logger.debug(
+                        "Script exited the shell before dumping its "
+                        "environment; keeping the previous environment."
+                    )
         return result
 
     def run(

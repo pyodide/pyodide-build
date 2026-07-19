@@ -162,9 +162,11 @@ class BasePackage:
     def build(
         self, build_args: BuildArgs, build_dir: Path, clean: bool = False
     ) -> None:
-        run_prefix = (
-            [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
-        )
+        run_prefix: list[str] = []
+        if uv_helper.should_use_uv():
+            uv_bin = uv_helper.find_uv_bin()
+            assert uv_bin is not None
+            run_prefix = [uv_bin, "run"]
         p = subprocess.run(
             [
                 *run_prefix,

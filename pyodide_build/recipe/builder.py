@@ -8,7 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import chdir
 from datetime import datetime
 from email.message import Message
@@ -90,7 +90,7 @@ def _sanitize_filename(filename: str) -> str | None:
     return name
 
 
-def _extract_tarballname(url: str, headers: dict) -> str:
+def _extract_tarballname(url: str, headers: Mapping[str, str]) -> str:
     tarballname = url.rsplit("/", 1)[-1]
 
     if "Content-Disposition" in headers:
@@ -113,7 +113,7 @@ def _extract_tarballname(url: str, headers: dict) -> str:
     return tarballname
 
 
-def check_versions_match(pkg_name: str, wheel_name: str, version: str):
+def check_versions_match(pkg_name: str, wheel_name: str, version: str) -> None:
     wheel_version = str(parse_wheel_filename(wheel_name)[1])
     if wheel_version != version:
         raise ValueError(
@@ -240,6 +240,7 @@ class RecipeBuilder:
     ) -> "RecipeBuilder":
         recipe = Path(recipe).resolve()
         _, config = _load_recipe(recipe)
+        builder: type[RecipeBuilder]
         match config.build.package_type:
             case "package" | "cpython_module":
                 builder = RecipeBuilderPackage
@@ -814,7 +815,7 @@ def copy_sharedlibs(
     wheel_file: Path,
     wheel_dir: Path,
     lib_dir: Path,
-    modify_rpath=False,
+    modify_rpath: bool = False,
 ) -> dict[str, Path]:
     from auditwheel_emscripten import copylib, modify_runtime_path, resolve_sharedlib
     from auditwheel_emscripten.wheel_utils import WHEEL_INFO_RE
