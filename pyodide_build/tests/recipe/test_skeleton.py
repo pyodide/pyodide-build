@@ -494,10 +494,12 @@ def _make_mock_metadata(
 
 def _write_recipe(base_dir: Path, name: str, ver: str, url: str, sha256: str) -> Path:
     """Write a minimal meta.yaml for the given package."""
-    db = MetaConfig(
-        package={"name": name, "version": ver},
-        source={"sha256": sha256, "url": url},
-        test={"imports": [name]},
+    db = MetaConfig.from_dict(
+        {
+            "package": {"name": name, "version": ver},
+            "source": {"sha256": sha256, "url": url},
+            "test": {"imports": [name]},
+        }
     )
     pkg_dir = base_dir / name
     pkg_dir.mkdir(parents=True, exist_ok=True)
