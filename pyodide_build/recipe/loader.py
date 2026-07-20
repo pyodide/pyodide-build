@@ -76,10 +76,7 @@ def load_recipes(
         # 3. meta packages
         elif name_or_tag == "*":  # all packages
             recipes.update(
-                {
-                    name: package.clone()
-                    for name, package in available_recipes.items()
-                }
+                {name: package.clone() for name, package in available_recipes.items()}
             )
         elif name_or_tag == "no-numpy-dependents":
             # This is a meta package and will be handled outside of this function
