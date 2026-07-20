@@ -104,6 +104,9 @@ python_version = "3.12"
 show_error_codes = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+# pyodide-lock is a pydantic-based dependency; the plugin type-checks
+# construction of its models (pyodide-build's own models use attrs/cattrs).
+plugins = ["pydantic.mypy"]
 
 # Strict checks
 warn_unused_configs = true
