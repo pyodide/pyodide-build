@@ -63,7 +63,7 @@ def load_recipes(
     for name_or_tag in names_or_tags:
         # 1. package name
         if name_or_tag in available_recipes:
-            recipes[name_or_tag] = available_recipes[name_or_tag].model_copy(deep=True)
+            recipes[name_or_tag] = available_recipes[name_or_tag].clone()
 
         # 2. tag
         elif (
@@ -71,13 +71,13 @@ def load_recipes(
             and (tag := name_or_tag.removeprefix("tag:")) in tagged_recipes
         ):
             for recipe in tagged_recipes[tag]:
-                recipes[recipe.package.name] = recipe.model_copy(deep=True)
+                recipes[recipe.package.name] = recipe.clone()
 
         # 3. meta packages
         elif name_or_tag == "*":  # all packages
             recipes.update(
                 {
-                    name: package.model_copy(deep=True)
+                    name: package.clone()
                     for name, package in available_recipes.items()
                 }
             )
@@ -92,13 +92,13 @@ def load_recipes(
                 name_or_tag,
             )
             for recipe in tagged_recipes[name_or_tag]:
-                recipes[recipe.package.name] = recipe.model_copy(deep=True)
+                recipes[recipe.package.name] = recipe.clone()
         else:
             raise ValueError(f"Unknown package name or tag: {name_or_tag}")
 
     if load_always_tag:
         always_recipes = tagged_recipes.get("always", [])
         for recipe in always_recipes:
-            recipes[recipe.package.name] = recipe.model_copy(deep=True)
+            recipes[recipe.package.name] = recipe.clone()
 
     return recipes

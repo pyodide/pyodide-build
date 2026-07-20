@@ -107,13 +107,15 @@ def test_mkpkg_update(tmpdir, old_dist_type, new_dist_type):
 
     old_ext = ".tar.gz" if old_dist_type == "sdist" else ".whl"
     old_url = "https://<some>/idna-2.0" + old_ext
-    db_init = MetaConfig(
-        package={"name": "idna", "version": "2.0"},
-        source={
-            "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
-            "url": old_url,
-        },
-        test={"imports": ["idna"]},
+    db_init = MetaConfig.from_dict(
+        {
+            "package": {"name": "idna", "version": "2.0"},
+            "source": {
+                "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
+                "url": old_url,
+            },
+            "test": {"imports": ["idna"]},
+        }
     )
 
     package_dir = base_dir / "idna"
@@ -215,13 +217,15 @@ def test_pin(tmpdir):
 def test_mkpkg_update_pinned(tmpdir):
     base_dir = Path(str(tmpdir))
 
-    db_init = MetaConfig(
-        package={"name": "idna", "version": "2.0", "pinned": True},
-        source={
-            "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
-            "url": "https://<some>/idna-2.0.whl",
-        },
-        test={"imports": ["idna"]},
+    db_init = MetaConfig.from_dict(
+        {
+            "package": {"name": "idna", "version": "2.0", "pinned": True},
+            "source": {
+                "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
+                "url": "https://<some>/idna-2.0.whl",
+            },
+            "test": {"imports": ["idna"]},
+        }
     )
 
     package_dir = base_dir / "idna"

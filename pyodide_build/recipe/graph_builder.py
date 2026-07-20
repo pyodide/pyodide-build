@@ -104,7 +104,7 @@ class BasePackage:
 
     def __init__(self, pkgdir: Path, config: MetaConfig):
         self.pkgdir = pkgdir
-        self.meta = config.model_copy(deep=True)
+        self.meta = config.clone()
 
         self.name = self.meta.package.name
         self.version = self.meta.package.version

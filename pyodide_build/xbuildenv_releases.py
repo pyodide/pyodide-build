@@ -1,10 +1,14 @@
+import json
 import logging
 import os
 from contextlib import contextmanager
 from functools import cache
+from typing import Any
 
+import cattrs
+from attrs import define, field
+from cattrs.gen import make_dict_structure_fn
 from packaging.version import Version
-from pydantic import BaseModel, ConfigDict
 
 DEFAULT_CROSS_BUILD_ENV_METADATA_URL = (
     "https://pyodide.github.io/pyodide/api/v2/pyodide-cross-build-environments.json"
@@ -21,23 +25,23 @@ STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL = (
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
 
 
-class CrossBuildEnvReleaseSpec(BaseModel):
+@define
+class CrossBuildEnvReleaseSpec:
     # The version of the Pyodide
     version: str
     # The URL to the cross-build environment tarball
     url: str
-    # The SHA256 hash of the cross-build environment tarball
-    sha256: str | None = None
     # The version of the Python interpreter
     python_version: str
     # The version of the Emscripten SDK
     emscripten_version: str
+    # The SHA256 hash of the cross-build environment tarball
+    sha256: str | None = None
     # The UTC timestamp when the release was published on GitHub (ISO 8601)
     published_at: str = ""
     # Minimum and maximum pyodide-build versions that are compatible with this release
     min_pyodide_build_version: str | None = None
     max_pyodide_build_version: str | None = None
-    model_config = ConfigDict(extra="ignore", title="CrossBuildEnvReleasesSpec")
 
     @property
     def python_version_tuple(self) -> tuple[int, int, int]:
@@ -100,16 +104,17 @@ class CrossBuildEnvReleaseSpec(BaseModel):
         return True
 
 
-class CrossBuildEnvMetaSpec(BaseModel):
+@define
+class CrossBuildEnvMetaSpec:
     """
     The specification for the Pyodide cross-build environment metadata
     """
 
-    releases: dict[str, CrossBuildEnvReleaseSpec]
-    model_config = ConfigDict(
-        extra="forbid",
-        title="CrossBuildEnvMetaSpec",
-    )
+    releases: dict[str, CrossBuildEnvReleaseSpec] = field()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CrossBuildEnvMetaSpec":
+        return _converter.structure(data, cls)
 
     def list_compatible_releases(
         self,
@@ -199,6 +204,19 @@ class CrossBuildEnvMetaSpec(BaseModel):
         return self.releases[version]
 
 
+_converter = cattrs.Converter(detailed_validation=False)
+# CrossBuildEnvReleaseSpec uses extra="ignore" (default), CrossBuildEnvMetaSpec
+# uses extra="forbid".
+_converter.register_structure_hook(
+    CrossBuildEnvMetaSpec,
+    make_dict_structure_fn(
+        CrossBuildEnvMetaSpec,
+        _converter,
+        _cattrs_forbid_extra_keys=True,
+    ),
+)
+
+
 @contextmanager
 def _suppress_urllib3_logging():
     """
@@ -254,8 +272,7 @@ def load_cross_build_env_metadata(url_or_filename: str) -> CrossBuildEnvMetaSpec
                 response.raise_for_status()
             data = response.json()
 
-        return CrossBuildEnvMetaSpec.model_validate(data)
+        return CrossBuildEnvMetaSpec.from_dict(data)
 
     with open(url_or_filename) as f:
-        data = f.read()
-        return CrossBuildEnvMetaSpec.model_validate_json(data)
+        return CrossBuildEnvMetaSpec.from_dict(json.load(f))
