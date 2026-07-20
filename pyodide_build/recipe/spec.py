@@ -344,9 +344,7 @@ def _rename_overrides(cls: type) -> dict[str, Any]:
 def _structure_exports(value: Any, _type: Any) -> _BuildSpecExports:
     if isinstance(value, str):
         if value not in ("pyinit", "requested", "whole_archive"):
-            raise SpecValidationError(
-                f"Invalid value for 'build/exports': {value!r}"
-            )
+            raise SpecValidationError(f"Invalid value for 'build/exports': {value!r}")
         return cast(_BuildSpecExports, value)
     return [str(item) for item in value]
 
