@@ -123,6 +123,36 @@ class TestOutOfTree(TestInTree):
         for var in extra_vars:
             assert var in build_vars, f"Missing {var}"
 
+        # PYVERSION of the dummy xbuildenv is a stable release, so the PyO3
+        # forward compatibility flag should not be set.
+        assert "PYO3_USE_ABI3_FORWARD_COMPATIBILITY" not in build_vars
+
+    @pytest.mark.parametrize(
+        "pyversion, expected",
+        [
+            ("3.13.2", False),
+            ("3.14.0a1", True),
+            ("3.14.0b2", True),
+            ("3.14.0rc1", True),
+        ],
+    )
+    def test_get_build_environment_vars_prerelease(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache, pyversion, expected
+    ):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        makefile_envs = manager.pyodide_root / "Makefile.envs"
+        contents = makefile_envs.read_text()
+        makefile_envs.write_text(
+            contents.replace("export PYVERSION ?= 3.13.2", f"export PYVERSION ?= {pyversion}")
+        )
+
+        build_env.get_build_environment_vars.cache_clear()
+        build_vars = build_env.get_build_environment_vars(manager.pyodide_root)
+
+        assert (
+            build_vars.get("PYO3_USE_ABI3_FORWARD_COMPATIBILITY") == "1"
+        ) is expected
+
     def test_get_build_flag(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
         for key, val in build_env.get_build_environment_vars(
