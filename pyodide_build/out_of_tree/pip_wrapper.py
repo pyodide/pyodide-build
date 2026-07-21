@@ -48,8 +48,8 @@ scripts.get_executable = get_executable
 from pip._vendor.packaging import __version__ as _packaging_version
 
 try:
-    _packaging_version = tuple(int(x) for x in _packaging_version.split("."))
-    should_patch = _packaging_version < (26, 2)
+    _packaging_version_tuple = tuple(int(x) for x in _packaging_version.split("."))
+    should_patch = _packaging_version_tuple < (26, 2)
 except ValueError:
     should_patch = False
 
