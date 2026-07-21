@@ -142,6 +142,13 @@ ignore_missing_imports = true
 module = ["pyodide_build.vendor.*"]
 ignore_errors = true
 
+# This module monkeypatches pip internals whose stubs differ between the local
+# and CI mypy environments, so the required "type: ignore" comments look unused
+# locally. Don't warn about that here.
+[[tool.mypy.overrides]]
+module = ["pyodide_build.out_of_tree.pip_wrapper"]
+warn_unused_ignores = false
+
 
 [tool.ruff]
 lint.exclude = ["pyodide_build/vendor/*"]

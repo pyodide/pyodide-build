@@ -40,7 +40,7 @@ def get_executable():
     return sys.executable.removesuffix(CONFIG.executable_symlink_suffix)
 
 
-scripts.get_executable = get_executable
+scripts.get_executable = get_executable  # type: ignore[attr-defined]
 
 # Patch packaging.tags.
 # Packaging < 26.2 needs to be taught about _emscripten_platforms
@@ -86,7 +86,7 @@ def _emscripten_platforms() -> Iterator[str]:
 
 from pip._vendor.packaging import tags
 
-tags._emscripten_platforms = _emscripten_platforms
+tags._emscripten_platforms = _emscripten_platforms  # type: ignore[attr-defined]
 
 # Now patch sys, platform, os.environ, and sysconfig.
 
