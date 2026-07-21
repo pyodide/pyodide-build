@@ -124,6 +124,8 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = [
   "_f2c_fixes",
+  "pip",
+  "pip.*",
   "resolvelib",
   "ruamel.yaml",
   "tomllib",
@@ -139,6 +141,13 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["pyodide_build.vendor.*"]
 ignore_errors = true
+
+# This module monkeypatches pip internals whose stubs differ between the local
+# and CI mypy environments, so the required "type: ignore" comments look unused
+# locally. Don't warn about that here.
+[[tool.mypy.overrides]]
+module = ["pyodide_build.out_of_tree.pip_wrapper"]
+warn_unused_ignores = false
 
 
 [tool.ruff]
@@ -168,6 +177,7 @@ lint.ignore = [
   "E501",    # Line too long
   "E731",    # Do not assign a lambda expression, use a def
   "E741",    # Ambiguous variable name (l, O, I)
+  "C408",    # Unnecessary `dict()` call
   "PERF401", # Replace for loops that build lists with list comprehension
   "PLW2901", # Redefined loop variable
   "PLR0912", # Too many branches in function
