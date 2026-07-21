@@ -143,7 +143,9 @@ class TestOutOfTree(TestInTree):
         makefile_envs = manager.pyodide_root / "Makefile.envs"
         contents = makefile_envs.read_text()
         makefile_envs.write_text(
-            contents.replace("export PYVERSION ?= 3.13.2", f"export PYVERSION ?= {pyversion}")
+            contents.replace(
+                "export PYVERSION ?= 3.13.2", f"export PYVERSION ?= {pyversion}"
+            )
         )
 
         build_env.get_build_environment_vars.cache_clear()
