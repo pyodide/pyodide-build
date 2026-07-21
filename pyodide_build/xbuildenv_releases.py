@@ -6,7 +6,7 @@ from functools import cache
 from typing import Any
 
 import cattrs
-from attrs import define, field
+from attrs import asdict, define, field
 from cattrs.gen import make_dict_structure_fn
 from packaging.version import Version
 
@@ -115,6 +115,19 @@ class CrossBuildEnvMetaSpec:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CrossBuildEnvMetaSpec":
         return _converter.structure(data, cls)
+
+    @classmethod
+    def from_json(cls, data: str) -> "CrossBuildEnvMetaSpec":
+        return cls.from_dict(json.loads(data))
+
+    def to_dict(self) -> dict[str, Any]:
+        # ``None`` valued fields are omitted (mirrors pydantic's
+        # ``model_dump(exclude_none=True)``) so that optional release fields such
+        # as ``max_pyodide_build_version`` are left out of the serialized output.
+        return asdict(self, filter=lambda _attr, value: value is not None)
+
+    def to_json(self, indent: int | None = 2) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
 
     def list_compatible_releases(
         self,
