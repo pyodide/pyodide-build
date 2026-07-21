@@ -94,7 +94,7 @@ os_name, sys_platform, platform_system, multiarch, host_platform = CONFIG.platfo
 
 os.getuid = os.getuid if hasattr(os, "getuid") else lambda: 0
 sys.platlibdir = "lib"
-sys.implementation._multiarch = multiarch
+sys.implementation._multiarch = multiarch  # type: ignore[attr-defined]
 sys.abiflags = getattr(sys, "abiflags", "")  # ensure abiflags exists even in Windows
 platform.system = lambda: platform_system
 platform.machine = lambda: "wasm32"
@@ -105,7 +105,7 @@ os.environ["_PYTHON_SYSCONFIGDATA_NAME"] = (
 sys.path.append(CONFIG.sysconfigdata_dir)
 import sysconfig
 
-sysconfig._init_config_vars()
+sysconfig._init_config_vars()  # type: ignore[attr-defined]
 del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
 
 # On windows, patching sys.platform or os.name breaks how pip internals work (e.g. Pathlib)

@@ -124,6 +124,8 @@ strict_equality = true
 [[tool.mypy.overrides]]
 module = [
   "_f2c_fixes",
+  "pip",
+  "pip.*",
   "resolvelib",
   "ruamel.yaml",
   "tomllib",
