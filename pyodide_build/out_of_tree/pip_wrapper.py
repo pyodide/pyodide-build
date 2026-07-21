@@ -1,3 +1,5 @@
+# This file is copied to the venv build directory and executed there, so it
+# must not import any pyodide-build source files.
 import json
 import os
 import platform
@@ -17,8 +19,9 @@ class Config:
     sysconfigdata_dir: str
 
 
-with (Path(__file__).parent / "pyodide_pip_config.json").open("r") as _config_file:
-    CONFIG = Config(**json.load(_config_file))
+CONFIG = Config(
+    **json.loads((Path(__file__).parent / "pyodide_pip_config.json").read_text())
+)
 
 
 # when pip installs an executable it uses sys.executable to create the

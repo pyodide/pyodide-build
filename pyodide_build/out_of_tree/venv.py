@@ -395,8 +395,9 @@ class PyodideVenv(ABC):
 
         pip_wrapper_src = Path(__file__).parent / "pip_wrapper.py"
         shutil.copy(pip_wrapper_src, self.pip_wrapper_path)
-        with (self.venv_bin / "pyodide_pip_config.json").open("w") as f:
-            json.dump(self._get_pyodide_pip_config(), f)
+        (self.venv_bin / "pyodide_pip_config.json").write_text(
+            json.dumps(self._get_pyodide_pip_config())
+        )
 
         # On windows, link the venv site-packages to the host site-packages so that the packages
         # installed in the windows location are visible to pyodide environment.
