@@ -251,7 +251,7 @@ BUILD_KEY_TO_VAR: dict[str, str] = {
     "pythoninclude": "PYTHONINCLUDE",
     "pyversion": "PYVERSION",
     "cpythoninstall": "CPYTHONINSTALL",
-    "rustflags": "RUSTFLAGS",
+    "rustflags": "CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS",
     "rust_toolchain": "RUST_TOOLCHAIN",
     "rust_emscripten_target_url": "RUST_EMSCRIPTEN_TARGET_URL",
     "cflags": "SIDE_MODULE_CFLAGS",
@@ -353,7 +353,7 @@ DEFAULT_CONFIG_COMPUTED: dict[str, str] = {
 PYODIDE_CLI_CONFIGS = {
     "emscripten_version": "PYODIDE_EMSCRIPTEN_VERSION",
     "python_version": "PYVERSION",
-    "rustflags": "RUSTFLAGS",
+    "rustflags": "CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS",
     "cmake_toolchain_file": "CMAKE_TOOLCHAIN_FILE",
     "rust_toolchain": "RUST_TOOLCHAIN",
     "rust_emscripten_target_url": "RUST_EMSCRIPTEN_TARGET_URL",

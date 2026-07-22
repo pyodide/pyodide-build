@@ -32,7 +32,7 @@ These keys can be set in `pyproject.toml` under `[tool.pyodide.build]` or via en
 | `cflags` | `CFLAGS` | C compiler flags |
 | `cxxflags` | `CXXFLAGS` | C++ compiler flags |
 | `ldflags` | `LDFLAGS` | Linker flags |
-| `rustflags` | `RUSTFLAGS` | Rust compiler flags |
+| `rustflags` | `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS` | Rust compiler flags (applied only to the `wasm32-unknown-emscripten` target) |
 | `rust_toolchain` | `RUST_TOOLCHAIN` | Required Rust nightly toolchain |
 | `meson_cross_file` | `MESON_CROSS_FILE` | Path to the Meson cross file |
 | `xbuildenv_path` | `PYODIDE_XBUILDENV_PATH` | Path to the cross-build environment |
