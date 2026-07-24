@@ -13,6 +13,7 @@ from io import StringIO
 from pathlib import Path
 
 from packaging.tags import Tag, compatible_tags, cpython_tags
+from packaging.version import Version
 
 from pyodide_build import __version__
 from pyodide_build.common import (
@@ -165,6 +166,11 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
             "PYODIDE_PACKAGE_ABI": "1",
         }
     )
+
+    # If the target Python is a pre-release, tell PyO3 to allow building against it.
+    pyversion = env.get("PYVERSION")
+    if pyversion and Version(pyversion).is_prerelease:
+        env["PYO3_USE_ABI3_FORWARD_COMPATIBILITY"] = "1"
 
     return env
 
