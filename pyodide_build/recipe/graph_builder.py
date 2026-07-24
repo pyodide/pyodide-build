@@ -14,10 +14,11 @@ from pathlib import Path
 from queue import PriorityQueue, Queue
 from threading import Lock, Thread
 from time import perf_counter, sleep
-from typing import Any
+from typing import Any, Literal, cast
 
 from packaging.utils import canonicalize_name
 from pyodide_lock import PyodideLockSpec
+from pyodide_lock.spec import InfoSpec
 from pyodide_lock.spec import PackageSpec as PackageLockSpec
 from pyodide_lock.utils import update_package_sha256
 from rich.live import Live
@@ -904,13 +905,13 @@ def generate_lockfile(
 
     # Build package.json data.
     [platform, _, arch] = build_env.platform().rpartition("_")
-    info = {
-        "arch": arch,
-        "platform": platform,
-        "version": build_env.get_build_flag("PYODIDE_VERSION"),
-        "python": build_env.get_build_flag("PYVERSION"),
-        "abi_version": build_env.get_build_flag("PYODIDE_ABI_VERSION"),
-    }
+    info = InfoSpec(
+        arch=cast(Literal["wasm32", "wasm64"], arch),
+        platform=platform,
+        version=build_env.get_build_flag("PYODIDE_VERSION"),
+        python=build_env.get_build_flag("PYVERSION"),
+        abi_version=build_env.get_build_flag("PYODIDE_ABI_VERSION"),
+    )
     packages = generate_packagedata(output_dir, pkg_map)
     lock_spec = PyodideLockSpec(info=info, packages=packages)
     lock_spec.check_wheel_filenames()
