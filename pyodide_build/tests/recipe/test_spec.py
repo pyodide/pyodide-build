@@ -1,7 +1,11 @@
 import pytest
-from pydantic import ValidationError
 
-from pyodide_build.recipe.spec import MetaConfig, _BuildSpec, _SourceSpec
+from pyodide_build.recipe.spec import (
+    MetaConfig,
+    SpecValidationError,
+    _BuildSpec,
+    _SourceSpec,
+)
 
 
 def test_wheel_and_host_deps():
@@ -13,11 +17,13 @@ def test_wheel_and_host_deps():
         "When source -> url is a wheel .test.whl. the package cannot have "
         "host dependencies. Found .'b'."
     )
-    with pytest.raises(ValidationError, match=msg):
-        MetaConfig(
-            package={"name": "a", "version": "0.2"},
-            source={"url": "test.whl", "sha256": ""},
-            requirements={"host": ["b"]},
+    with pytest.raises(SpecValidationError, match=msg):
+        MetaConfig.from_dict(
+            {
+                "package": {"name": "a", "version": "0.2"},
+                "source": {"url": "test.whl", "sha256": ""},
+                "requirements": {"host": ["b"]},
+            }
         )
 
 
@@ -25,35 +31,37 @@ def test_source_fields():
     """Test consistency of source meta.yaml fields"""
 
     msg = "Source section should not have both a 'url' and a 'path' key"
-    with pytest.raises(ValidationError, match=msg):
+    with pytest.raises(SpecValidationError, match=msg):
         _SourceSpec(url="a", path="b", sha256="a")
 
     msg = "If source is downloaded from url, it must have a 'source/sha256' hash"
-    with pytest.raises(ValidationError, match=msg):
+    with pytest.raises(SpecValidationError, match=msg):
         _SourceSpec(url="a")
 
     msg = "If source is in tree, 'source/patches' and 'source/extras' keys are not allowed"
-    with pytest.raises(ValidationError, match=msg):
+    with pytest.raises(SpecValidationError, match=msg):
         _SourceSpec(path="b", patches=["a"], sha256="a")
 
     msg = "If source is a wheel, 'source/patches' and 'source/extras' keys are not allowed"
-    with pytest.raises(ValidationError, match=msg):
+    with pytest.raises(SpecValidationError, match=msg):
         _SourceSpec(url="b.whl", patches=["a"], sha256="a")
 
 
 def test_build_fields():
     """Test consistency of source meta.yaml fields"""
     msg = "If building a static_library, 'build/post' key is not allowed."
-    with pytest.raises(ValidationError, match=msg):
-        _BuildSpec(type="static_library", post="a")
+    with pytest.raises(SpecValidationError, match=msg):
+        _BuildSpec.from_dict({"type": "static_library", "post": "a"})
 
 
 @pytest.mark.parametrize("exe", ["rustc", "cargo", "rustup"])
 def test_is_rust_package_1(exe):
-    pkg = MetaConfig(
-        package={"name": "a", "version": "0.2"},
-        source={"url": "test.whl", "sha256": ""},
-        requirements={"executable": [exe]},
+    pkg = MetaConfig.from_dict(
+        {
+            "package": {"name": "a", "version": "0.2"},
+            "source": {"url": "test.whl", "sha256": ""},
+            "requirements": {"executable": [exe]},
+        }
     )
     assert pkg.is_rust_package()
 
@@ -67,22 +75,26 @@ def test_is_rust_package_1(exe):
     ],
 )
 def test_is_rust_package_2(reqs):
-    pkg = MetaConfig(
-        package={"name": "a", "version": "0.2"},
-        source={"url": "test.tar", "sha256": ""},
-        **reqs,
+    pkg = MetaConfig.from_dict(
+        {
+            "package": {"name": "a", "version": "0.2"},
+            "source": {"url": "test.tar", "sha256": ""},
+            **reqs,
+        }
     )
     assert not pkg.is_rust_package()
 
 
 def test_wheel_source_with_retain_test_patterns():
-    pkg = MetaConfig(
-        package={"name": "test-pkg", "version": "1.0.0"},
-        source={"url": "test.whl", "sha256": "abc123"},
-        build={
-            "unvendor-tests": True,
-            "_retain-test-patterns": ["*conftest.py", "*test_keep.py"],
-        },
+    pkg = MetaConfig.from_dict(
+        {
+            "package": {"name": "test-pkg", "version": "1.0.0"},
+            "source": {"url": "test.whl", "sha256": "abc123"},
+            "build": {
+                "unvendor-tests": True,
+                "_retain-test-patterns": ["*conftest.py", "*test_keep.py"],
+            },
+        }
     )
     assert pkg.build.unvendor_tests is True
     assert pkg.build.retain_test_patterns == ["*conftest.py", "*test_keep.py"]

@@ -16,9 +16,10 @@ requires-python = ">=3.12"
 dependencies = [
     "build>=1.4,<1.6,!=1.4.4", # keep in sync with uv extra
     "pyodide-cli>=0.4.1",
-    "pyodide-lock~=0.1.0",
+    "pyodide-lock~=0.2.0",
     "auditwheel-emscripten~=0.2.0",
-    "pydantic>=2,<3",
+    "attrs",
+    "cattrs",
     "wheel",
     "ruamel.yaml",
     "packaging",
@@ -103,7 +104,6 @@ python_version = "3.12"
 show_error_codes = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-plugins = ["pydantic.mypy"]
 
 # Strict checks
 warn_unused_configs = true
