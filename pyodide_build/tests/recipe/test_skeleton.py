@@ -107,13 +107,15 @@ def test_mkpkg_update(tmpdir, old_dist_type, new_dist_type):
 
     old_ext = ".tar.gz" if old_dist_type == "sdist" else ".whl"
     old_url = "https://<some>/idna-2.0" + old_ext
-    db_init = MetaConfig(
-        package={"name": "idna", "version": "2.0"},
-        source={
-            "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
-            "url": old_url,
-        },
-        test={"imports": ["idna"]},
+    db_init = MetaConfig.from_dict(
+        {
+            "package": {"name": "idna", "version": "2.0"},
+            "source": {
+                "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
+                "url": old_url,
+            },
+            "test": {"imports": ["idna"]},
+        }
     )
 
     package_dir = base_dir / "idna"
@@ -215,13 +217,15 @@ def test_pin(tmpdir):
 def test_mkpkg_update_pinned(tmpdir):
     base_dir = Path(str(tmpdir))
 
-    db_init = MetaConfig(
-        package={"name": "idna", "version": "2.0", "pinned": True},
-        source={
-            "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
-            "url": "https://<some>/idna-2.0.whl",
-        },
-        test={"imports": ["idna"]},
+    db_init = MetaConfig.from_dict(
+        {
+            "package": {"name": "idna", "version": "2.0", "pinned": True},
+            "source": {
+                "sha256": "b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6",
+                "url": "https://<some>/idna-2.0.whl",
+            },
+            "test": {"imports": ["idna"]},
+        }
     )
 
     package_dir = base_dir / "idna"
@@ -490,10 +494,12 @@ def _make_mock_metadata(
 
 def _write_recipe(base_dir: Path, name: str, ver: str, url: str, sha256: str) -> Path:
     """Write a minimal meta.yaml for the given package."""
-    db = MetaConfig(
-        package={"name": name, "version": ver},
-        source={"sha256": sha256, "url": url},
-        test={"imports": [name]},
+    db = MetaConfig.from_dict(
+        {
+            "package": {"name": name, "version": ver},
+            "source": {"sha256": sha256, "url": url},
+            "test": {"imports": [name]},
+        }
     )
     pkg_dir = base_dir / name
     pkg_dir.mkdir(parents=True, exist_ok=True)

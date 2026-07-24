@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess as sp
 import sys
+import sysconfig
 import traceback
 import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -56,6 +57,21 @@ SYMLINK_ENV_VARS = {
 }
 
 
+def _host_scripts_dir() -> str:
+    """
+    Return the scripts directory of the Python environment that runs the build.
+    """
+    # We need this to refer to the host environment. Temporarily remove
+    # _PYTHON_SYSCONFIGDATA_NAME environment variable so we don't look for
+    # Emscripten sysconfig.
+    saved = os.environ.pop("_PYTHON_SYSCONFIGDATA_NAME", None)
+    try:
+        return sysconfig.get_path("scripts")
+    finally:
+        if saved is not None:
+            os.environ["_PYTHON_SYSCONFIGDATA_NAME"] = saved
+
+
 def _gen_runner(
     cross_build_env: Mapping[str, str],
     isolated_build_env: _DefaultIsolatedEnv | None = None,
@@ -93,11 +109,9 @@ def _gen_runner(
         if isolated_build_env is not None:
             env["BUILD_ENV_SCRIPTS_DIR"] = isolated_build_env.scripts_dir
         else:
-            # For non-isolated builds, set a fallback path or use the current Python path
-            import sysconfig
-
-            scripts_dir = sysconfig.get_path("scripts")
-            env["BUILD_ENV_SCRIPTS_DIR"] = scripts_dir
+            # For non-isolated builds, build dependencies are installed into the
+            # environment that is running the build.
+            env["BUILD_ENV_SCRIPTS_DIR"] = _host_scripts_dir()
 
         env["PATH"] = f"{cross_build_env['COMPILER_WRAPPER_DIR']}:{env['PATH']}"
         if verbosity >= 1:

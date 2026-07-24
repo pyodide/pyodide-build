@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PYO3_USE_ABI3_FORWARD_COMPATIBILITY` environment variable is now set for all
   builds so that PyO3 packages will build against the unstable CPython version.
 
+### Changed
+
+- Replaced the `pydantic` dependency with `attrs` + `cattrs` for recipe
+  (`meta.yaml`) and cross-build environment metadata parsing/validation.
+  Recipe validation errors now raise `pyodide_build.recipe.spec.SpecValidationError`
+  instead of `pydantic.ValidationError`.
+
 ## [0.37.0] - 2026/07/24
 
 ### Changed

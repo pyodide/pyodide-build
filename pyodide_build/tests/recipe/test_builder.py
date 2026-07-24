@@ -3,9 +3,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Self
 
-import pydantic
+import attrs
 import pytest
 
 from pyodide_build import common
@@ -204,10 +203,10 @@ def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
     assert data[-3:] == ["numpy < 2.0", "pytest == 7.0", "setuptools < 75"], data
 
 
+@attrs.define
 class MockSourceSpec(_SourceSpec):
-    @pydantic.model_validator(mode="after")
-    def _check_patches_extra(self) -> Self:
-        return self
+    def _check_patches_extra(self) -> None:
+        return None
 
 
 @pytest.mark.parametrize("is_wheel", [False, True])

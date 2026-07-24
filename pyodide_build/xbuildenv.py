@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import subprocess
@@ -470,7 +469,7 @@ class CrossBuildEnvManager:
             )
             return
 
-        lockfile = PyodideLockSpec(**json.loads(lockfile_path.read_bytes()))
+        lockfile = PyodideLockSpec.from_json(lockfile_path)
         create_package_index(lockfile.packages, xbuildenv_pyodide_root, cdn_base)
 
     def uninstall_version(self, version: str | None) -> str:
