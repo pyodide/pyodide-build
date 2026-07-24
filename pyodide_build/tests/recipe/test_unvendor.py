@@ -15,9 +15,9 @@ def test_unvendor_tests_in_wheel(tmp_path):
     test_tar_path = unvendor.unvendor_tests_in_wheel(test_wheel_path, [])
 
     assert test_tar_path.exists()
-    assert test_tar_path.name == "package-with-bunch-of-test-directories-tests.tar"
+    assert test_tar_path.name == "package-with-bunch-of-test-directories-tests.zip"
 
-    # Check the contents of the tar file
+    # Check the contents of the zip file
     shutil.unpack_archive(test_tar_path, extract_dir=tmp_path / "extracted_tests")
     files = [f.name for f in (tmp_path / "extracted_tests").rglob("*")]
 
@@ -52,9 +52,9 @@ def test_unvendor_tests_in_wheel_retain(tmp_path):
     )
 
     assert test_tar_path.exists()
-    assert test_tar_path.name == "package-with-bunch-of-test-directories-tests.tar"
+    assert test_tar_path.name == "package-with-bunch-of-test-directories-tests.zip"
 
-    # Check the contents of the tar file
+    # Check the contents of the zip file
     shutil.unpack_archive(test_tar_path, extract_dir=tmp_path / "extracted_tests")
     files = [f.name for f in (tmp_path / "extracted_tests").rglob("*")]
 

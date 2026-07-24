@@ -17,7 +17,7 @@ def unvendor_tests_in_wheel(
     Unvendor tests from a wheel file.
 
     This function finds the tests in the wheel file, and extracts them to a separate
-    tar file. The tar file is placed in the same directory as the wheel file, with the -tests.tar suffix.
+    zip file. The zip file is placed in the same directory as the wheel file, with the -tests.zip suffix.
 
     Parameters
     ----------
@@ -29,12 +29,12 @@ def unvendor_tests_in_wheel(
 
     Returns
     -------
-    The path to the tar file containing the tests. If no tests were found, returns None.
+    The path to the zip file containing the tests. If no tests were found, returns None.
     """
     retain_patterns = retain_patterns or []
 
     name = parse_wheel_filename(wheel.name)[0]
-    file_format = "tar"
+    file_format = "zip"
     basename = f"{name}-tests"
     fullname = f"{basename}.{file_format}"
     destination = wheel.parent / fullname
