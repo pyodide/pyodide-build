@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Recipe validation errors now raise `pyodide_build.recipe.spec.SpecValidationError`
   instead of `pydantic.ValidationError`.
 
+- The `rustflags` config is now applied via the target-specific
+  `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS` environment variable instead
+  of the global `RUSTFLAGS`, so the flags only affect the
+  `wasm32-unknown-emscripten` target and no longer leak into host builds of
+  build-dependencies and proc-macros.
+
 ## [0.37.0] - 2026/07/24
 
 ### Changed
