@@ -7,7 +7,6 @@ from typing import Any
 
 import cattrs
 from attrs import asdict, define, field
-from cattrs.gen import make_dict_structure_fn
 from packaging.version import Version
 
 DEFAULT_CROSS_BUILD_ENV_METADATA_URL = (
@@ -218,16 +217,6 @@ class CrossBuildEnvMetaSpec:
 
 
 _converter = cattrs.Converter(detailed_validation=False)
-# CrossBuildEnvReleaseSpec uses extra="ignore" (default), CrossBuildEnvMetaSpec
-# uses extra="forbid".
-_converter.register_structure_hook(
-    CrossBuildEnvMetaSpec,
-    make_dict_structure_fn(
-        CrossBuildEnvMetaSpec,
-        _converter,
-        _cattrs_forbid_extra_keys=True,
-    ),
-)
 
 
 @contextmanager
