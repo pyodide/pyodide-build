@@ -512,7 +512,11 @@ class RecipeBuilder:
             build_env["UV_BUILD_CONSTRAINT"] = constraints_file
 
             wheel_path = pypabuild.build(
-                self.src_extract_dir, self.src_dist_dir, build_env, config_settings
+                self.src_extract_dir,
+                self.src_dist_dir,
+                build_env,
+                config_settings,
+                extra_build_requires=self.recipe.requirements.build,
             )
             check_versions_match(self.name, Path(wheel_path).name, self.version)
 

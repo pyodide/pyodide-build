@@ -290,6 +290,7 @@ def _build_in_isolated_env(
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
     verbosity: int = 0,
+    extra_build_requires: Sequence[str] = (),
 ) -> str:
     # For debugging: The following line disables removal of the isolated venv.
     # It will be left in the /tmp folder and can be inspected or entered as
@@ -305,7 +306,9 @@ def _build_in_isolated_env(
 
         # first install the build dependencies
         _copy_sysconfigdata_to_isolated_env(env)
-        install_reqs(build_env, env, builder.build_system_requires)
+        install_reqs(
+            build_env, env, builder.build_system_requires | set(extra_build_requires)
+        )
         build_reqs: set[str] | None = None
         try:
             build_reqs = builder.get_requires_for_build(
@@ -547,6 +550,7 @@ def build(
     isolation: bool = True,
     skip_dependency_check: bool = False,
     verbosity: int = 0,
+    extra_build_requires: Sequence[str] = (),
 ) -> str:
     with _configure_build_verbosity(verbosity, _make_pypa_build_logger(verbosity)):
         try:
@@ -559,6 +563,7 @@ def build(
                         "wheel",
                         config_settings,
                         verbosity=verbosity,
+                        extra_build_requires=extra_build_requires,
                     )
                 else:
                     built = _build_in_current_env(

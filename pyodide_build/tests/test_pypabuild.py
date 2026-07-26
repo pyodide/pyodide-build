@@ -1,5 +1,6 @@
 import os
 import subprocess
+from collections.abc import Sequence
 
 import pytest
 from build import BuildBackendException, BuildException, FailedProcessError
@@ -366,7 +367,13 @@ def test_build_sets_ctx_verbosity(tmp_path, dummy_xbuildenv, monkeypatch, verbos
     observed: list[int] = []
 
     def _fake_isolated(
-        build_env, srcdir, outdir, distribution, config_settings, verbosity=0
+        build_env,
+        srcdir,
+        outdir,
+        distribution,
+        config_settings,
+        verbosity=0,
+        extra_build_requires=(),
     ):
         observed.append(_build_ctx.VERBOSITY.get())
         return os.path.join(outdir, "pkg-1.0-py3-none-any.whl")
@@ -387,3 +394,90 @@ def test_build_sets_ctx_verbosity(tmp_path, dummy_xbuildenv, monkeypatch, verbos
         pypabuild.build(tmp_path, tmp_path / "dist", env, {}, verbosity=verbosity)
 
     assert observed == [verbosity]
+
+
+def test_build_forwards_extra_build_requires(tmp_path, dummy_xbuildenv, monkeypatch):
+    """pypabuild.build() must pass extra_build_requires through to the isolated env."""
+    observed: list[Sequence[str]] = []
+
+    def _fake_isolated(
+        build_env,
+        srcdir,
+        outdir,
+        distribution,
+        config_settings,
+        verbosity=0,
+        extra_build_requires=(),
+    ):
+        observed.append(extra_build_requires)
+        return os.path.join(outdir, "pkg-1.0-py3-none-any.whl")
+
+    monkeypatch.setattr(pypabuild, "_build_in_isolated_env", _fake_isolated)
+
+    pypabuild.build(
+        tmp_path,
+        tmp_path / "dist",
+        {"PATH": ""},
+        {},
+        extra_build_requires=["cython", "pkgconfig"],
+    )
+
+    assert observed == [["cython", "pkgconfig"]]
+
+
+def test_build_in_isolated_env_installs_extra_build_requires(
+    tmp_path, monkeypatch, reset_env_vars
+):
+    """extra_build_requires must be installed along with the build system requires."""
+    installed: list[set[str]] = []
+
+    class DummyIsolatedEnv:
+        path = str(tmp_path / "isolated")
+
+        def __init__(self, installer):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    class DummyProjectBuilder:
+        build_system_requires = {"setuptools"}
+
+        @classmethod
+        def from_isolated_env(cls, env, srcdir, runner=None):
+            return cls()
+
+        def get_requires_for_build(self, distribution, config_settings=None):
+            return {"wheel"}
+
+        def build(self, distribution, outdir, config_settings):
+            return os.path.join(outdir, "pkg-1.0-py3-none-any.whl")
+
+    monkeypatch.setattr(pypabuild, "_DefaultIsolatedEnv", DummyIsolatedEnv)
+    monkeypatch.setattr(pypabuild, "ProjectBuilder", DummyProjectBuilder)
+    monkeypatch.setattr(
+        pypabuild, "_copy_sysconfigdata_to_isolated_env", lambda env: None
+    )
+    monkeypatch.setattr(pypabuild, "_get_unisolated_pkgconfig_dirs", lambda path: [])
+    monkeypatch.setattr(
+        pypabuild,
+        "install_reqs",
+        lambda build_env, env, reqs: installed.append(set(reqs)),
+    )
+
+    wheel = pypabuild._build_in_isolated_env(
+        {"PATH": ""},
+        tmp_path,
+        str(tmp_path / "dist"),
+        "wheel",
+        {},
+        extra_build_requires=["cython", "pkgconfig"],
+    )
+
+    assert wheel.endswith("pkg-1.0-py3-none-any.whl")
+    # The build system requires and the extra build requires are installed
+    # together, before the backend is queried for its dynamic requirements.
+    assert installed == [{"setuptools", "cython", "pkgconfig"}, {"wheel"}]
