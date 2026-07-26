@@ -162,6 +162,7 @@ jobs:
         # for the pip installer and on Linux
           - task: {name: test-src-no-isolation, installer: pip} # installer doesn't matter
             os: ubuntu-latest
+            pyodide-version: stable
           - task: { name: test-recipe, installer: pip }
             os: ubuntu-latest
             pyodide-version: minimum
