@@ -181,18 +181,10 @@ jobs:
             os: ubuntu-latest
             pyodide-version: minimum
             python-version: "3.13"
-          - task: { name: test-recipe, installer: pip }
-            os: ubuntu-latest
-            pyodide-version: minimum
-            python-version: "3.14"
           - task: { name: test-src, installer: pip }
             os: ubuntu-latest
             pyodide-version: minimum
             python-version: "3.13"
-          - task: { name: test-src, installer: pip }
-            os: ubuntu-latest
-            pyodide-version: minimum
-            python-version: "3.14"
         # Debug xbuildenvs are only published for Python 3.14
           - task: { name: test-src, installer: pip }
             os: ubuntu-latest
