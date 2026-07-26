@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -42,21 +43,36 @@ def reset_cache():
     _reset()
 
 
+def test_xbuildenv_path() -> Path:
+    """Returns the dummy xbuildenv archive built per the Python version we are running on"""
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    path = (
+        Path(__file__).parent
+        / "_test_xbuildenv"
+        / f"xbuildenv-test-{python_version}.tar.gz"
+    )
+    if not path.exists():
+        raise FileNotFoundError(
+            f"There is no test xbuildenv for Python {python_version}. "
+            f"Build one with {path.parent / 'make_fixture.py'}."
+        )
+
+    return path
+
+
 @pytest.fixture(scope="function")
 def dummy_xbuildenv_url(httpserver):
     """
     Returns the URL of a dummy xbuildenv archive.
     This archive contains a minimal files that are required to install a xbuildenv.
     """
-    test_xbuildenv_archive_path = (
-        Path(__file__).parent / "_test_xbuildenv" / "xbuildenv-test.tar.gz"
-    )
+    test_xbuildenv_archive_path = test_xbuildenv_path()
     test_xbuildenv_archive = test_xbuildenv_archive_path.read_bytes()
 
-    httpserver.expect_request("/xbuildenv-test.tar.gz").respond_with_data(
+    httpserver.expect_request(f"/{test_xbuildenv_archive_path.name}").respond_with_data(
         test_xbuildenv_archive
     )
-    yield httpserver.url_for("/xbuildenv-test.tar.gz")
+    yield httpserver.url_for(f"/{test_xbuildenv_archive_path.name}")
 
 
 @pytest.fixture(scope="function")
