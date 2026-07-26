@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 
@@ -142,11 +143,14 @@ class TestOutOfTree(TestInTree):
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
         makefile_envs = manager.pyodide_root / "Makefile.envs"
         contents = makefile_envs.read_text()
-        makefile_envs.write_text(
-            contents.replace(
-                "export PYVERSION ?= 3.13.2", f"export PYVERSION ?= {pyversion}"
-            )
+        contents, replaced = re.subn(
+            r"^export PYVERSION \?= .*$",
+            f"export PYVERSION ?= {pyversion}",
+            contents,
+            flags=re.MULTILINE,
         )
+        assert replaced == 1, "PYVERSION is not set the way this test expects"
+        makefile_envs.write_text(contents)
 
         build_env.get_build_environment_vars.cache_clear()
         build_vars = build_env.get_build_environment_vars(manager.pyodide_root)
