@@ -312,6 +312,22 @@ jobs:
             ./scripts/pyodide_venv_test.sh
           fi
 
+      - name: Create a venv under Program Files
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dest = "C:\Program Files\pyodide venv test\.venv-pyodide"
+          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+
+          pyodide venv $dest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          & "$dest\Scripts\pip.bat" install six
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          & "$dest\Scripts\python.bat" -c "import six; print(six.__version__)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   coverage:
     name: Collect and upload coverage
     runs-on: ubuntu-latest
