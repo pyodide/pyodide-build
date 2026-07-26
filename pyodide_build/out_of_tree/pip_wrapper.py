@@ -37,7 +37,10 @@ def get_executable():
         raise RuntimeError(
             f'Internal Pyodide error: expected sys.executable="{sys.executable}" to end with "{CONFIG.executable_symlink_suffix}"'
         )
-    return sys.executable.removesuffix(CONFIG.executable_symlink_suffix)
+    return (
+        sys.executable.removesuffix(CONFIG.executable_symlink_suffix)
+        + CONFIG.exe_suffix
+    )
 
 
 scripts.get_executable = get_executable  # type: ignore[attr-defined]

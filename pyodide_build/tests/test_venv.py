@@ -630,6 +630,33 @@ def test_windows_pyodide_cli_script_runs_with_spaces_in_paths(tmp_path, monkeypa
     assert result.stdout.splitlines() == [str(pyodide_root), "build ."]
 
 
+@pytest.mark.parametrize(
+    "make_venv",
+    [_unix_venv_with_spaces, _windows_venv_with_spaces],
+    ids=["unix", "windows"],
+)
+def test_pip_wrapper_executable_is_the_interpreter(tmp_path, make_venv):
+    """The path pip bakes into console scripts must be the venv interpreter.
+
+    ``pip_wrapper.get_executable`` rewrites ``sys.executable`` (the host python
+    symlink) into the Pyodide interpreter next to it. The two names differ by
+    more than the symlink suffix on Windows, where the host symlink ends in
+    ``.exe`` but the interpreter is a ``.bat``, so dropping the suffix alone
+    used to leave a path that does not exist.
+    """
+    pyodide_venv = make_venv(tmp_path)
+
+    # What pip_wrapper.get_executable() computes. It cannot import from
+    # pyodide-build, so the calculation is repeated rather than shared.
+    sys_executable = str(pyodide_venv.host_python_symlink_path)
+    executable = (
+        sys_executable.removesuffix(pyodide_venv.host_python_symlink_suffix)
+        + pyodide_venv.exe_suffix
+    )
+
+    assert executable == str(pyodide_venv.interpreter_symlink_path)
+
+
 def test_cleanup_skips_preexisting_directory(monkeypatch, tmp_path):
     """A failed venv creation must not delete a pre-existing destination."""
     dest = tmp_path / "existing-venv"
