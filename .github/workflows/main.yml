@@ -335,10 +335,15 @@ jobs:
           pyodide venv .venv-pyodide
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          .\.venv-pyodide\Scripts\pip.bat install six
+          .\.venv-pyodide\Scripts\pip.bat install pygments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          .\.venv-pyodide\Scripts\python.bat -c "import six; print(six.__version__)"
+          Get-ChildItem .\.venv-pyodide\Scripts
+          $script = Get-ChildItem .\.venv-pyodide\Scripts -Filter "pygmentize*" |
+            Select-Object -First 1
+          if (-not $script) { throw "pygmentize console script was not created" }
+
+          & $script.FullName -V
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   coverage:
