@@ -32,6 +32,7 @@ def reset_cache():
         build_env.get_host_build_environment_vars.cache_clear()
         build_env.get_build_environment_vars.cache_clear()
         build_env.get_unisolated_packages.cache_clear()
+        build_env.pyodide_tags.cache_clear()
         common.default_xbuildenv_path.cache_clear()
 
     _reset()
@@ -86,7 +87,8 @@ def dummy_xbuildenv(
 
     manager = CrossBuildEnvManager(default_xbuildenv_path())
     manager.install(
-        version=None, url=dummy_xbuildenv_url, skip_install_cross_build_packages=True
+        version=None,
+        url=dummy_xbuildenv_url,
     )
 
     cur_dir = os.getcwd()

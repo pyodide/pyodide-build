@@ -1,3 +1,5 @@
+import ast
+import json
 import os
 import shutil
 import sys
@@ -8,7 +10,12 @@ from typing import Any
 
 import virtualenv
 
-from pyodide_build.build_env import get_build_flag, get_pyodide_root, in_xbuildenv
+from pyodide_build.build_env import (
+    get_build_flag,
+    get_pyodide_root,
+    in_xbuildenv,
+    wheel_platform,
+)
 from pyodide_build.common import IS_WIN, run_command
 from pyodide_build.logger import logger
 
@@ -32,22 +39,47 @@ SUPPORTED_VIRTUALENV_OPTIONS = [
     "--no-periodic-update",
 ]
 
+# See https://github.com/python/cpython/issues/119535
+# fmt: off
+PI_ALIASES = (
+    "pythonπ",           # pythonπ U+03C0 GREEK SMALL LETTER PI
+    "python\U0001d70b",  # python𝜋 U+1D70B MATHEMATICAL ITALIC SMALL PI
+    "πthon",             # πthon
+    "\U0001d70bthon",    # 𝜋thon
+)
+# fmt: on
+
 
 def dedent(s: str) -> str:
     return textwrap.dedent(s).strip() + "\n"
+
+
+def _pip_script_name(pip: Path, exe_suffix: str) -> Path:
+    """Return the pip script path with *exe_suffix* applied.
+
+    On Unix ``exe_suffix`` is empty and the name is returned unchanged, so
+    versioned names like ``pip3.12`` keep their version (``Path.with_suffix("")``
+    would wrongly strip it to ``pip3``). On Windows the real extension (``.exe``
+    or ``.bat``) is replaced with ``exe_suffix``.
+    """
+    if not exe_suffix:
+        return pip
+    base_name = pip.stem if pip.suffix else pip.name
+    return pip.parent / (base_name + exe_suffix)
 
 
 def get_pyversion() -> str:
     return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
-def check_host_python_version(session: Any) -> None:
-    pyodide_version = session.interpreter.version.partition(" ")[0].split(".")[:2]
-    sys_version = [str(sys.version_info.major), str(sys.version_info.minor)]
+def check_host_python_version(session: Any) -> tuple[int, int]:
+    pyodide_version_str = session.interpreter.version.partition(" ")[0].split(".")[:2]
+    pyodide_version = (int(pyodide_version_str[0]), int(pyodide_version_str[1]))
+    sys_version = (sys.version_info.major, sys.version_info.minor)
     if pyodide_version == sys_version:
-        return
-    pyodide_version_fmt = ".".join(pyodide_version)
-    sys_version_fmt = ".".join(sys_version)
+        return pyodide_version
+    pyodide_version_fmt = ".".join(pyodide_version_str)
+    sys_version_fmt = ".".join(str(version) for version in sys_version)
     logger.stderr(
         f"Expected host Python version to be {pyodide_version_fmt} but got version {sys_version_fmt}"
     )
@@ -70,9 +102,10 @@ class PyodideVenv(ABC):
         self.virtualenv_args = virtualenv_args or []
         self._venv_root: Path | None = None
         self._venv_bin: Path | None = None
+        self._pyodide_pyversion: tuple[int, int] | None = None
 
     @property
-    def venv_root(self) -> Path | None:
+    def venv_root(self) -> Path:
         """Get the path to the virtualenv's root directory."""
         if self._venv_root is None:
             raise RuntimeError("venv_root is not set")
@@ -80,7 +113,7 @@ class PyodideVenv(ABC):
         return self._venv_root
 
     @property
-    def venv_bin(self) -> Path | None:
+    def venv_bin(self) -> Path:
         """Get the path to the virtualenv's bin directory."""
         if self._venv_bin is None:
             raise RuntimeError("venv_bin is not set")
@@ -281,10 +314,11 @@ class PyodideVenv(ABC):
             err_msg="ERROR: failed to install unvendored stdlib modules",
         )
 
-    def _get_pip_monkeypatch(self) -> str:
-        """Monkey patch pip's environment to show info about Pyodide's environment.
+    def _get_pyodide_pip_config(self) -> dict[str, Any]:
+        """Compute the config used by the pip wrapper to emulate Pyodide's environment.
 
-        The code returned is injected at the beginning of the pip script.
+        The returned dict is serialized to ``pyodide_pip_config.json`` next to the
+        pip wrapper script and loaded by ``pip_wrapper.py`` at runtime.
         """
         result = run_command(
             [
@@ -307,143 +341,17 @@ class PyodideVenv(ABC):
             ],
             err_msg="ERROR: failed to invoke Pyodide",
         )
-        platform_data = result.stdout
-        sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
-        pip_patched_name = self.pip_patched_path.name
-        exe_suffix = self.exe_suffix
-        pyodide_platform = f"pyodide_{get_build_flag('PYODIDE_ABI_VERSION')}_wasm32"
-        return dedent(
-            """\
-            import os
-            import platform
-            import sys
-            import pathlib
-            """
-            # when pip installs an executable it uses sys.executable to create the
-            # shebang for the installed executable. The shebang for pip points to
-            # python-host but we want the shebang of the executable that we install
-            # to point to Pyodide python. We monkeypatch distlib.scripts.get_executable
-            # to return the value with the host suffix removed.
-            f"""
-            from pip._vendor.distlib import scripts
-            EXECUTABLE_SUFFIX = "{self.host_python_symlink_suffix}"
-            def get_executable():
-                if not sys.executable.endswith(EXECUTABLE_SUFFIX):
-                    raise RuntimeError(f'Internal Pyodide error: expected sys.executable="{{sys.executable}}" to end with "{{EXECUTABLE_SUFFIX}}"')
-                return sys.executable.removesuffix(EXECUTABLE_SUFFIX)
-
-            scripts.get_executable = get_executable
-
-            from pip._vendor.packaging import tags
-            orig_platform_tags = tags.platform_tags
-            """
-            # TODO: Remove the following monkeypatch when we merge and pull in
-            # https://github.com/pypa/packaging/pull/804
-            """
-            def _emscripten_platforms():
-                pyodide_abi_version = sysconfig.get_config_var("PYODIDE_ABI_VERSION")
-                if pyodide_abi_version:
-                    yield f"pyodide_{pyodide_abi_version}_wasm32"
-                yield from tags._generic_platforms()
-
-            def platform_tags():
-                if platform.system() == "Emscripten":
-                    yield from _emscripten_platforms()
-                    return
-                return orig_platform_tags()
-
-            tags.platform_tags = platform_tags
-            """
-            f"""
-            os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
-
-            os.getuid = os.getuid if hasattr(os, "getuid") else lambda: 0
-            sys.platlibdir = "lib"
-            sys.implementation._multiarch = multiarch
-            sys.abiflags = getattr(sys, "abiflags", "")  # ensure abiflags exists even in Windows
-            platform.system = lambda: platform_system
-            platform.machine = lambda: "wasm32"
-            os.environ["_PYTHON_HOST_PLATFORM"] = host_platform
-            os.environ["_PYTHON_SYSCONFIGDATA_NAME"] = f'_sysconfigdata_{{sys.abiflags}}_{{sys_platform}}_{{sys.implementation._multiarch}}'
-            sys.path.append("{sysconfigdata_dir}")
-            import sysconfig
-            sysconfig._init_config_vars()
-            del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
-            """
-            # On windows, patching sys.platform or os.name breaks how pip internals work (e.g. Pathlib)
-            # So instead, we use `--platform` option to inject the correct platform to pip commands.
-            # However, pip does not allow cross-platform installation unless `--target` flag is given,
-            # but `--target` behaves differently from normal installation (e.g. it does not support upgrading/downgrading packages very well, etc).
-            # so we ended up monkey-patching the cli option check function to allow using `--platform` without `--target`.
-            f"""
-            if os.name == "nt":
-                import pip._internal.cli.cmdoptions as cmdoptions
-
-                _original_check = cmdoptions.check_dist_restriction
-
-                def _patched_check_dist_restriction(options, check_target=False):
-                    _original_check(options, check_target=False)  # always skip target check
-
-                cmdoptions.check_dist_restriction = _patched_check_dist_restriction
-
-                if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
-                    if "--platform" not in sys.argv:
-                        sys.argv.extend(["--platform", "{pyodide_platform}"])
-                    if "--only-binary" not in sys.argv:
-                        sys.argv.extend(["--only-binary", ":all:"])
-            else:
-                sys.platform = sys_platform
-            """
-            # Handle pip updates.
-            #
-            # The pip executable should be a symlink to pip_patched. If it is not a
-            # link, or it is a symlink to something else, pip has been updated. We
-            # have to restore the correct value of pip. Iterate through all of the
-            # pip variants in the folder and remove them and replace with a symlink
-            # to pip_patched.
-            # Avoid using pathlib as it might mess up the path calculation on cross-platform environments.
-            f"""
-            file_path = os.path.join(os.path.dirname(__file__), "pip{exe_suffix}")
-
-
-            def pip_is_okay():
-                try:
-                    return os.readlink(file_path) == os.path.join(os.path.dirname(file_path), "{pip_patched_name}")
-                except OSError as e:
-                    if e.strerror != "Invalid argument":
-                        raise
-                return False
-
-
-            def maybe_repair_after_pip_update():
-                if pip_is_okay():
-                    return
-
-                venv_bin = os.path.dirname(file_path)
-                pip_patched = os.path.join(venv_bin, "{pip_patched_name}")
-                for pip in os.listdir(venv_bin):
-                    if not pip.startswith("pip"):
-                        continue
-                    if pip == "{pip_patched_name}":
-                        continue
-                    pip_path = os.path.join(venv_bin, pip)
-                    try:
-                        os.unlink(pip_path)
-                    except FileNotFoundError:
-                        pass
-                    patched_pip_exe = os.path.join(venv_bin, f"pip{exe_suffix}")
-                    if patched_pip_exe != pip_patched:
-                        try:
-                            os.unlink(patched_pip_exe)
-                        except FileNotFoundError:
-                            pass
-                        os.symlink(pip_patched, patched_pip_exe)
-
-
-            import atexit
-
-            atexit.register(maybe_repair_after_pip_update)
-            """
+        sysconfigdata_dir = str(
+            Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
+        )
+        return dict(
+            executable_symlink_suffix=self.host_python_symlink_suffix,
+            exe_suffix=self.exe_suffix,
+            pip_patched_name=self.pip_patched_path.name,
+            pip_wrapper_name=self.pip_wrapper_path.name,
+            platform_data=ast.literal_eval(result.stdout),
+            pyodide_platform=wheel_platform(),
+            sysconfigdata_dir=sysconfigdata_dir,
         )
 
     def _create_pip_script(self) -> None:
@@ -465,7 +373,7 @@ class PyodideVenv(ABC):
                 continue
             pip.unlink(missing_ok=True)
 
-            patched_pip_exe = pip.with_suffix(self.exe_suffix)
+            patched_pip_exe = _pip_script_name(pip, self.exe_suffix)
             if patched_pip_exe != self.pip_patched_path:
                 patched_pip_exe.unlink(missing_ok=True)
                 patched_pip_exe.symlink_to(self.pip_patched_path)
@@ -485,21 +393,10 @@ class PyodideVenv(ABC):
         self.pip_patched_path.write_text(self.host_pip_wrapper)
         self.pip_patched_path.chmod(0o777)
 
-        pip_wrapper_name = self.pip_wrapper_path.name
-        self.pip_wrapper_path.write_text(
-            (
-                self._get_pip_monkeypatch()
-                + dedent(
-                    f"""
-                    import re
-                    import sys
-                    from pip._internal.cli.main import main
-                    if __name__ == '__main__':
-                        sys.argv[0] = sys.argv[0].replace('{pip_wrapper_name}', 'pip')
-                        sys.exit(main())
-                    """
-                )
-            ).replace("\\", "\\\\")  # Escape backslashes for Windows batch files
+        pip_wrapper_src = Path(__file__).parent / "pip_wrapper.py"
+        shutil.copy(pip_wrapper_src, self.pip_wrapper_path)
+        (self.venv_bin / "pyodide_pip_config.json").write_text(
+            json.dumps(self._get_pyodide_pip_config())
         )
 
         # On windows, link the venv site-packages to the host site-packages so that the packages
@@ -533,6 +430,21 @@ class PyodideVenv(ABC):
         """Create and return a virtualenv session object."""
         pass
 
+    def _create_pi_aliases(self) -> None:
+        """
+        Create pythonπ-style easter egg aliases for the Python 3.14
+        release. See https://github.com/python/cpython/issues/119535 and
+        https://github.com/python/cpython/pull/119536 for details. This
+        is a no-op for all other versions of Python.
+        """
+        if self._pyodide_pyversion != (3, 14):
+            return
+
+        for name in PI_ALIASES:
+            alias_path = self.venv_bin / f"{name}{self.exe_suffix}"
+            alias_path.unlink(missing_ok=True)
+            alias_path.symlink_to(self.interpreter_path)
+
     def configure_virtualenv(self) -> None:
         """Configure the virtualenv after creation."""
         logger.info("... Configuring virtualenv")
@@ -540,23 +452,33 @@ class PyodideVenv(ABC):
         self._create_pip_conf()
         self._create_pip_script()
         self._create_pyodide_script()
+        self._create_pi_aliases()
 
     def create(self) -> None:
         """Create the Pyodide virtualenv."""
         logger.info("Creating Pyodide virtualenv at %s", self.dest)
         self.validate_interpreter()
         session = self._create_session()
-        check_host_python_version(session)
+        self._pyodide_pyversion = check_host_python_version(session)
+
+        dest_path = Path(session.creator.dest)
+        dest_existed_before = dest_path.exists()
 
         try:
             session.run()
-            self._venv_root = Path(session.creator.dest).absolute()
+            self._venv_root = dest_path.absolute()
             self._venv_bin = self._venv_root / self.bin_dir_name
 
             self.configure_virtualenv()
             self._install_stdlib()
         except (Exception, KeyboardInterrupt, SystemExit):
-            shutil.rmtree(session.creator.dest)
+            if dest_existed_before:
+                logger.warning(
+                    "Venv creation failed; leaving pre-existing directory %s intact",
+                    dest_path,
+                )
+            else:
+                shutil.rmtree(dest_path, ignore_errors=True)
             raise
 
         logger.success("Successfully created Pyodide virtual environment!")
@@ -580,7 +502,8 @@ class UnixPyodideVenv(PyodideVenv):
         """Get the content of the host python wrapper script.
         This script allows invoking the host python with the correct PYTHONHOME.
         """
-        pythonhome = Path(sys._base_executable).parents[1]
+        base_executable = getattr(sys, "_base_executable", sys.executable)
+        pythonhome = Path(base_executable).parents[1]
         return dedent(
             f"""\
             #!/bin/sh

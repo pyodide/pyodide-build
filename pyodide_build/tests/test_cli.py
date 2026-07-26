@@ -1,4 +1,5 @@
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,33 @@ def assert_runner_succeeded(result):
 
         traceback.print_exception(result.exception)
     assert result.exit_code == 0
+
+
+def test_cli_import_does_not_resolve_xbuildenv_path(monkeypatch):
+    """Importing the build/xbuildenv CLI modules must NOT call default_xbuildenv_path.
+
+    Resolving the default path does a ConfigManager build, filesystem probes,
+    and can even raise RuntimeError when no writable directory exists.  All of
+    that should be deferred until the command body runs, not happen at import
+    time on every ``pyodide`` invocation.
+    """
+    called = []
+    monkeypatch.setattr(
+        common, "default_xbuildenv_path", lambda: called.append(1) or None
+    )
+
+    # Re-import the modules so module-level code runs again under the monkeypatch.
+    import importlib
+
+    import pyodide_build.cli.build as _build_mod
+    import pyodide_build.cli.xbuildenv as _xbuildenv_mod
+
+    importlib.reload(_build_mod)
+    importlib.reload(_xbuildenv_mod)
+
+    assert not called, (
+        "default_xbuildenv_path must not be called at CLI module import time"
+    )
 
 
 def test_skeleton_pypi(tmp_path):
@@ -439,11 +467,15 @@ def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
         backend_flags: Any,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ) -> str:
         results["srcdir"] = srcdir
         results["outdir"] = outdir
         results["backend_flags"] = backend_flags
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     from contextlib import nullcontext
@@ -452,7 +484,7 @@ def test_build1(tmp_path, monkeypatch, dummy_xbuildenv, mock_emscripten):
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
     )
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
@@ -520,11 +552,12 @@ def test_build_exports(monkeypatch, dummy_xbuildenv):
         backend_flags,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         nonlocal exports_
         exports_ = exports
 
-    monkeypatch.setattr(build, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build, "_download_url", download_url_shim)
     monkeypatch.setattr(shutil, "unpack_archive", unpack_archive_shim)
     monkeypatch.setattr(out_of_tree_build, "run", run_shim)
@@ -575,11 +608,12 @@ def test_build_config_settings(monkeypatch, dummy_xbuildenv):
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         nonlocal config_settings_passed
         config_settings_passed = config_settings
 
-    monkeypatch.setattr(build, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(out_of_tree_build, "run", run)
 
     result = runner.invoke(
@@ -659,7 +693,10 @@ def test_build_cpython_module(tmp_path, dummy_xbuildenv, mock_emscripten):
     results = list(dist_dir.glob("*.whl"))
     assert len(results) == 1
     result = results[0]
-    assert result.name == "pydecimal-1.0.0-cp312-cp312-pyodide_2024_0_wasm32.whl"
+    pyver = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    assert (
+        result.name == f"pydecimal-1.0.0-{pyver}-{pyver}-pyemscripten_2025_0_wasm32.whl"
+    )
 
 
 def test_wheel_download_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten):
@@ -753,6 +790,7 @@ def test_build_isolation_flags(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -762,10 +800,13 @@ def test_build_isolation_flags(
             }
         )
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
@@ -815,6 +856,7 @@ def test_build_skip_dependency_check(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -824,10 +866,13 @@ def test_build_skip_dependency_check(
             }
         )
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
@@ -878,6 +923,7 @@ def test_build_combined_flags(
         config_settings,
         isolation=True,
         skip_dependency_check=False,
+        verbosity=0,
     ):
         build_calls.append(
             {
@@ -887,10 +933,13 @@ def test_build_combined_flags(
             }
         )
         dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
         return str(dummy_wheel)
 
     monkeypatch.setattr(pypabuild, "build", mocked_build)
-    monkeypatch.setattr(build_env, "check_emscripten_version", lambda: None)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
     monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
     monkeypatch.setattr(
         common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
@@ -916,3 +965,65 @@ def test_build_combined_flags(
     assert len(build_calls) == 1
     assert build_calls[0]["isolation"] == isolation
     assert build_calls[0]["skip_dependency_check"] == skip_check
+
+
+@pytest.mark.parametrize(
+    "verbosity_args,expected_verbosity",
+    [
+        ([], 0),
+        (["-v"], 1),
+        (["-vv"], 2),
+        (["--verbose"], 1),
+        (["-v", "-v"], 2),
+    ],
+)
+def test_build_verbosity_flag(
+    tmp_path,
+    monkeypatch,
+    dummy_xbuildenv,
+    mock_emscripten,
+    verbosity_args,
+    expected_verbosity,
+):
+    """Test that -v/-vv verbosity flags are accepted and propagate correctly."""
+    from pyodide_build import pypabuild
+
+    build_calls = []
+
+    def mocked_build(
+        srcdir,
+        outdir,
+        env,
+        config_settings,
+        isolation=True,
+        skip_dependency_check=False,
+        verbosity=0,
+    ):
+        build_calls.append({"verbosity": verbosity})
+        dummy_wheel = outdir / "package-1.0.0-py3-none-any.whl"
+        # Create a real (empty) zip so that the .so-detection step can read it.
+        with zipfile.ZipFile(dummy_wheel, "w"):
+            pass
+        return str(dummy_wheel)
+
+    monkeypatch.setattr(pypabuild, "build", mocked_build)
+    monkeypatch.setattr(build_env, "ensure_emscripten", lambda skip_install=False: None)
+    monkeypatch.setattr(build_env, "replace_so_abi_tags", lambda whl: None)
+    monkeypatch.setattr(
+        common, "retag_wheel", lambda wheel_path, platform: Path(wheel_path)
+    )
+
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(common, "modify_wheel", lambda whl: nullcontext())
+
+    srcdir = tmp_path / "in"
+    outdir = tmp_path / "out"
+    srcdir.mkdir()
+
+    args = [str(srcdir), "--outdir", str(outdir)] + verbosity_args
+    result = runner.invoke(build.main, args)
+
+    assert result.exit_code == 0, result.output
+    assert len(build_calls) == 1
+    assert build_calls[0]["verbosity"] == expected_verbosity

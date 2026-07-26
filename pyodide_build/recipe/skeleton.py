@@ -121,10 +121,11 @@ def _make_predictable_url(
     package_url_name = package_name.replace("-", "_")
 
     if source_type == "sdist":
-        return f"{host}/packages/source/{package_name[0]}/{package_url_name}/{package_url_name}-{version}.tar.gz"
+        return f"{host}/packages/source/{package_name[0]}/{package_url_name}/{filename}"
 
     elif source_type == "wheel":
         try:
+            python_tag: str | None = None
             # Special case for universal wheels (py2.py3)
             # we return early as packaging doesn't handle
             # this case properly.
@@ -133,7 +134,6 @@ def _make_predictable_url(
                 return f"{host}/packages/{python_tag}/{package_url_name[0]}/{package_url_name}/{filename}"
 
             _, _, _, tags = parse_wheel_filename(filename)
-            python_tag = None
             for tag in tags:
                 if (
                     tag.interpreter.startswith("py")
@@ -157,8 +157,6 @@ def _make_predictable_url(
             msg = f"Error parsing wheel filename {filename}: {e}"
             logger.warning(msg)
             return None
-
-    return None
 
 
 def _find_dist(
@@ -234,7 +232,7 @@ def run_prettier(meta_path: str | Path) -> None:
         )
 
 
-def load_meta_yaml(yaml, meta_path: Path):
+def load_meta_yaml(yaml: YAML, meta_path: Path) -> Any:
     if not meta_path.exists():
         package = meta_path.parent.name
         logger.error("%s does not exist", meta_path)
@@ -243,7 +241,7 @@ def load_meta_yaml(yaml, meta_path: Path):
     return yaml.load(meta_path.read_bytes())
 
 
-def store_meta_yaml(yaml, meta_path: Path, yaml_content):
+def store_meta_yaml(yaml: YAML, meta_path: Path, yaml_content: Any) -> None:
     yaml.dump(yaml_content, meta_path)
     run_prettier(meta_path)
 
@@ -354,12 +352,6 @@ def update_package(
     pypi_ver = Version(pypi_metadata["info"]["version"])
     local_ver = Version(yaml_content["package"]["version"])
 
-    # and grab checksums from metadata
-    source_fmt = source_fmt or old_fmt
-    dist_metadata = _find_dist(pypi_metadata, [source_fmt])
-    sha256 = dist_metadata["digests"]["sha256"]
-    sha256_local = yaml_content["source"].get("sha256")
-
     # fail if local version is newer than PyPI version
     # since updating isn't possible in that case
     if pypi_ver < local_ver:
@@ -369,12 +361,29 @@ def update_package(
             "updated manually and is correct."
         )
 
+    # Determine which source formats to try.
+    # If source_fmt is explicitly given, require exactly that format.
+    # Otherwise, prefer the existing format but fall back to the other.
+    if source_fmt:
+        sources = [source_fmt]
+    elif old_fmt == "wheel":
+        sources = ["wheel", "sdist"]
+    else:
+        sources = ["sdist", "wheel"]
+
+    dist_metadata = _find_dist(pypi_metadata, sources)
+    sha256 = dist_metadata["digests"]["sha256"]
+    sha256_local = yaml_content["source"].get("sha256")
+    # The format that was actually found (may differ from old_fmt when falling back)
+    resolved_fmt = "wheel" if dist_metadata["url"].endswith(".whl") else "sdist"
+
     # conditions to check if the package is up to date
     is_sha256_up_to_date = sha256 == sha256_local
     is_version_up_to_date = pypi_ver == local_ver
+    is_fmt_up_to_date = source_fmt is None or resolved_fmt == old_fmt
 
-    already_up_to_date = (is_sha256_up_to_date and is_version_up_to_date) and (
-        source_fmt is None or source_fmt == old_fmt
+    already_up_to_date = (
+        is_sha256_up_to_date and is_version_up_to_date and is_fmt_up_to_date
     )
     if already_up_to_date:
         logger.success(
@@ -405,18 +414,6 @@ def update_package(
                 f" Use --update-patched to force updating {package}."
             )
 
-    if source_fmt:
-        # require the type requested
-        sources = [source_fmt]
-    elif old_fmt == "wheel":
-        # prefer wheel to sdist
-        sources = ["wheel", "sdist"]
-    else:
-        # prefer sdist to wheel
-        sources = ["sdist", "wheel"]
-
-    dist_metadata = _find_dist(pypi_metadata, sources)
-
     yaml_content["source"]["url"] = dist_metadata["url"]
     yaml_content["source"].pop("md5", None)
     yaml_content["source"]["sha256"] = dist_metadata["digests"]["sha256"]
@@ -443,7 +440,7 @@ def disable_package(recipe_dir: Path, package: str, message: str) -> None:
     store_meta_yaml(yaml, meta_path, yaml_content)
 
 
-def remove_comment_on_line(pkg: Any, line: int):
+def remove_comment_on_line(pkg: Any, line: int) -> None:
     # Search for comment on the right line. It's probably after the version key
     # where we put it, but this will find it as long as it isn't directly after
     # top_level (we don't traverse the tree to look for it).

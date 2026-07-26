@@ -3,33 +3,43 @@ import os
 import shutil
 import subprocess as sp
 import sys
+import sysconfig
 import traceback
+import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from itertools import chain
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
-from build import BuildBackendException, ConfigSettingsType
+from build import (
+    BuildBackendException,
+    ConfigSettingsType,
+    ProjectBuilder,
+    RunnerType,
+)
 from build.env import DefaultIsolatedEnv
 from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
 from pyodide_build.build_env import (
     get_build_flag,
+    get_cross_build_files_dir,
+    get_current_xbuildenv_manager,
     get_host_build_flag,
-    get_hostsitepackages,
     get_pyversion,
     get_unisolated_packages,
+    in_xbuildenv,
     platform,
 )
 from pyodide_build.spec import _BuildSpecExports
 from pyodide_build.vendor._pypabuild import (
-    _STYLES,
+    _configure_build_verbosity,
     _DefaultIsolatedEnv,
     _error,
+    _find_executable_and_scripts,
     _handle_build_error,
-    _ProjectBuilder,
+    _styles,
 )
 
 # corresponding env variables for symlinks
@@ -47,10 +57,26 @@ SYMLINK_ENV_VARS = {
 }
 
 
+def _host_scripts_dir() -> str:
+    """
+    Return the scripts directory of the Python environment that runs the build.
+    """
+    # We need this to refer to the host environment. Temporarily remove
+    # _PYTHON_SYSCONFIGDATA_NAME environment variable so we don't look for
+    # Emscripten sysconfig.
+    saved = os.environ.pop("_PYTHON_SYSCONFIGDATA_NAME", None)
+    try:
+        return sysconfig.get_path("scripts")
+    finally:
+        if saved is not None:
+            os.environ["_PYTHON_SYSCONFIGDATA_NAME"] = saved
+
+
 def _gen_runner(
     cross_build_env: Mapping[str, str],
-    isolated_build_env: _DefaultIsolatedEnv = None,
-) -> Callable[[Sequence[str], str | None, Mapping[str, str] | None], None]:
+    isolated_build_env: _DefaultIsolatedEnv | None = None,
+    verbosity: int = 0,
+) -> RunnerType:
     """
     This returns a slightly modified version of default subprocess runner that pypa/build uses.
     pypa/build prepends the virtual environment's bin directory to the PATH environment variable.
@@ -65,35 +91,41 @@ def _gen_runner(
         The cross build environment for pywasmcross.
     isolated_build_env
         The isolated build environment created by pypa/build.
+    verbosity
+        Verbosity level. When >= 1, the build backend command is logged.
     """
 
-    def _runner(cmd, cwd=None, extra_environ=None):
+    def _runner(
+        cmd: Sequence[str],
+        cwd: str | None = None,
+        extra_environ: Mapping[str, str] | None = None,
+    ) -> None:
         env = os.environ.copy()
         if extra_environ:
             env.update(extra_environ)
 
         # Some build dependencies like cmake, meson installs binaries to this directory
         # and we should add it to the PATH so that they can be found.
-        if isolated_build_env:
+        if isolated_build_env is not None:
             env["BUILD_ENV_SCRIPTS_DIR"] = isolated_build_env.scripts_dir
         else:
-            # For non-isolated builds, set a fallback path or use the current Python path
-            import sysconfig
-
-            scripts_dir = sysconfig.get_path("scripts")
-            env["BUILD_ENV_SCRIPTS_DIR"] = scripts_dir
+            # For non-isolated builds, build dependencies are installed into the
+            # environment that is running the build.
+            env["BUILD_ENV_SCRIPTS_DIR"] = _host_scripts_dir()
 
         env["PATH"] = f"{cross_build_env['COMPILER_WRAPPER_DIR']}:{env['PATH']}"
-        # For debugging: Uncomment the following line to print the build command
-        # print("Build backend call:", " ".join(str(x) for x in cmd), file=sys.stderr)
+        if verbosity >= 1:
+            print(f"> {' '.join(str(x) for x in cmd)}", file=sys.stderr, flush=True)
         sp.check_call(cmd, cwd=cwd, env=env)
 
     return _runner
 
 
-def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
-    from pyodide_build.build_env import get_build_flag, get_unisolated_packages
-
+def _copy_sysconfigdata_to_isolated_env(env: DefaultIsolatedEnv) -> None:
+    """
+    Copy the sysconfigdata module into the isolated build environment's
+    site-packages so that builds can pick up Pyodide's build configuration.
+    """
     pyversion = get_pyversion()
     site_packages_path = f"lib/{pyversion}/site-packages"
     env_site_packages = Path(env.path) / site_packages_path
@@ -105,20 +137,112 @@ def symlink_unisolated_packages(env: DefaultIsolatedEnv) -> None:
 
     env_site_packages.mkdir(parents=True, exist_ok=True)
     shutil.copy(sysconfigdata_path, env_site_packages)
-    host_site_packages = Path(get_hostsitepackages())
-    for name in get_unisolated_packages():
-        for path in chain(
-            host_site_packages.glob(f"{name}*"), host_site_packages.glob(f"_{name}*")
-        ):
-            (env_site_packages / path.name).unlink(missing_ok=True)
-            (env_site_packages / path.name).symlink_to(path)
+
+
+def _replace_unisolated_packages(
+    reqs: set[str], unisolated_packages: dict[str, str]
+) -> tuple[set[str], set[str]]:
+    """
+    Replace unisolated packages with the correct version.
+
+    Parameters
+    ----------
+    reqs
+        The set of requirements to filter.
+    unisolated_packages
+        The dictionary of unisolated packages [name: version].
+
+    Returns
+    -------
+    A tuple of (the filtered set of requirements, the set of unisolated requirements)
+    """
+    canonical_unisolated = {
+        canonicalize_name(name): (name, version)
+        for name, version in unisolated_packages.items()
+    }
+
+    new_reqs = reqs.copy()
+    unisolated: set[str] = set()
+    for reqstr in reqs:
+        req = Requirement(reqstr)
+        # Evaluate the PEP 508 marker to see if the requirement
+        # is applicable in the current environment or not.
+        if req.marker and not req.marker.evaluate():
+            continue
+        if canonicalize_name(req.name) == "oldest-supported-numpy":
+            raise ValueError(
+                f"Build dependency '{reqstr}' is not supported. "
+                "oldest-supported-numpy is deprecated since NumPy 2.0. "
+                "Use a direct 'numpy' dependency instead."
+            )
+        match = canonical_unisolated.get(canonicalize_name(req.name))
+        if match is None:
+            continue
+        name, version = match
+        # TODO: find a better way to handle this case
+        if not req.specifier.contains(version):
+            warnings.warn(
+                f"Found build dependency {req} but the only supported "
+                f"cross-build version is {name}=={version}; "
+                f"using {name}=={version} instead.",
+                stacklevel=2,
+            )
+        new_reqs.discard(reqstr)
+        new_reqs.add(f"{name}=={version}")
+        unisolated.add(name)
+    return new_reqs, unisolated
+
+
+def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
+    """
+    Install the cross build files (headers, .a libs, .pxd files) to the
+    isolated environment's site packages.
+
+    Parameters
+    ----------
+    venv_path
+        The path to the isolated environment.
+
+    unisolated
+        The set of unisolated packages.
+    """
+    if not unisolated:
+        return
+    _, _, purelib = _find_executable_and_scripts(venv_path)
+    sitepackagesdir = Path(purelib)
+    for name in unisolated:
+        package_dir = get_cross_build_files_dir(name)
+        if not package_dir.is_dir():
+            # Not every unisolated package has cross-build files. The package
+            # may only need to be pinned to the cross-build version (for its
+            # console scripts, for instance) without any file overlay.
+            continue
+        shutil.copytree(package_dir, sitepackagesdir / name, dirs_exist_ok=True)
 
 
 def remove_avoided_requirements(
     requires: set[str], avoided_requirements: set[str] | list[str]
 ) -> set[str]:
+    """
+    Remove requirements that are in the list of avoided requirements.
+
+    Parameters
+    ----------
+    requires
+        The set of requirements to filter.
+    avoided_requirements
+        The set of requirements to avoid.
+
+    Returns
+    -------
+    The filtered set of requirements.
+    """
     for reqstr in list(requires):
         req = Requirement(reqstr)
+        # Evaluate the PEP 508 marker to see if the requirement
+        # is applicable in the current environment or not.
+        if req.marker and not req.marker.evaluate():
+            continue
         for avoid_name in set(avoided_requirements):
             if avoid_name == req.name.lower():
                 requires.remove(reqstr)
@@ -131,16 +255,32 @@ def install_reqs(
     IGNORED_BUILD_REQUIREMENTS = [
         pkg.strip() for pkg in get_host_build_flag("IGNORED_BUILD_REQUIREMENTS").split()
     ]
+    reqs, unisolated = _replace_unisolated_packages(reqs, get_unisolated_packages())
+    reqs = remove_avoided_requirements(reqs, IGNORED_BUILD_REQUIREMENTS)
+
+    if in_xbuildenv() and unisolated:
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+
     # propagate PIP config from build_env to current environment
     with common.replace_env(
         os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
     ):
-        env.install(
-            remove_avoided_requirements(
-                reqs,
-                get_unisolated_packages() + IGNORED_BUILD_REQUIREMENTS,
-            )
-        )
+        env.install(reqs)
+
+    _install_cross_build_files(env.path, unisolated)
+
+
+# So far among all packages in pyodide-recipes, only NumPy ships
+# a .pc file, but I don't want to hardcode that here as such
+def _get_unisolated_pkgconfig_dirs(venv_path: str) -> list[str]:
+    """
+    Find directories containing .pc files shipped by packages installed in the
+    isolated build environment. These need to be added to PKG_CONFIG_LIBDIR so
+    that meson can discover unisolated packages (like numpy) via pkg-config
+    during cross-compilation.
+    """
+    _, _, purelib = _find_executable_and_scripts(venv_path)
+    return list({str(pc.parent) for pc in Path(purelib).rglob("*.pc") if pc.is_file()})
 
 
 def _build_in_isolated_env(
@@ -149,22 +289,22 @@ def _build_in_isolated_env(
     outdir: str,
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
+    verbosity: int = 0,
 ) -> str:
     # For debugging: The following line disables removal of the isolated venv.
     # It will be left in the /tmp folder and can be inspected or entered as
     # needed.
     # _DefaultIsolatedEnv.__exit__ = lambda self, *args: print("Skipping removing isolated env in", self.path)
-    installer = "uv" if uv_helper.should_use_uv() else "pip"
+    installer: Literal["uv", "pip"] = "uv" if uv_helper.should_use_uv() else "pip"
     with _DefaultIsolatedEnv(installer=installer) as env:
-        env = cast(_DefaultIsolatedEnv, env)
-        builder = _ProjectBuilder.from_isolated_env(
+        builder = ProjectBuilder.from_isolated_env(
             env,
             srcdir,
-            runner=_gen_runner(build_env, env),
+            runner=_gen_runner(build_env, env, verbosity=verbosity),
         )
 
         # first install the build dependencies
-        symlink_unisolated_packages(env)
+        _copy_sysconfigdata_to_isolated_env(env)
         install_reqs(build_env, env, builder.build_system_requires)
         build_reqs: set[str] | None = None
         try:
@@ -174,7 +314,7 @@ def _build_in_isolated_env(
         except BuildBackendException:
             pass
 
-        if not build_reqs:
+        if build_reqs is None:
             # get_requires_for_build in native env failed. Maybe trying to
             # execute get_requires_for_build in the cross build environment will
             # work?
@@ -191,6 +331,14 @@ def _build_in_isolated_env(
 
         install_reqs(build_env, env, build_reqs)
 
+        pkgconfig_dirs = _get_unisolated_pkgconfig_dirs(env.path)
+        if pkgconfig_dirs:
+            build_env = dict(build_env)
+            existing = build_env.get("PKG_CONFIG_LIBDIR", "")
+            build_env["PKG_CONFIG_LIBDIR"] = ":".join(
+                [existing, *pkgconfig_dirs] if existing else pkgconfig_dirs
+            )
+
         with common.replace_env(build_env):
             return builder.build(
                 distribution,
@@ -206,9 +354,12 @@ def _build_in_current_env(
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> str:
     with common.replace_env(build_env):
-        builder = _ProjectBuilder(srcdir, runner=_gen_runner(build_env))
+        builder = ProjectBuilder(
+            srcdir, runner=_gen_runner(build_env, verbosity=verbosity)
+        )
 
         if not skip_dependency_check:
             missing = builder.check_dependencies(distribution, config_settings or {})
@@ -284,17 +435,12 @@ def make_command_wrapper_symlinks(symlink_dir: Path) -> dict[str, str]:
     return env
 
 
-# TODO: a context manager is no longer needed here
-@contextmanager
-def _create_symlink_dir(
-    env: dict[str, str],
-    build_dir: Path,
-):
+def _create_symlink_dir(build_dir: Path) -> Path:
     # Leave the symlinks in the build directory. This helps with reproducing.
     symlink_dir = build_dir / "pywasmcross_symlinks"
     shutil.rmtree(symlink_dir, ignore_errors=True)
     symlink_dir.mkdir()
-    yield symlink_dir
+    return symlink_dir
 
 
 @contextmanager
@@ -328,28 +474,69 @@ def get_build_env(
     args["exports"] = exports
     env = env.copy()
 
-    with _create_symlink_dir(env, build_dir) as symlink_dir:
-        env.update(make_command_wrapper_symlinks(symlink_dir))
-        sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
-        args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
-        args["orig__name__"] = __name__
-        args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
-        args["PATH"] = env["PATH"]
-        args["abi"] = get_build_flag("PYODIDE_ABI_VERSION")
+    symlink_dir = _create_symlink_dir(build_dir or Path.cwd())
+    env.update(make_command_wrapper_symlinks(symlink_dir))
+    sysconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
+    args["PYTHONPATH"] = sys.path + [str(symlink_dir), str(sysconfig_dir)]
+    args["orig__name__"] = __name__
+    args["pythoninclude"] = get_build_flag("PYTHONINCLUDE")
+    args["PATH"] = env["PATH"]
+    args["abi"] = get_build_flag("PYODIDE_ABI_VERSION")
 
-        pywasmcross_env = json.dumps(args)
-        # Store into environment variable and to disk. In most cases we will
-        # load from the environment variable but if some other tool filters
-        # environment variables we will load from disk instead.
-        env["PYWASMCROSS_ARGS"] = pywasmcross_env
-        (symlink_dir / "pywasmcross_env.json").write_text(pywasmcross_env)
+    pywasmcross_env = json.dumps(args)
+    # Store into environment variable and to disk. In most cases we will
+    # load from the environment variable but if some other tool filters
+    # environment variables we will load from disk instead.
+    env["PYWASMCROSS_ARGS"] = pywasmcross_env
+    (symlink_dir / "pywasmcross_env.json").write_text(pywasmcross_env)
 
-        env["_PYTHON_HOST_PLATFORM"] = platform()
-        env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
-        env["PYTHONPATH"] = str(sysconfig_dir)
-        env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
+    env["_PYTHON_HOST_PLATFORM"] = platform()
+    env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
+    env["PYTHONPATH"] = str(sysconfig_dir)
+    env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
 
-        yield env
+    yield env
+
+
+# Based on pypa/build's reference logger implementation. See
+# https://github.com/pypa/build/blob/615d04cfc52ac3c1592a463f0afe484fee1cc368/src/build/__main__.py#L99-L123
+def _make_pypa_build_logger(verbosity: int) -> Callable[[str], None]:
+    """
+    Returns a logger function compatible with build._ctx.LOGGER.
+
+    pypa/build's default _log_default sends messages to logging.getLogger('build')
+    at INFO level, but that logger has no handlers and an effective level of WARNING,
+    so all output is silently dropped when we use pypa/build as a library.
+
+    We mirror pypa/build's CLI logger, where all messages go to stderr. The subprocess
+    commands are prefixed by "> " and subprocess output is prefixed by "< ".
+
+    The ``message`` is a plain string. ``kind`` is a tuple tag that is set by pypa/build:
+      - ``('step',)``                  --> this is a high-level build step (such as "Building wheel...")
+      - ``('subprocess', 'cmd')``      --> the installer command that is being run
+      - ``('subprocess', 'stdout')``   --> a line of the installer's stdout
+      - ``('subprocess', 'stderr')``   --> a line of the installer's stderr
+      - ``None``                       --> some untagged informational message
+
+    pypa/build only calls this logger with the subprocess's content when
+    _ctx.VERBOSITY is greater than zero.
+    """
+
+    def _log(message: str, *, kind: tuple[str, ...] | None = None) -> None:
+        msg = message.rstrip()
+        if not msg:
+            return
+        match kind:
+            case ("subprocess", "cmd") if verbosity >= 1:
+                print(f"> {msg}", file=sys.stderr, flush=True)
+            case ("subprocess", *_) if verbosity >= 1:
+                print(f"< {msg}", file=sys.stderr, flush=True)
+            case ("subprocess", *_):
+                pass  # verbosity=0: installer output is not shown
+            case _:
+                print(msg, file=sys.stderr, flush=True)
+
+    return _log
 
 
 def build(
@@ -359,26 +546,38 @@ def build(
     config_settings: ConfigSettingsType,
     isolation: bool = True,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> str:
-    try:
-        with _handle_build_error():
-            if isolation:
-                built = _build_in_isolated_env(
-                    build_env, srcdir, str(outdir), "wheel", config_settings
+    with _configure_build_verbosity(verbosity, _make_pypa_build_logger(verbosity)):
+        try:
+            with _handle_build_error():
+                if isolation:
+                    built = _build_in_isolated_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        verbosity=verbosity,
+                    )
+                else:
+                    built = _build_in_current_env(
+                        build_env,
+                        srcdir,
+                        str(outdir),
+                        "wheel",
+                        config_settings,
+                        skip_dependency_check,
+                        verbosity=verbosity,
+                    )
+                print(
+                    "{bold}{green}Successfully built {}{reset}".format(
+                        built, **_styles.get()
+                    )
                 )
-            else:
-                built = _build_in_current_env(
-                    build_env,
-                    srcdir,
-                    str(outdir),
-                    "wheel",
-                    config_settings,
-                    skip_dependency_check,
-                )
-            print("{bold}{green}Successfully built {}{reset}".format(built, **_STYLES))
-            return built
-    except Exception as e:  # pragma: no cover
-        tb = traceback.format_exc().strip("\n")
-        print("\n{dim}{}{reset}\n".format(tb, **_STYLES))
-        _error(str(e))
-        sys.exit(1)
+                return built
+        except Exception as e:  # pragma: no cover
+            tb = traceback.format_exc().strip("\n")
+            print("\n{dim}{}{reset}\n".format(tb, **_styles.get()))
+            _error(str(e))
+            sys.exit(1)

@@ -103,3 +103,53 @@ def test_resolve_targets_star_selects_all(tmp_path: Path):
     all_targets = set(resolve_targets(recipe_dir, ["*"]))
     assert "pkg_a" in all_targets
     assert "pkg_b" in all_targets
+
+
+def _write_meta_with_tag(recipe_dir: Path, pkg: str, tag: str) -> Path:
+    """Write a minimal meta.yaml with a package tag."""
+    pkg_root = recipe_dir / pkg
+    pkg_root.mkdir(parents=True, exist_ok=True)
+    meta = (
+        f"package:\n"
+        f"  name: {pkg}\n"
+        f"  version: '1.0.0'\n"
+        f"  tag:\n"
+        f"    - {tag}\n"
+        f"source:\n"
+        f"  path: .\n"
+    )
+    (pkg_root / "meta.yaml").write_text(meta, encoding="utf-8")
+    return pkg_root
+
+
+# Bug 2: resolve_targets must not implicitly include packages tagged "always"
+# when a specific subset of packages is requested.
+def test_resolve_targets_does_not_include_always_tagged_packages(tmp_path: Path):
+    recipe_dir = tmp_path / "recipes"
+    _write_meta(recipe_dir, "pkg_explicit")
+    _write_meta_with_tag(recipe_dir, "pkg_always", "always")
+
+    targets = resolve_targets(recipe_dir, ["pkg_explicit"])
+    assert "pkg_explicit" in targets
+    assert "pkg_always" not in targets, (
+        "resolve_targets should not include 'always'-tagged packages when "
+        "a specific target list is given"
+    )
+
+
+def test_clean_recipes_does_not_clean_always_tagged_packages(tmp_path: Path):
+    recipe_dir = tmp_path / "recipes"
+    _, build_explicit, _ = _make_pkg_with_artifacts(recipe_dir, "pkg_explicit")
+
+    # Create an 'always'-tagged package with artifacts
+    always_root = _write_meta_with_tag(recipe_dir, "pkg_always", "always")
+    always_build = always_root / "build"
+    always_build.mkdir(parents=True, exist_ok=True)
+    (always_build / "artifact.txt").write_text("should survive", encoding="utf-8")
+
+    clean_recipes(recipe_dir, ["pkg_explicit"], build_dir=None, include_dist=False)
+
+    assert not build_explicit.exists(), "Explicitly targeted package should be cleaned"
+    assert always_build.exists(), (
+        "Package with 'always' tag should NOT be cleaned when not explicitly targeted"
+    )

@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Iterator, Sequence
@@ -12,9 +13,15 @@ from io import StringIO
 from pathlib import Path
 
 from packaging.tags import Tag, compatible_tags, cpython_tags
+from packaging.version import Version
 
 from pyodide_build import __version__
-from pyodide_build.common import default_xbuildenv_path, search_pyproject_toml, to_bool
+from pyodide_build.common import (
+    IS_WIN,
+    default_xbuildenv_path,
+    search_pyproject_toml,
+    to_bool,
+)
 
 RUST_BUILD_PRELUDE = """
 rustup default ${RUST_TOOLCHAIN}
@@ -102,6 +109,15 @@ def get_pyodide_root() -> Path:
     return Path(os.environ["PYODIDE_ROOT"])
 
 
+def get_current_xbuildenv_manager():
+    from pyodide_build.xbuildenv import CrossBuildEnvManager
+
+    pyodide_root = get_pyodide_root()
+
+    xbuild_version_dir = pyodide_root.parent.parent
+    return CrossBuildEnvManager(xbuild_version_dir.parent)
+
+
 def search_pyodide_root(curdir: str | Path, *, max_depth: int = 10) -> Path | None:
     """
     Recursively search for the root of the Pyodide repository,
@@ -148,9 +164,13 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
             "PYODIDE": "1",
             # This is the legacy environment variable used for the aforementioned purpose
             "PYODIDE_PACKAGE_ABI": "1",
-            "PYTHONPATH": env["HOSTSITEPACKAGES"],
         }
     )
+
+    # If the target Python is a pre-release, tell PyO3 to allow building against it.
+    pyversion = env.get("PYVERSION")
+    if pyversion and Version(pyversion).is_prerelease:
+        env["PYO3_USE_ABI3_FORWARD_COMPATIBILITY"] = "1"
 
     return env
 
@@ -205,27 +225,80 @@ def get_hostsitepackages() -> str:
     return get_build_flag("HOSTSITEPACKAGES")
 
 
+# TODO: Remove this function (and use remote package index)
+# https://github.com/pyodide/pyodide-build/issues/43
 @functools.cache
-def get_unisolated_packages() -> list[str]:
-    # TODO: Remove this function (and use remote package index)
-    # https://github.com/pyodide/pyodide-build/issues/43
+def get_unisolated_packages() -> dict[str, str]:
+    """
+    Get a map of unisolated packages.
+
+    Unisolated packages are packages that are used during the build process
+    and have some platform-specific files. When these packages are used
+    during the build process, their platform-specific files are replaced with
+    WASM-compatible versions to build the package correctly.
+
+    Returns
+    -------
+    A dictionary of package names and versions.
+    """
     PYODIDE_ROOT = get_pyodide_root()
 
-    unisolated_file = PYODIDE_ROOT / "unisolated.txt"
-    if unisolated_file.exists():
-        # in xbuild env, read from file
-        unisolated_packages = unisolated_file.read_text().splitlines()
+    unisolated_packages: dict[str, str] = {}
+    if in_xbuildenv():
+        unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
+
+        if not unisolated_packages_file.exists():
+            raise FileNotFoundError(
+                f"Expected {unisolated_packages_file} to exist in the xbuildenv. "
+                "The xbuildenv archive may be corrupt or from an incompatible version."
+            )
+        for line in unisolated_packages_file.read_text().splitlines():
+            line = line.strip()
+            # The xbuildenv requirements.txt is machine-generated and always
+            # uses pinned name==version entries, but we skip blank lines,
+            # comments, and any non-pinned specs just in case. Shouldn't
+            # really happen though.
+            if not line or line.startswith("#") or "==" not in line:
+                continue
+            name, version = line.split("==", 1)
+            unisolated_packages[name] = version
     else:
         from pyodide_build.recipe.loader import load_all_recipes
 
-        unisolated_packages = []
         recipe_dir = PYODIDE_ROOT / "packages"
         recipes = load_all_recipes(recipe_dir)
         for name, config in recipes.items():
             if config.build.cross_build_env:
-                unisolated_packages.append(name)
+                unisolated_packages[name] = config.package.version
 
     return unisolated_packages
+
+
+def get_cross_build_files_dir(package_name: str) -> Path:
+    """
+    Get the directory containing an unisolated package's cross-build files
+    (such as headers, .a libs, .pxd files, and so on).
+
+    Parameters
+    ----------
+    package_name
+        The name of the package
+
+    Returns
+    -------
+    The directory containing the package's cross-build files, relative to
+    which they should be laid out in site-packages. The directory may not
+    exist if the package has no cross-build files.
+    """
+    PYODIDE_ROOT = get_pyodide_root()
+
+    # TODO: unify libdir for in-tree and out-of-tree builds
+    if in_xbuildenv():
+        libdir = PYODIDE_ROOT / ".." / "site-packages-extras"
+    else:
+        libdir = Path(get_hostsitepackages())
+
+    return libdir / package_name
 
 
 def platform() -> str:
@@ -235,6 +308,14 @@ def platform() -> str:
 
 
 def wheel_platform() -> str:
+    abi_version = get_build_flag("PYODIDE_ABI_VERSION")
+    use_legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if use_legacy_platform:
+        return f"pyodide_{abi_version}_wasm32"
+    return f"pyemscripten_{abi_version}_wasm32"
+
+
+def legacy_platform() -> str:
     abi_version = get_build_flag("PYODIDE_ABI_VERSION")
     return f"pyodide_{abi_version}_wasm32"
 
@@ -248,10 +329,13 @@ def pyodide_tags_() -> Iterator[Tag]:
     PYMAJOR = get_pyversion_major()
     PYMINOR = get_pyversion_minor()
     PLATFORMS = [platform(), wheel_platform()]
+    use_legacy_platform = to_bool(get_host_build_flag("USE_LEGACY_PLATFORM"))
+    if not use_legacy_platform:
+        PLATFORMS.append(legacy_platform())
     python_version = (int(PYMAJOR), int(PYMINOR))
     yield from cpython_tags(platforms=PLATFORMS, python_version=python_version)
     yield from compatible_tags(platforms=PLATFORMS, python_version=python_version)
-    # Following line can be removed once packaging 22.0 is released and we update to it.
+    # packaging's cpython_tags does not emit cpXY-none-any
     yield Tag(interpreter=f"cp{PYMAJOR}{PYMINOR}", abi="none", platform="any")
 
 
@@ -280,23 +364,129 @@ def emscripten_version() -> str:
 
 def get_emscripten_version_info() -> str:
     """Extracted for testing purposes."""
+    emcc = shutil.which("emcc")
+    if not emcc:
+        raise FileNotFoundError
     return subprocess.run(
-        ["emcc", "-v"], capture_output=True, encoding="utf8", check=True
+        [emcc, "-v"], capture_output=True, encoding="utf8", check=True
     ).stderr
 
 
-def check_emscripten_version() -> None:
+# Env variables that are set by emsdk_env.sh
+EMSDK_ENV_VARS = {
+    "PATH",
+    "EMSDK",
+    "EMSDK_NODE",
+    "EMSDK_PYTHON",
+    "SSL_CERT_FILE",
+}
+
+
+def activate_emscripten_env(emsdk_dir: Path) -> dict[str, str]:
+    """
+    Source the emsdk_env script (emsdk_env.sh on Unix, emsdk_env.bat on Windows)
+    and return the resulting environment variables.
+
+    Parameters
+    ----------
+    emsdk_dir
+        Path to the emsdk directory containing the emsdk_env script
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary of environment variables set by the emsdk_env script
+    """
+    emsdk_env_script_filename = "emsdk_env.bat" if IS_WIN else "emsdk_env.sh"
+    emsdk_env_script = emsdk_dir / emsdk_env_script_filename
+    if not emsdk_env_script.exists():
+        raise FileNotFoundError(
+            f"{emsdk_env_script_filename} not found at {emsdk_env_script}"
+        )
+
+    # Source the emsdk_env script and capture the resulting environment
+    if IS_WIN:
+        # Passing args as a string, as otherwise shell is misinterpreting the command with quotes,
+        # resulting in no output.
+        result = subprocess.run(
+            f'cmd /c call "{emsdk_env_script}" > nul 2>&1 && set',
+            capture_output=True,
+            encoding="utf8",
+            check=True,
+        )
+    else:
+        result = subprocess.run(
+            ["bash", "-c", f'source "{emsdk_env_script}" > /dev/null 2>&1 && env'],
+            capture_output=True,
+            encoding="utf8",
+            check=True,
+        )
+
+    # Parse the environment variables from output
+    env_vars: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        if "=" in line:
+            key, _, value = line.partition("=")
+            # On Windows it's 'Path'.
+            key = key.upper()
+            if key in EMSDK_ENV_VARS:
+                env_vars[key] = value
+
+    return env_vars
+
+
+def ensure_emscripten(skip_install: bool = False) -> None:
+    """
+    Ensure Emscripten is available and correctly versioned.
+
+    If emcc is not found and auto-install is not skipped, this function will
+    automatically install Emscripten using CrossBuildEnvManager and activate it.
+
+    Parameters
+    ----------
+    skip_install
+        If True, skip auto-installation when emcc is not found.
+        Also controlled by PYODIDE_SKIP_EMSCRIPTEN_INSTALL env var.
+
+    Raises
+    ------
+    RuntimeError
+        If emcc is not found and auto-install is skipped, or if version mismatch.
+    """
+
+    # Check if auto-install should be skipped
+    env_skip = os.environ.get("PYODIDE_SKIP_EMSCRIPTEN_INSTALL", "")
+    should_skip_install = skip_install or to_bool(env_skip)
+
     skip = get_build_flag("SKIP_EMSCRIPTEN_VERSION_CHECK")
     if to_bool(skip):
         return
 
     needed_version = emscripten_version()
+
     try:
         version_info = get_emscripten_version_info()
     except FileNotFoundError:
-        raise RuntimeError(
-            f"No Emscripten compiler found. Need Emscripten version {needed_version}"
-        ) from None
+        if should_skip_install:
+            raise RuntimeError(
+                f"No Emscripten compiler found. Need Emscripten version {needed_version}"
+            ) from None
+
+        manager = get_current_xbuildenv_manager()
+        emsdk_dir = manager.install_emscripten(needed_version)
+
+        env_vars = activate_emscripten_env(emsdk_dir)
+        os.environ.update(env_vars)
+
+        try:
+            version_info = get_emscripten_version_info()
+        except FileNotFoundError:
+            raise RuntimeError(
+                f"Emscripten activation failed. emcc not found after setup. "
+                f"Need Emscripten version {needed_version}"
+            ) from None
+
+    # Parse and check version
     installed_version = None
     try:
         for x in reversed(version_info.partition("\n")[0].split(" ")):
@@ -307,8 +497,10 @@ def check_emscripten_version() -> None:
                 break
     except Exception:
         raise RuntimeError("Failed to determine Emscripten version.") from None
+
     if installed_version is None:
         raise RuntimeError("Failed to determine Emscripten version.")
+
     if installed_version != needed_version:
         raise RuntimeError(
             f"Incorrect Emscripten version {installed_version}. Need Emscripten version {needed_version}"

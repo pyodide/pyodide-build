@@ -3,15 +3,17 @@ from pathlib import Path
 import click
 
 from pyodide_build.build_env import get_build_flag, local_versions
-from pyodide_build.common import default_xbuildenv_path
-from pyodide_build.views import MetadataView
+from pyodide_build.common import IS_WIN, default_xbuildenv_path
+from pyodide_build.views import MetadataView, SourceType
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
+    NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
+    NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    CrossBuildEnvReleaseSpec,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
-
-DEFAULT_PATH = default_xbuildenv_path()
 
 
 @click.group(invoke_without_command=True)
@@ -33,10 +35,10 @@ def check_xbuildenv_root(path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     envvar="PYODIDE_XBUILDENV_PATH",
     show_envvar=True,
-    help="destination to download cross-build environment directory to.",
+    help="destination to download cross-build environment directory to (default: resolved from config or platformdirs cache).",
 )
 @click.option(
     "--url",
@@ -52,18 +54,33 @@ def check_xbuildenv_root(path: Path) -> None:
     help="force installation even if the version is not compatible.",
 )
 @click.option(
+    "--nightly",
+    is_flag=True,
+    default=False,
+    help="install a nightly cross-build environment instead of a stable release.",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="install the debug variant of the cross-build environment. Combine with --nightly to install the nightly debug variant.",
+)
+@click.option(
     "--skip-cross-build-packages",
     is_flag=True,
     default=False,
     envvar="PYODIDE_SKIP_CROSS_BUILD_PACKAGES",
     show_envvar=True,
-    help="skip installing cross-build packages (e.g. numpy, scipy) into the environment.",
+    help="Deprecated, no-op. Cross-build packages are installed lazily "
+    "when required by build dependencies.",
 )
 def _install(
     version: str | None,
-    path: Path,
+    path: Path | None,
     url: str | None,
     force_install: bool,
+    nightly: bool,
+    debug: bool,
     skip_cross_build_packages: bool,
 ) -> None:
     """Install cross-build environment.
@@ -77,20 +94,23 @@ def _install(
     Arguments:
         VERSION: version of cross-build environment to install (optional)
     """
-    manager = CrossBuildEnvManager(path)
+    if path is None:
+        path = default_xbuildenv_path()
+    if nightly and debug:
+        metadata_url = NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
+    elif nightly:
+        metadata_url = NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
+    elif debug:
+        metadata_url = STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL
+    else:
+        metadata_url = None
+
+    manager = CrossBuildEnvManager(path, metadata_url=metadata_url)
 
     if url:
-        manager.install(
-            url=url,
-            force_install=force_install,
-            skip_install_cross_build_packages=skip_cross_build_packages,
-        )
+        manager.install(url=url, force_install=force_install)
     else:
-        manager.install(
-            version=version,
-            force_install=force_install,
-            skip_install_cross_build_packages=skip_cross_build_packages,
-        )
+        manager.install(version=version, force_install=force_install)
 
     click.echo(f"Pyodide cross-build environment installed at {path.resolve()}")
 
@@ -99,11 +119,13 @@ def _install(
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _version(path: Path) -> None:
+def _version(path: Path | None) -> None:
     """Print current version of cross-build environment."""
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     version = manager.current_version
@@ -118,11 +140,13 @@ def _version(path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _versions(path: Path) -> None:
+def _versions(path: Path | None) -> None:
     """Print all installed versions of cross-build environment."""
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     versions = manager.list_versions()
@@ -140,16 +164,18 @@ def _versions(path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _uninstall(version: str | None, path: Path) -> None:
+def _uninstall(version: str | None, path: Path | None) -> None:
     """Uninstall cross-build environment.
 
     \b
     Arguments:
         VERSION: version of cross-build environment to uninstall (optional)
     """
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     v = manager.uninstall_version(version)
@@ -161,16 +187,18 @@ def _uninstall(version: str | None, path: Path) -> None:
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="path to cross-build environment directory.",
 )
-def _use(version: str, path: Path) -> None:
+def _use(version: str, path: Path | None) -> None:
     """Select a version of cross-build environment to use.
 
     \b
     Arguments:
         VERSION: version of cross-build environment to use (required)
     """
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
     manager.use_version(version)
@@ -196,6 +224,18 @@ def _use(version: str, path: Path) -> None:
     help="search all versions, without filtering out incompatible ones.",
 )
 @click.option(
+    "--nightly",
+    is_flag=True,
+    default=False,
+    help="search nightly releases instead of stable ones.",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="search debug releases. Searches stable-debug by default. Combine with --nightly to search nightly-debug releases.",
+)
+@click.option(
     "--json",
     "json_output",
     is_flag=True,
@@ -205,32 +245,33 @@ def _use(version: str, path: Path) -> None:
 def _search(
     metadata_path: str | None,
     show_all: bool,
+    nightly: bool,
+    debug: bool,
     json_output: bool,
 ) -> None:
     """Search for available versions of cross-build environment."""
 
     # TODO: cache the metadata file somewhere to avoid downloading it every time
 
-    metadata_path = metadata_path or cross_build_env_metadata_url()
-    metadata = load_cross_build_env_metadata(metadata_path)
-    local = local_versions()
-
-    if show_all:
-        releases = metadata.list_compatible_releases()
-    else:
-        releases = metadata.list_compatible_releases(
-            python_version=local["python"],
-            pyodide_build_version=local["pyodide-build"],
-        )
-
-    if not releases:
-        click.echo(
-            "No compatible cross-build environment found for your system. Try using --all to see all versions."
-        )
+    if metadata_path and (nightly or debug):
+        click.echo("--metadata cannot be combined with --nightly or --debug")
         raise SystemExit(1)
 
-    views = [
-        MetadataView(
+    local = local_versions()
+
+    def _compat_kwargs() -> dict[str, str]:
+        if show_all:
+            return {}
+        return {
+            "python_version": local["python"],
+            "pyodide_build_version": local["pyodide-build"],
+        }
+
+    def _make_view(
+        release: CrossBuildEnvReleaseSpec,
+        source: SourceType = "stable",
+    ) -> MetadataView:
+        return MetadataView(
             version=release.version,
             python=release.python_version,
             emscripten=release.emscripten_version,
@@ -238,18 +279,57 @@ def _search(
                 "min": release.min_pyodide_build_version,
                 "max": release.max_pyodide_build_version,
             },
+            published_at=release.published_at,
+            source=source,
             compatible=release.is_compatible(
                 python_version=local["python"],
                 pyodide_build_version=local["pyodide-build"],
             ),
         )
-        for release in releases
-    ]
 
-    if json_output:
-        print(MetadataView.to_json(views))
+    if nightly or debug:
+        sources: list[tuple[SourceType, str]]
+        if nightly and debug:
+            sources = [("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
+        elif nightly:
+            sources = [("nightly", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL)]
+        else:
+            sources = [("stable-debug", STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
+        compat = _compat_kwargs()
+        views = [
+            _make_view(release, source)
+            for source, url in sources
+            for release in sorted(
+                (
+                    release
+                    for release in load_cross_build_env_metadata(url).releases.values()
+                    if release.is_compatible(**compat)
+                ),
+                key=lambda release: release.published_at,
+                reverse=True,
+            )
+        ]
     else:
-        print(MetadataView.to_table(views))
+        # Stable releases
+        stable_metadata = load_cross_build_env_metadata(
+            metadata_path or cross_build_env_metadata_url()
+        )
+        views = [
+            _make_view(r, "stable")
+            for r in stable_metadata.list_compatible_releases(**_compat_kwargs())
+        ]
+
+    if not views:
+        click.echo(
+            "No compatible cross-build environment found for your system. Try using --all to see all versions."
+        )
+        raise SystemExit(1)
+
+    show_source = nightly or debug
+    if json_output:
+        print(MetadataView.to_json(views, show_source=show_source))
+    else:
+        print(MetadataView.to_table(views, show_source=show_source))
 
 
 @app.command("install-emscripten")
@@ -261,18 +341,31 @@ def _search(
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     help="Pyodide cross-env path",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="force reinstallation even if the same version is already installed.",
 )
 def _install_emscripten(
     version: str | None,
-    path: Path,
+    path: Path | None,
+    force: bool,
 ) -> None:
     """Install Emscripten SDK into the cross-build environment.
 
     This command clones the emsdk repository, installs and activates the specified
     Emscripten version, and applies Pyodide-specific patches.
+
+    If the requested version is already installed, the command is a no-op unless
+    --force is passed.
     """
+    if path is None:
+        path = default_xbuildenv_path()
     check_xbuildenv_root(path)
     manager = CrossBuildEnvManager(path)
 
@@ -281,7 +374,11 @@ def _install_emscripten(
 
     print("Installing emsdk...")
 
-    emsdk_dir = manager.install_emscripten(version)
+    emsdk_dir = manager.install_emscripten(version, force=force)
 
     print("Installing emsdk complete.")
-    print(f"Use `source {emsdk_dir}/emsdk_env.sh` to set up the environment.")
+    if IS_WIN:
+        cmd = f"{emsdk_dir}/emsdk_env.bat"
+    else:
+        cmd = f"source {emsdk_dir}/emsdk_env.sh"
+    print(f"Use `{cmd}` to set up the environment.")

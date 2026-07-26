@@ -161,14 +161,14 @@ def replay_genargs_handle_dashI(arg: str, target_install_dir: str) -> str | None
     if include_path_str.startswith("/usr"):
         return None
 
-    # Replace local Python include paths with the cross compiled ones
+    # Replace local Python include paths with the cross compiled ones.
+    # (resolve symlinks, since on macOS/homebrew Python sys.prefix will contain a symlink)
     include_path = str(Path(include_path_str).resolve())
 
-    if include_path.startswith(sys.prefix + "/include/python"):
-        return arg.replace("-I" + sys.prefix, "-I" + target_install_dir)
-
-    if include_path.startswith(sys.base_prefix + "/include/python"):
-        return arg.replace("-I" + sys.base_prefix, "-I" + target_install_dir)
+    for prefix in (sys.prefix, sys.base_prefix):
+        prefix = str(Path(prefix).resolve())
+        if include_path.startswith(prefix + "/include/python"):
+            return "-I" + target_install_dir + include_path.removeprefix(prefix)
 
     return arg
 
@@ -193,6 +193,8 @@ def replay_genargs_handle_linker_opts(arg: str) -> str | None:
         # macOS-specific linker flags that wasm-ld doesn't understand
         "-headerpad_max_install_names",
         "-dead_strip_dylibs",
+        # Newer clang seems to add this by default, but wasm-ld doesn't support it
+        "--enable-new-dtags",
     )
 
     excluded_linker_prefixes = (
@@ -368,6 +370,7 @@ def calculate_object_exports_readobj(objects: list[str]) -> list[str] | None:
     assert which_emcc
     emcc = Path(which_emcc)
     readobj = (emcc / "../../bin/llvm-readobj").resolve()
+    readobj_path: str | None
     if readobj.exists():
         readobj_path = str(readobj)
     else:
@@ -560,7 +563,13 @@ def handle_command_generate_args(  # noqa: C901
         line[0] = "emranlib"
         return line
     elif cmd == "strip":
-        line[0] = "emstrip"
+        if build_args.abi > "2026":
+            # Emscripten > 5.0.0 strips out the dylink.0 section
+            # so we skip strip to avoid the error
+            # https://github.com/emscripten-core/emscripten/issues/26563
+            line[0] = "echo"
+        else:
+            line[0] = "emstrip"
         return line
     else:
         return line

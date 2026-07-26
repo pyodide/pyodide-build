@@ -58,6 +58,29 @@ class TestConfigManager:
         assert config["xbuildenv_path"] == "my_custom/xbuildenv_path"
         assert config["ignored_build_requirements"] == "cmake foo bar"
 
+    # Bug 4: non-string scalars in [tool.pyodide.build] must not crash with
+    # TypeError when passed to _environment_substitute_str.
+    def test_load_config_from_file_non_string_values(
+        self, tmp_path, reset_env_vars, reset_cache
+    ):
+        pyproject_file = tmp_path / "pyproject.toml"
+        env: dict = {}
+
+        # TOML booleans (true/false) and integers are valid TOML spellings but
+        # would previously cause TypeError inside re.sub.
+        pyproject_file.write_text(
+            "[tool.pyodide.build]\n"
+            "skip_emscripten_version_check = true\n"
+            "use_legacy_platform = false\n"
+        )
+
+        config_manager = ConfigManager()
+        config = config_manager._load_config_file(pyproject_file, env)
+
+        # TOML true -> "1", false -> "0" (matches the env-var convention)
+        assert config["skip_emscripten_version_check"] == "1"
+        assert config["use_legacy_platform"] == "0"
+
 
 class TestCrossBuildEnvConfigManager_OutOfTree:
     def test_default_config(self, dummy_xbuildenv, reset_env_vars, reset_cache):
@@ -87,7 +110,11 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
         assert "pythoninclude" in makefile_vars
 
         default_config = config_manager._load_default_config()
+        # Skip rust-related flags that pyodide >= 0.28.0 provides in their Makefile.envs
+        skip_keys = {"rustflags", "rust_toolchain", "rust_emscripten_target_url"}
         for key in default_config:
+            if key in skip_keys:
+                continue
             assert key not in makefile_vars
 
     def test_get_make_environment_vars(
@@ -116,6 +143,25 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
             assert k in makefile_vars
             assert makefile_vars[k] != v  # The template should have been substituted
             assert "$(" not in makefile_vars[k]
+
+    def test_emscripten_dir(self, dummy_xbuildenv, reset_env_vars, reset_cache):
+        xbuildenv_manager = CrossBuildEnvManager(
+            dummy_xbuildenv / common.xbuildenv_dirname()
+        )
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
+
+        emsdk_root = xbuildenv_manager.pyodide_root.parent.parent / "emsdk"
+        expected_emsdk = str(emsdk_root)
+        expected_emscripten = str(emsdk_root / "upstream" / "emscripten")
+
+        assert config_manager.config["emsdk_dir"] == expected_emsdk
+        assert config_manager.config["emscripten_dir"] == expected_emscripten
+
+        env = config_manager.to_env()
+        assert env["PYODIDE_EMSDK_DIR"] == expected_emsdk
+        assert env["PYODIDE_EMSCRIPTEN_DIR"] == expected_emscripten
 
     def test_load_config_from_env(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         xbuildenv_manager = CrossBuildEnvManager(

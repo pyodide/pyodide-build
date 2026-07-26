@@ -12,7 +12,7 @@ import requests
 from build import ConfigSettingsType
 
 from pyodide_build.build_env import (
-    check_emscripten_version,
+    ensure_emscripten,
     get_pyodide_root,
     init_environment,
 )
@@ -35,6 +35,7 @@ class BuildArgs:
     config_settings: ConfigSettingsType
     isolation: bool
     skip_dependency_check: bool
+    verbosity: int = 0
 
 
 def _convert_exports(exports: str) -> _BuildSpecExports:
@@ -76,6 +77,7 @@ def _build_from_source(
         args.config_settings,
         isolation=args.isolation,
         skip_dependency_check=args.skip_dependency_check,
+        verbosity=args.verbosity,
     )
 
 
@@ -231,9 +233,6 @@ def _extract_extras(source_location: str) -> tuple[str, list[str]]:
     return source_location, extras
 
 
-DEFAULT_PATH = default_xbuildenv_path()
-
-
 @click.command(
     context_settings={
         "ignore_unknown_options": True,
@@ -261,7 +260,13 @@ DEFAULT_PATH = default_xbuildenv_path()
     default="requested",
     envvar="PYODIDE_BUILD_EXPORTS",
     show_envvar=True,
-    help="Which symbols should be exported when linking .so files?",
+    help=(
+        "Which symbols to export when linking .so files. "
+        "Choices: 'pyinit' (only PyInit_<module>), "
+        "'requested' (default, symbols requested by the build system), "
+        "'whole_archive' (all symbols from all archives), "
+        "or a comma-separated list of symbol names."
+    ),
 )
 @click.option(
     "--build-dependencies/--no-build-dependencies",
@@ -326,10 +331,25 @@ DEFAULT_PATH = default_xbuildenv_path()
 @click.option(
     "--xbuildenv-path",
     type=click.Path(path_type=Path),
-    default=DEFAULT_PATH,
+    default=None,
     envvar="PYODIDE_XBUILDENV_PATH",
     show_envvar=True,
-    help="Path to the cross-build environment directory.",
+    help="Path to the cross-build environment directory (default: resolved from config or platformdirs cache).",
+)
+@click.option(
+    "--skip-emscripten-install",
+    is_flag=True,
+    default=False,
+    envvar="PYODIDE_SKIP_EMSCRIPTEN_INSTALL",
+    show_envvar=True,
+    help="Skip automatic installation of Emscripten if not found.",
+)
+@click.option(
+    "-v",
+    "--verbose",
+    "verbosity",
+    count=True,
+    help="Increase build verbosity. Use -v for verbose output, -vv for very verbose output.",
 )
 @click.pass_context
 def main(
@@ -346,7 +366,9 @@ def main(
     no_isolation: bool,
     skip_dependency_check: bool,
     config_setting: tuple[str, ...],
-    xbuildenv_path: Path,
+    xbuildenv_path: Path | None,
+    skip_emscripten_install: bool,
+    verbosity: int,
 ) -> None:
     """Use pypa/build to build a Python package from source, pypi or url.
 
@@ -356,9 +378,11 @@ def main(
             or url to a source dist archive or wheel file. If this is blank, it
             will build the current directory.
     """
+    if xbuildenv_path is None:
+        xbuildenv_path = default_xbuildenv_path()
     init_environment(xbuildenv_path=xbuildenv_path)
     try:
-        check_emscripten_version()
+        ensure_emscripten(skip_install=skip_emscripten_install)
     except RuntimeError as e:
         print(e.args[0], file=sys.stderr)
         sys.exit(1)
@@ -372,6 +396,7 @@ def main(
         config_settings=config_settings,
         isolation=not no_isolation,
         skip_dependency_check=skip_dependency_check,
+        verbosity=verbosity,
     )
 
     skip_dependency_list = list(skip_dependency)
@@ -458,6 +483,7 @@ def source(
     config_settings: ConfigSettingsType,
     isolation: bool = True,
     skip_dependency_check: bool = False,
+    verbosity: int = 0,
 ) -> Path:
     """Use pypa/build to build a Python package from source"""
     args = BuildArgs(
@@ -465,5 +491,6 @@ def source(
         config_settings=config_settings,
         isolation=isolation,
         skip_dependency_check=skip_dependency_check,
+        verbosity=verbosity,
     )
     return _build_from_source(source_location, output_directory, args)

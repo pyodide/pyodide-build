@@ -8,17 +8,18 @@ authors = [{name = "Pyodide developers"}]
 description = '"Tools for building Pyodide"'
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Operating System :: OS Independent",
 ]
-license = {text = "MPL-2.0"}
+license = "MPL-2.0"
+license-files = ["LICENSE", "pyodide_build/vendor/LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-    "build~=1.2.0",
+    "build>=1.4,<1.6,!=1.4.4", # keep in sync with uv extra
     "pyodide-cli>=0.4.1",
-    "pyodide-lock~=0.1.0",
+    "pyodide-lock~=0.2.0",
     "auditwheel-emscripten~=0.2.0",
-    "pydantic>=2,<3",
+    "attrs",
+    "cattrs",
     "wheel",
     "ruamel.yaml",
     "packaging",
@@ -37,7 +38,7 @@ content-type = "text/markdown"
 [project.urls]
 Homepage = "https://github.com/pyodide/pyodide-build"
 "Bug Tracker" = "https://github.com/pyodide/pyodide-build/issues"
-Documentation = "https://pyodide.org/en/stable/"
+Documentation = "https://pyodide-build.readthedocs.io"
 
 [project.entry-points."pipx.run"]
 pyodide = "pyodide_cli.__main__:main"
@@ -58,14 +59,30 @@ resolve = [
     "resolvelib",
     "unearth~=0.6",
 ]
+uv = [
+  "build[uv]>=1.4,<1.6,!=1.4.4",
+]
+
+[dependency-groups]
 test = [
     "pytest",
     "pytest-httpserver",
     "pytest-cov",
     "types-requests",
+    # click 8.3.3 has a regression where
+    # pytest giving OSError: [Errno 29] Illegal seek error
+    "click>=8.0,<8.3.3",
 ]
-uv = [
-  "build[uv]~=1.2.0",
+docs = [
+    # sphinx-click 6.2.0 is broken with Sphinx 9 due to a mock resolution issue.
+    # see https://github.com/click-contrib/sphinx-click/pull/160. We can remove
+    # this when merged and released.
+    "sphinx>=5.3.0,<9",
+    "sphinx_book_theme>=0.4.0rc1",
+    "myst-parser",
+    "sphinx-autodoc-typehints>=1.21.7",
+    "sphinx-design",
+    "sphinx-click",
 ]
 
 [tool.hatch.version]
@@ -84,11 +101,9 @@ markers = [
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = ["pyodide_build"]
 show_error_codes = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-plugins = ["pydantic.mypy"]
 
 # Strict checks
 warn_unused_configs = true
@@ -108,19 +123,31 @@ strict_equality = true
 
 [[tool.mypy.overrides]]
 module = [
-  "loky",
+  "_f2c_fixes",
+  "pip",
+  "pip.*",
   "resolvelib",
   "ruamel.yaml",
-  "termcolor",
-  "test",
-  "tomli",
   "tomllib",
   "unearth",
   "unearth.*",
-  "virtualenv>=20.31.2",
+  "uv",
+  "virtualenv",
+  "virtualenv.*",
   "auditwheel_emscripten.*"
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyodide_build.vendor.*"]
+ignore_errors = true
+
+# This module monkeypatches pip internals whose stubs differ between the local
+# and CI mypy environments, so the required "type: ignore" comments look unused
+# locally. Don't warn about that here.
+[[tool.mypy.overrides]]
+module = ["pyodide_build.out_of_tree.pip_wrapper"]
+warn_unused_ignores = false
 
 
 [tool.ruff]
@@ -145,7 +172,17 @@ lint.select = [
 
 lint.logger-objects = ["pyodide_build.logger.logger"]
 
-lint.ignore = ["E402", "E501", "E731", "E741", "PERF401", "PLW2901", "UP038", "PLR0912", "PLC0415"]
+lint.ignore = [
+  "E402",    # Module level import not at top of file
+  "E501",    # Line too long
+  "E731",    # Do not assign a lambda expression, use a def
+  "E741",    # Ambiguous variable name (l, O, I)
+  "C408",    # Unnecessary `dict()` call
+  "PERF401", # Replace for loops that build lists with list comprehension
+  "PLW2901", # Redefined loop variable
+  "PLR0912", # Too many branches in function
+  "PLC0415"  # Import inside function or class
+]
 # line-length = 219  # E501: Recommended goal is 88 to match black
 target-version = "py312"
 

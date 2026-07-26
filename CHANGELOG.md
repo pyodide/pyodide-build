@@ -5,11 +5,204 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
-## [0.32.2] - 2026/02/20
+### Added
+
+- When the target Python is a pre-release, the
+  `PYO3_USE_ABI3_FORWARD_COMPATIBILITY` environment variable is now set for all
+  builds so that PyO3 packages will build against the unstable CPython version.
+
+### Changed
+
+- Replaced the `pydantic` dependency with `attrs` + `cattrs` for recipe
+  (`meta.yaml`) and cross-build environment metadata parsing/validation.
+  Recipe validation errors now raise `pyodide_build.recipe.spec.SpecValidationError`
+  instead of `pydantic.ValidationError`.
+
+- The `rustflags` config is now applied via the target-specific
+  `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS` environment variable instead
+  of the global `RUSTFLAGS`, so the flags only affect the
+  `wasm32-unknown-emscripten` target and no longer leak into host builds of
+  build-dependencies and proc-macros.
+
+## [0.37.0] - 2026/07/24
+
+### Changed
+
+- Unvendored tests that are generated from the package recipes are now compressed as a
+  `.zip` file instead of a `.tar` file. This should not affect any user-facing
+  functionality.
+  [#401](https://github.com/pyodide/pyodide-build/pull/401)
+
+## [0.36.0] - 2026/06/30
 
 ### Fixed
+
+- Fixed several bugs in the cross-build-environment (xbuildenv) lifecycle
+  [#378](https://github.com/pyodide/pyodide-build/pull/378):
+  - A Python-version marker mismatch on an already-installed xbuildenv will now
+    refresh the host packages.
+  - Installing via `DEFAULT_CROSS_BUILD_ENV_URL` is now treated like an explicit
+    `--url` install, so it no longer bakes a mangled, URL-derived version into the
+    generated package index.
+  - `pyodide xbuildenv use` no longer raises `FileExistsError` when the `xbuildenv`
+    symlink is dangling (its target was removed); the stale symlink is now
+    cleaned up first.
+  - A failure during a later installation step no longer deletes a pre-existing,
+    valid cached xbuildenv.
+
+- Fixed a hang when a recipe `build/script` or `build/post` ends by exiting the
+  shell itself (e.g. `exit 0`). The build no longer blocks forever waiting for an
+  environment dump that never runs; the previous environment is kept instead.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed per-package build variables (`PKGDIR`, `PKG_VERSION`, `DISTDIR`, ...)
+  leaking into the cached build-environment dict, which caused later packages in
+  a sequential `build-recipes` run to see the previous package's values.
+  [#383](https://github.com/pyodide/pyodide-build/pull/383)
+
+- Fixed `find_matching_wheel` raising `RuntimeError("Found multiple matching
+  wheels")` for a single file.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed `pyodide clean recipes` incorrectly cleaning packages tagged `always`.
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Fixed a bug where boolean and non-string values in pyproject.toml crashes pyodide CLI
+  when loading config values
+  [#381](https://github.com/pyodide/pyodide-build/pull/381)
+
+- Sanitize `Content-Disposition: filename=...` header values to prevent path traversal.
+  [#382](https://github.com/pyodide/pyodide-build/pull/382)
+
+- Fixed build constraints not being applied when using `uv` as the installer by
+  setting `UV_BUILD_CONSTRAINT` alongside `PIP_CONSTRAINT` and `PIP_BUILD_CONSTRAINT`.
+  [#389](https://github.com/pyodide/pyodide-build/pull/389)
+
+- Fixed a dead-code control flow in `pyodide skeleton pypi` where a package
+  whose new release ships only wheels (while the recipe used an sdist) would
+  raise an exception rather than updating to the wheel.
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
+- `skeleton`: fixed incorrect predictable URLs sdists for `.zip`-style sdists
+  and packages with non-normalised names (such as `ruamel.yaml`).
+  [#384](https://github.com/pyodide/pyodide-build/pull/384)
+
+- Fixed three bugs in `pyodide venv`: `pyodide venv --no-download` / `--never-download`
+  being silently ignored, versioned pip scripts (e.g., `pip3.12`) being renamed
+  to `pip3`, and a failed `pyodide venv` invocation deleting a pre-existing
+  destination directory.
+  [#377](https://github.com/pyodide/pyodide-build/pull/377)
+
+### Changed
+
+- Fixed build-time scripts of unisolated packages (like `f2py` and
+  `numpy-config` from NumPy) not being available on `PATH` during builds.
+  [#21](https://github.com/pyodide/pyodide-build/pull/21)
+
+- `oldest-supported-numpy` is now explicitly rejected when encountered as a
+  build-time dependency. It is deprecated since NumPy 2.0, and packages that
+  still list it should migrate to a direct `numpy` dependency.
+  [#392](https://github.com/pyodide/pyodide-build/pull/392)
+
+## [0.35.1] - 2026/06/13
+
+### Fixed
+
+- Fixed an include path issue on macOS when homebrew Python is installed:
+  if `sys.prefix` contains a symlink (as is the case with homebrew), resolve it
+  so that host include paths are still replaced by the cross-compile ones
+  [#375](https://github.com/pyodide/pyodide-build/pull/375)
+
+## [0.35.0] - 2026/06/09
+
+### Added
+
+- `CrossBuildEnvReleaseSpec` now has a `published_at` field containing the UTC timestamp
+  when the release was published on GitHub (ISO 8601 format). This is exposed in
+  `pyodide xbuildenv search --all` and `pyodide xbuildenv search --all --json`.
+  [#349](https://github.com/pyodide/pyodide-build/pull/349)
+
+- `pyodide xbuildenv search` and `pyodide xbuildenv install` now support `--nightly`
+  and `--debug` flags to search and install stable-debug, nightly, and nightly-debug
+  cross-build environments respectively.
+  [#350](https://github.com/pyodide/pyodide-build/pull/350), [#354](https://github.com/pyodide/pyodide-build/pull/371)
+
+- `pyodide build` now accepts `-v`/`--verbose` flags (stackable twice up to `-vv`)
+  to increase build verbosity. At `-v`, installer commands and
+  backend hook invocations are shown. At `-vv`, the package installers (`uv`/`pip`)
+  additionally receive a `-v` flag for detailed package resolution output.
+  [#363](https://github.com/pyodide/pyodide-build/pull/363)
+
+## [0.34.4] - 2026/05/15
+
+### Added
+
+- We now show better error message when `pyodide build` fails to install build dependencies.
+  [#346](https://github.com/pyodide/pyodide-build/pull/346)
+
+## [0.34.3] - 2026/04/30
+
+### Fixed
+
+- Fixed compatibility issue with newer pypa/build >= 1.4.4
+  [#345](https://github.com/pyodide/pyodide-build/pull/345)
+
+## [0.34.2] - 2026/04/29
+
+### Fixed
+
+- Fixed error when undefined environment variables are used in `meta.yaml`.
+  [#331](https://github.com/pyodide/pyodide-build/pull/331)
+
+- `pyodide venv` now works with new pip 26.1.
+  [#341](https://github.com/pyodide/pyodide-build/pull/341)
+
+## [0.34.1] - 2026/04/03
+
+### Added
+
+- `pyodide config` exposes variables `emsdk_dir` and `emscripten_dir` that point to the Emscripten SDK
+  installation directory and Emscripten installation directory respectively in the xbuildenv (these are
+  only available after Emscripten gets installed into the xbuildenv via the `pyodide xbuildenv install-emscripten` command).
+  [#321](https://github.com/pyodide/pyodide-build/pull/321), [#326](https://github.com/pyodide/pyodide-build/pull/326)
+
+### Changed
+
+- Platform name for the Pyodide wheel is now `pyemscripten` instead of `pyodide`, following the PEP 783 standard.
+  If you want to use the old platform name, you can set the `USE_LEGACY_PLATFORM` environment variable to `1`.
+  [#319](https://github.com/pyodide/pyodide-build/pull/319)
+
+## [0.34.0] - 2026/03/31
+
+### Added
+
+- pyodide xbuildenv install can skip eager installation, and cross-build packages are installed on first build-time use.
+
+## Changed
+
+- `vendor_sharedlib` option is now enabled by default.
+  [#304](https://github.com/pyodide/pyodide-build/pull/304)
+
+- By default, `-Oz` flag is used for C/C++ compilation instead of `-O2`, to reduce binary size.
+  This can be overridden by setting `cflags` and `cxxflags` in `pyproject.toml`.
+  [#306](https://github.com/pyodide/pyodide-build/pull/306)
+
+## Fixed
+
+- `--enable-new-dtags` linker flag is now filtered out.
+  [#317](https://github.com/pyodide/pyodide-build/pull/317)
+
+## [0.33.0] - 2026/02/26
+
+## Changed
+
+- Emscripten will now be auto installed when running `pyodide build` and `pyodide build-recipes` if
+  the host system does not have emscripten installed.
+  [#293](https://github.com/pyodide/pyodide-build/pull/293)
+
+## Fixed
 
 - Fixed `pyodide venv` not working in Windows + Python 3.14.
   [#299](https://github.com/pyodide/pyodide-build/pull/299)
@@ -85,12 +278,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `pyodide clean recipes`, a CLI command that deletes build files for chosen packages or tags.
-[#254](https://github.com/pyodide/pyodide-build/pull/254)
+  [#254](https://github.com/pyodide/pyodide-build/pull/254)
 
 ## [0.30.8] - 2025/10/22
 
 - `pyodide config` now exposes `dist_dir` variable.
-[#236](https://github.com/pyodide/pyodide-build/pull/236)
+  [#236](https://github.com/pyodide/pyodide-build/pull/236)
 
 - The CMake toolchain file for Pyodide now sets `CMAKE_SHARED_LINKER_FLAGS_INIT` and `CMAKE_MODULE_LINKER_FLAGS_INIT` and
   unset `CMAKE_SHARED_LINKER_FLAGS` to avoid conflicts with the user's settings.

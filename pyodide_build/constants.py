@@ -4,5 +4,4 @@
 BASE_IGNORED_REQUIREMENTS: list[str] = [
     # mesonpy installs patchelf in linux platform but we don't want it.
     "patchelf",
-    "oldest-supported-numpy",
 ]

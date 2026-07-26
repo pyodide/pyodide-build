@@ -1,5 +1,16 @@
+import os
+import subprocess
+
+import pytest
+from build import BuildBackendException, BuildException, FailedProcessError
+
 from pyodide_build import pypabuild, pywasmcross
 from pyodide_build.constants import BASE_IGNORED_REQUIREMENTS
+from pyodide_build.vendor._pypabuild import (
+    _find_called_process_error,
+    _handle_build_error,
+    _log_subprocess_output,
+)
 
 
 class MockIsolatedEnv:
@@ -19,7 +30,72 @@ def test_remove_avoided_requirements():
     ) == {"baz"}
 
 
-def test_install_reqs(tmp_path, dummy_xbuildenv):
+def test_replace_unisolated_packages():
+    requires = {"foo", "bar<1.0", "baz==1.0", "qux"}
+    unisolated = {
+        "foo": "2.0",
+        "bar": "0.5",
+        "baz": "1.0",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"foo==2.0", "bar==0.5", "baz==1.0", "qux"}
+    assert replaced == {"foo", "bar", "baz"}
+
+
+def test_replace_unisolated_packages_normalizes_names():
+    requires = {"NumPy>=1.20", "Ruamel-YAML"}
+    unisolated = {
+        "numpy": "2.0.3",
+        "ruamel.yaml": "0.18.6",
+    }
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(
+        requires, unisolated
+    )
+    assert new_requires == {"numpy==2.0.3", "ruamel.yaml==0.18.6"}
+    assert replaced == {"numpy", "ruamel.yaml"}
+
+
+def test_replace_unisolated_packages_version_mismatch():
+    requires = {"baz==1.0"}
+    unisolated = {
+        "baz": "1.1",
+    }
+
+    with pytest.warns(UserWarning, match=r"cross-build version is baz==1\.1"):
+        new_requires, replaced = pypabuild._replace_unisolated_packages(
+            requires, unisolated
+        )
+    assert new_requires == {"baz==1.1"}
+    assert replaced == {"baz"}
+
+
+@pytest.mark.parametrize(
+    "reqstr",
+    [
+        "oldest-supported-numpy",
+        "oldest-supported-numpy>=2021.6.17",
+        "Oldest-Supported-NumPy",
+    ],
+)
+def test_replace_unisolated_packages_rejects_oldest_supported_numpy(reqstr):
+    with pytest.raises(ValueError, match="oldest-supported-numpy is deprecated"):
+        pypabuild._replace_unisolated_packages({reqstr}, {"numpy": "2.0.3"})
+
+
+def test_replace_unisolated_packages_oldest_supported_numpy_marker_not_applicable():
+    requires = {"oldest-supported-numpy; python_version<'3.0'"}
+
+    new_requires, replaced = pypabuild._replace_unisolated_packages(requires, {})
+    assert new_requires == requires
+    assert replaced == set()
+
+
+def test_install_reqs(tmp_path, dummy_xbuildenv, monkeypatch):
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
     env = MockIsolatedEnv(tmp_path)
 
     reqs = {"foo", "bar", "baz"}
@@ -97,3 +173,217 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "cxxflags" in wasmcross_args
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
+
+
+def test_install_reqs_triggers_lazy_install(tmp_path, monkeypatch):
+    called = {"count": 0}
+
+    class DummyManager:
+        def ensure_cross_build_packages_installed(self):
+            called["count"] += 1
+
+    monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: True)
+    monkeypatch.setattr(pypabuild, "get_current_xbuildenv_manager", DummyManager)
+    monkeypatch.setattr(pypabuild, "get_unisolated_packages", lambda: {"numpy": "1.0"})
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
+
+    env = MockIsolatedEnv(tmp_path)
+    pypabuild.install_reqs({}, env, {"numpy>=1.0"})
+
+    assert called["count"] == 1
+
+
+def test_install_reqs_skips_lazy_install_when_not_unisolated(tmp_path, monkeypatch):
+    called = {"count": 0}
+
+    class DummyManager:
+        def ensure_cross_build_packages_installed(self):
+            called["count"] += 1
+
+    monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: True)
+    monkeypatch.setattr(pypabuild, "get_current_xbuildenv_manager", DummyManager)
+    monkeypatch.setattr(pypabuild, "get_unisolated_packages", lambda: {"numpy": "1.0"})
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
+
+    env = MockIsolatedEnv(tmp_path)
+    pypabuild.install_reqs({}, env, {"foo>=1.0"})
+
+    assert called["count"] == 0
+
+
+def test_install_cross_build_files(tmp_path, monkeypatch):
+    purelib = tmp_path / "venv" / "lib" / "site-packages"
+    purelib.mkdir(parents=True)
+
+    extras = tmp_path / "site-packages-extras"
+    numpy_header = extras / "numpy" / "_core" / "include" / "numpy" / "ndarrayobject.h"
+    numpy_header.parent.mkdir(parents=True)
+    numpy_header.write_text("// header")
+    scipy_pxd = extras / "scipy" / "linalg" / "cython_blas.pxd"
+    scipy_pxd.parent.mkdir(parents=True)
+    scipy_pxd.write_text("# pxd")
+
+    monkeypatch.setattr(
+        pypabuild,
+        "_find_executable_and_scripts",
+        lambda venv_path: ("python", "scripts", str(purelib)),
+    )
+    monkeypatch.setattr(
+        pypabuild, "get_cross_build_files_dir", lambda name: extras / name
+    )
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"numpy", "scipy"})
+
+    assert (
+        purelib / "numpy" / "_core" / "include" / "numpy" / "ndarrayobject.h"
+    ).read_text() == "// header"
+    assert (purelib / "scipy" / "linalg" / "cython_blas.pxd").read_text() == "# pxd"
+
+
+def test_install_cross_build_files_skips_packages_without_cross_build_files(
+    tmp_path, monkeypatch
+):
+    purelib = tmp_path / "venv" / "lib" / "site-packages"
+    purelib.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        pypabuild,
+        "_find_executable_and_scripts",
+        lambda venv_path: ("python", "scripts", str(purelib)),
+    )
+    monkeypatch.setattr(
+        pypabuild,
+        "get_cross_build_files_dir",
+        lambda name: tmp_path / "does-not-exist" / name,
+    )
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), {"some-package"})
+
+    assert list(purelib.iterdir()) == []
+
+
+def test_install_cross_build_files_skips_when_no_unisolated_packages(
+    tmp_path, monkeypatch
+):
+    def _unexpected_call(*args, **kwargs):
+        raise AssertionError("should not be called when there are no unisolated reqs")
+
+    monkeypatch.setattr(pypabuild, "_find_executable_and_scripts", _unexpected_call)
+    monkeypatch.setattr(pypabuild, "get_cross_build_files_dir", _unexpected_call)
+
+    pypabuild._install_cross_build_files(str(tmp_path / "venv"), set())
+
+
+def _make_cpe(
+    stdout: str | bytes | None = None, stderr: str | bytes | None = None
+) -> subprocess.CalledProcessError:
+    exc = subprocess.CalledProcessError(1, ["pip", "install", "bad-pkg"])
+    exc.stdout = stdout
+    exc.stderr = stderr
+    return exc
+
+
+class TestFindCalledProcessError:
+    def test_direct_called_process_error(self):
+        cpe = _make_cpe()
+        assert _find_called_process_error(cpe) is cpe
+
+    def test_wrapped_in_failed_process_error(self):
+        cpe = _make_cpe()
+        fpe = FailedProcessError(cpe, "install failed")
+        assert _find_called_process_error(fpe) is cpe
+
+    def test_wrapped_in_build_backend_exception(self):
+        cpe = _make_cpe()
+        bbe = BuildBackendException(cpe)
+        assert _find_called_process_error(bbe) is cpe
+
+    def test_unrelated_exception(self):
+        assert _find_called_process_error(RuntimeError("boom")) is None
+
+    def test_build_exception_without_inner(self):
+        assert _find_called_process_error(BuildException("bad")) is None
+
+
+class TestLogSubprocessOutput:
+    def test_logs_str_output(self, capsys):
+        cpe = _make_cpe(stdout="pkg not found\n", stderr="ERROR: no match\n")
+        _log_subprocess_output(cpe)
+        captured = capsys.readouterr().out
+        assert "pkg not found" in captured
+        assert "ERROR: no match" in captured
+        assert "stdout:" in captured
+        assert "stderr:" in captured
+
+    def test_logs_bytes_output(self, capsys):
+        cpe = _make_cpe(stdout=b"bytes stdout\n", stderr=b"bytes stderr\n")
+        _log_subprocess_output(cpe)
+        captured = capsys.readouterr().out
+        assert "bytes stdout" in captured
+        assert "bytes stderr" in captured
+
+    def test_no_output(self, capsys):
+        cpe = _make_cpe()
+        _log_subprocess_output(cpe)
+        captured = capsys.readouterr().out
+        assert captured == ""
+
+
+class TestHandleBuildErrorSubprocessOutput:
+    def test_called_process_error_surfaces_output(self, capsys):
+        with pytest.raises(SystemExit):
+            with _handle_build_error():
+                raise _make_cpe(
+                    stdout="Collecting bad-pkg\n",
+                    stderr="ERROR: No matching distribution found for bad-pkg\n",
+                )
+        captured = capsys.readouterr()
+        assert "Collecting bad-pkg" in captured.out
+        assert "No matching distribution found for bad-pkg" in captured.out
+
+    def test_failed_process_error_surfaces_output(self, capsys):
+        cpe = _make_cpe(stderr="pip resolution failed\n")
+        with pytest.raises(SystemExit):
+            with _handle_build_error():
+                raise FailedProcessError(cpe, "Failed to install deps")
+        captured = capsys.readouterr()
+        assert "pip resolution failed" in captured.out
+
+    def test_build_backend_exception_with_cpe_surfaces_output(self, capsys):
+        cpe = _make_cpe(stderr="backend install error\n")
+        with pytest.raises(SystemExit):
+            with _handle_build_error():
+                raise BuildBackendException(cpe)
+        captured = capsys.readouterr()
+        assert "backend install error" in captured.out
+
+
+@pytest.mark.parametrize("verbosity", [0, 1, 2])
+def test_build_sets_ctx_verbosity(tmp_path, dummy_xbuildenv, monkeypatch, verbosity):
+    """pypabuild.build() must set build._ctx.VERBOSITY before calling the builder."""
+    from build import _ctx as _build_ctx
+
+    observed: list[int] = []
+
+    def _fake_isolated(
+        build_env, srcdir, outdir, distribution, config_settings, verbosity=0
+    ):
+        observed.append(_build_ctx.VERBOSITY.get())
+        return os.path.join(outdir, "pkg-1.0-py3-none-any.whl")
+
+    monkeypatch.setattr(pypabuild, "_build_in_isolated_env", _fake_isolated)
+
+    build_env_ctx = pypabuild.get_build_env(
+        env={"PATH": ""},
+        pkgname="",
+        cflags="",
+        cxxflags="",
+        ldflags="",
+        target_install_dir=str(tmp_path),
+        exports="pyinit",
+        build_dir=tmp_path,
+    )
+    with build_env_ctx as env:
+        pypabuild.build(tmp_path, tmp_path / "dist", env, {}, verbosity=verbosity)
+
+    assert observed == [verbosity]

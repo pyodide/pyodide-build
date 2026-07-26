@@ -39,7 +39,7 @@ def test_install_emscripten_default_version(tmp_path, monkeypatch):
 
     called = {}
 
-    def fake_install(self, version):
+    def fake_install(self, version, *, force=False):
         called["version"] = version
         return self.env_dir / "emsdk"
 
@@ -72,7 +72,7 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
 
     called = {}
 
-    def fake_install(self, version):
+    def fake_install(self, version, *, force=False):
         called["version"] = version
         return self.env_dir / "emsdk"
 
@@ -112,7 +112,7 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
         lambda name: "latest",
     )
 
-    def fake_install(self, version):
+    def fake_install(self, version, *, force=False):
         assert version == "latest"
         assert existing_emsdk.exists()
         return existing_emsdk
@@ -144,7 +144,7 @@ def test_install_emscripten_git_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
-        lambda self, version: (_ for _ in ()).throw(
+        lambda self, version, *, force=False: (_ for _ in ()).throw(
             subprocess.CalledProcessError(1, "git clone")
         ),
     )
@@ -170,7 +170,7 @@ def test_install_emscripten_emsdk_install_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
-        lambda self, version: (_ for _ in ()).throw(
+        lambda self, version, *, force=False: (_ for _ in ()).throw(
             subprocess.CalledProcessError(1, "./emsdk install")
         ),
     )
@@ -189,6 +189,42 @@ def test_install_emscripten_emsdk_install_failure(tmp_path, monkeypatch):
     assert isinstance(result.exception, subprocess.CalledProcessError)
 
 
+def test_install_emscripten_force_flag(tmp_path, monkeypatch):
+    """Test that --force flag triggers reinstallation"""
+    envpath = Path(tmp_path) / ".xbuildenv"
+    envpath.mkdir()
+
+    called = {}
+
+    def fake_install(self, version, *, force=False):
+        called["version"] = version
+        called["force"] = force
+        return self.env_dir / "emsdk"
+
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.get_build_flag",
+        lambda name: "3.1.46",
+    )
+    monkeypatch.setattr(
+        "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
+        fake_install,
+    )
+
+    result = runner.invoke(
+        xbuildenv.app,
+        [
+            "install-emscripten",
+            "--force",
+            "--path",
+            str(envpath),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert called["force"] is True
+    assert called["version"] == "3.1.46"
+
+
 def test_install_emscripten_output_format(tmp_path, monkeypatch):
     """Test that the output message format is correct"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -203,7 +239,7 @@ def test_install_emscripten_output_format(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "pyodide_build.xbuildenv.CrossBuildEnvManager.install_emscripten",
-        lambda self, version: expected_path,
+        lambda self, version, *, force=False: expected_path,
     )
 
     result = runner.invoke(

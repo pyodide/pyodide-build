@@ -3,7 +3,6 @@ Build all of the packages in a given directory.
 """
 
 import dataclasses
-import datetime
 import shutil
 import subprocess
 import sys
@@ -15,10 +14,11 @@ from pathlib import Path
 from queue import PriorityQueue, Queue
 from threading import Lock, Thread
 from time import perf_counter, sleep
-from typing import Any
+from typing import Any, Literal, cast
 
 from packaging.utils import canonicalize_name
 from pyodide_lock import PyodideLockSpec
+from pyodide_lock.spec import InfoSpec
 from pyodide_lock.spec import PackageSpec as PackageLockSpec
 from pyodide_lock.utils import update_package_sha256
 from rich.live import Live
@@ -105,7 +105,7 @@ class BasePackage:
 
     def __init__(self, pkgdir: Path, config: MetaConfig):
         self.pkgdir = pkgdir
-        self.meta = config.model_copy(deep=True)
+        self.meta = config.clone()
 
         self.name = self.meta.package.name
         self.version = self.meta.package.version
@@ -163,9 +163,11 @@ class BasePackage:
     def build(
         self, build_args: BuildArgs, build_dir: Path, clean: bool = False
     ) -> None:
-        run_prefix = (
-            [uv_helper.find_uv_bin(), "run"] if uv_helper.should_use_uv() else []
-        )
+        run_prefix: list[str] = []
+        if uv_helper.should_use_uv():
+            uv_bin = uv_helper.find_uv_bin()
+            assert uv_bin is not None
+            run_prefix = [uv_bin, "run"]
         p = subprocess.run(
             [
                 *run_prefix,
@@ -212,7 +214,7 @@ class BasePackage:
         raise NotImplementedError()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class PythonPackage(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)
@@ -229,7 +231,7 @@ class PythonPackage(BasePackage):
         return wheel
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class SharedLibrary(BasePackage):
     install_dir: str = "dynlib"
 
@@ -248,7 +250,7 @@ class SharedLibrary(BasePackage):
         return candidates[0]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=False)
 class StaticLibrary(BasePackage):
     def __init__(self, pkgdir: Path, config: MetaConfig) -> None:
         super().__init__(pkgdir, config)
@@ -269,12 +271,15 @@ class PackageStatus:
         self.finished = False
 
     def finish(self, success: bool, elapsed_time: float) -> None:
-        time = datetime.datetime.fromtimestamp(elapsed_time, tz=datetime.UTC)
-        if time.minute == 0:
-            minutes = ""
+        seconds = int(elapsed_time)
+        hours, rem = divmod(seconds, 3600)
+        minutes, secs = divmod(rem, 60)
+        if hours:
+            timestr = f"{hours}h {minutes}m {secs}s"
+        elif minutes:
+            timestr = f"{minutes}m {secs}s"
         else:
-            minutes = f"{time.minute}m "
-        timestr = f"{minutes}{time.second}s"
+            timestr = f"{secs}s"
 
         status = "built" if success else "failed"
         done_message = f"{self.prefix} {status} {self.pkg_name} in {timestr}"
@@ -900,13 +905,13 @@ def generate_lockfile(
 
     # Build package.json data.
     [platform, _, arch] = build_env.platform().rpartition("_")
-    info = {
-        "arch": arch,
-        "platform": platform,
-        "version": build_env.get_build_flag("PYODIDE_VERSION"),
-        "python": sys.version.partition(" ")[0],
-        "abi_version": build_env.get_build_flag("PYODIDE_ABI_VERSION"),
-    }
+    info = InfoSpec(
+        arch=cast(Literal["wasm32", "wasm64"], arch),
+        platform=platform,
+        version=build_env.get_build_flag("PYODIDE_VERSION"),
+        python=build_env.get_build_flag("PYVERSION"),
+        abi_version=build_env.get_build_flag("PYODIDE_ABI_VERSION"),
+    )
     packages = generate_packagedata(output_dir, pkg_map)
     lock_spec = PyodideLockSpec(info=info, packages=packages)
     lock_spec.check_wheel_filenames()

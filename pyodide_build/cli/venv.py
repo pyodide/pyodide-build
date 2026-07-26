@@ -29,8 +29,9 @@ from pyodide_build.out_of_tree import venv
     help="Disable download of the latest pip/setuptools from PyPI.",
 )
 @click.option(
-    "--download/--no-download",
+    "--download",
     "download",
+    is_flag=True,
     default=False,
     help="Enable download of the latest pip/setuptools from PyPI.",
 )

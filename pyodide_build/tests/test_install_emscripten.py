@@ -1,5 +1,6 @@
 """Tests for install_emscripten functionality"""
 
+import shutil
 import subprocess
 from unittest.mock import MagicMock, call
 
@@ -53,26 +54,33 @@ def test_clone_emscripten_fresh_clone(tmp_path, monkeypatch):
 
 
 def test_clone_emscripten_already_exists(tmp_path, monkeypatch):
-    """Test that _clone_emscripten pulls updates when emsdk already exists"""
+    """Test that _clone_emscripten removes existing dir and clones fresh"""
     manager = CrossBuildEnvManager(tmp_path)
 
-    # Setup: create active xbuildenv with existing emsdk
     version_dir = tmp_path / "0.28.0"
     version_dir.mkdir()
     emsdk_dir = version_dir / "emsdk"
-    emsdk_dir.mkdir()  # Simulate existing emsdk
+    emsdk_dir.mkdir()
     manager.use_version("0.28.0")
 
-    # Mock subprocess.run
     mock_run = MagicMock(return_value=subprocess.CompletedProcess([], 0))
     monkeypatch.setattr(subprocess, "run", mock_run)
 
-    # Execute
     result = manager._clone_emscripten()
 
-    # Verify - should pull instead of clone
     assert result == emsdk_dir
-    mock_run.assert_called_once_with(["git", "-C", str(emsdk_dir), "pull"], check=True)
+    assert not emsdk_dir.exists()
+    mock_run.assert_called_once_with(
+        [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "https://github.com/emscripten-core/emsdk.git",
+            str(emsdk_dir),
+        ],
+        check=True,
+    )
 
 
 def test_install_emscripten_no_active_xbuildenv(tmp_path):
@@ -95,6 +103,11 @@ def test_install_emscripten_fresh_install(tmp_path, monkeypatch):
     version_dir.mkdir()
     manager.use_version("0.28.0")
 
+    patches_dir = version_dir / "xbuildenv" / "pyodide-root" / "emsdk" / "patches"
+    patches_dir.mkdir(parents=True)
+    patch_path = patches_dir / "test.patch"
+    patch_path.touch()
+
     emsdk_dir = version_dir / "emsdk"
     upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
 
@@ -106,14 +119,17 @@ def test_install_emscripten_fresh_install(tmp_path, monkeypatch):
         return subprocess.CompletedProcess([], 0)
 
     mock_run = MagicMock(side_effect=mock_run_side_effect)
+    mock_which = MagicMock(return_value="./emsdk")
     monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
 
     # Execute with default version
     result = manager.install_emscripten()
 
     # Verify
     assert result == emsdk_dir
-    assert mock_run.call_count == 4  # clone + install + patch + activate
+    assert mock_run.call_count == 4  # clone + install + git apply + activate
+    assert mock_which.call_count == 1  # install
 
     # Check the four subprocess calls
     calls = mock_run.call_args_list
@@ -140,11 +156,11 @@ def test_install_emscripten_fresh_install(tmp_path, monkeypatch):
 
     # 3. Apply patches (before activate)
     patch_cmd = calls[2][0][0]
-    assert "cat" in patch_cmd
-    assert "patches/*.patch" in patch_cmd
-    assert "patch -p1 --verbose" in patch_cmd
-    assert calls[2][1]["shell"] is True
+    assert patch_cmd[:3] == ["git", "apply", "--verbose"]
+    assert str(patch_path) in patch_cmd
+    assert calls[2][1]["check"] is True
     assert calls[2][1]["cwd"] == upstream_emscripten
+    assert calls[2][1]["env"]["GIT_DIR"] == "."
 
     # 4. Activate emsdk
     assert calls[3] == call(
@@ -162,6 +178,10 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     version_dir = tmp_path / "0.28.0"
     version_dir.mkdir()
     manager.use_version("0.28.0")
+    patches_dir = version_dir / "xbuildenv" / "pyodide-root" / "emsdk" / "patches"
+    patches_dir.mkdir(parents=True)
+    patch_path = patches_dir / "test.patch"
+    patch_path.touch()
 
     emsdk_dir = version_dir / "emsdk"
     upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
@@ -174,7 +194,9 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
         return subprocess.CompletedProcess([], 0)
 
     mock_run = MagicMock(side_effect=mock_run_side_effect)
+    mock_which = MagicMock(return_value="./emsdk")
     monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
 
     # Execute with specific version
     emscripten_version = "3.1.46"
@@ -182,7 +204,8 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
 
     # Verify
     assert result == emsdk_dir
-    assert mock_run.call_count == 4  # clone + install + patch + activate
+    assert mock_run.call_count == 4  # clone + install + git apply + activate
+    assert mock_which.call_count == 1  # install
 
     calls = mock_run.call_args_list
 
@@ -194,7 +217,8 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     )
     # Verify patch command (call 2)
     patch_cmd = calls[2][0][0]
-    assert "patch" in patch_cmd
+    assert patch_cmd[:3] == ["git", "apply", "--verbose"]
+    assert calls[2][1]["env"]["GIT_DIR"] == "."
     # Verify version is passed correctly to activate (call 3)
     assert calls[3] == call(
         [
@@ -210,56 +234,180 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
 
 
 def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
-    """Test installing Emscripten when emsdk directory already exists"""
+    """Test installing Emscripten removes existing emsdk and clones fresh"""
     manager = CrossBuildEnvManager(tmp_path)
-
-    # Setup: create active xbuildenv with existing emsdk
     version_dir = tmp_path / "0.28.0"
     version_dir.mkdir()
     emsdk_dir = version_dir / "emsdk"
-    emsdk_dir.mkdir()  # Simulate existing emsdk
-    patches_dir = emsdk_dir / "patches"
-    patches_dir.mkdir()
-    (patches_dir / "test.patch").write_text("--- a/test\n+++ b/test\n")
+    emsdk_dir.mkdir()
     upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
-    upstream_emscripten.mkdir(parents=True)
+    patches_dir = version_dir / "xbuildenv" / "pyodide-root" / "emsdk" / "patches"
+    patches_dir.mkdir(parents=True)
+    patch_path = patches_dir / "test.patch"
+    patch_path.touch()
+
+    def mock_run_side_effect(cmd, **kwargs):
+        if isinstance(cmd, list) and "clone" in cmd:
+            upstream_emscripten.mkdir(parents=True, exist_ok=True)
+        return subprocess.CompletedProcess([], 0)
+
+    mock_run = MagicMock(side_effect=mock_run_side_effect)
+    mock_which = MagicMock(return_value="./emsdk")
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
     manager.use_version("0.28.0")
 
-    # Mock subprocess.run
-    mock_run = MagicMock(return_value=subprocess.CompletedProcess([], 0))
-    monkeypatch.setattr(subprocess, "run", mock_run)
-
-    # Execute
     result = manager.install_emscripten()
 
-    # Verify - should pull, then install, patch, and activate
     assert result == emsdk_dir
     assert mock_run.call_count == 4
+    assert mock_which.call_count == 1  # install
 
     calls = mock_run.call_args_list
 
-    # 1. Pull latest changes (not clone)
-    assert calls[0] == call(["git", "-C", str(emsdk_dir), "pull"], check=True)
+    assert calls[0] == call(
+        [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "https://github.com/emscripten-core/emsdk.git",
+            str(emsdk_dir),
+        ],
+        check=True,
+    )
 
-    # 2. Install emsdk
     assert calls[1] == call(
         ["./emsdk", "install", "--build=Release", "latest"],
         cwd=emsdk_dir,
         check=True,
     )
 
-    # 3. Apply patches
     patch_cmd = calls[2][0][0]
-    assert "patch" in patch_cmd
-    assert calls[2][1]["shell"] is True
+    assert patch_cmd[:3] == ["git", "apply", "--verbose"]
+    assert calls[2][1]["check"] is True
     assert calls[2][1]["cwd"] == upstream_emscripten
+    assert calls[2][1]["env"]["GIT_DIR"] == "."
 
-    # 4. Activate emsdk
     assert calls[3] == call(
         ["./emsdk", "activate", "--embedded", "--build=Release", "latest"],
         cwd=emsdk_dir,
         check=True,
     )
+
+
+def test_install_emscripten_skips_when_already_installed(tmp_path, monkeypatch):
+    manager = CrossBuildEnvManager(tmp_path)
+
+    version_dir = tmp_path / "0.28.0"
+    version_dir.mkdir()
+    manager.use_version("0.28.0")
+
+    emsdk_dir = version_dir / "emsdk"
+    emsdk_dir.mkdir()
+
+    marker = version_dir / ".emscripten-version"
+    marker.write_text("3.1.46")
+
+    mock_run = MagicMock(return_value=subprocess.CompletedProcess([], 0))
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    result = manager.install_emscripten("3.1.46")
+
+    assert result == emsdk_dir
+    mock_run.assert_not_called()
+
+
+def test_install_emscripten_reinstalls_different_version(tmp_path, monkeypatch):
+    manager = CrossBuildEnvManager(tmp_path)
+
+    version_dir = tmp_path / "0.28.0"
+    version_dir.mkdir()
+    manager.use_version("0.28.0")
+    patches_dir = version_dir / "xbuildenv" / "pyodide-root" / "emsdk" / "patches"
+    patches_dir.mkdir(parents=True)
+    patch_path = patches_dir / "test.patch"
+    patch_path.touch()
+
+    emsdk_dir = version_dir / "emsdk"
+    emsdk_dir.mkdir()
+    upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
+    upstream_emscripten.mkdir(parents=True)
+
+    marker = version_dir / ".emscripten-version"
+    marker.write_text("3.1.45")
+
+    mock_run = MagicMock(return_value=subprocess.CompletedProcess([], 0))
+    mock_which = MagicMock(return_value="./emsdk")
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
+
+    result = manager.install_emscripten("3.1.46")
+
+    assert result == emsdk_dir
+    assert mock_run.call_count == 4
+    assert mock_which.call_count == 1  # install
+    assert marker.read_text() == "3.1.46"
+
+
+def test_install_emscripten_force_reinstalls_same_version(tmp_path, monkeypatch):
+    manager = CrossBuildEnvManager(tmp_path)
+
+    version_dir = tmp_path / "0.28.0"
+    version_dir.mkdir()
+    manager.use_version("0.28.0")
+    patches_dir = version_dir / "xbuildenv" / "pyodide-root" / "emsdk" / "patches"
+    patches_dir.mkdir(parents=True)
+    patch_path = patches_dir / "test.patch"
+    patch_path.touch()
+
+    emsdk_dir = version_dir / "emsdk"
+    emsdk_dir.mkdir()
+    upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
+    upstream_emscripten.mkdir(parents=True)
+
+    marker = version_dir / ".emscripten-version"
+    marker.write_text("3.1.46")
+
+    mock_run = MagicMock(return_value=subprocess.CompletedProcess([], 0))
+    mock_which = MagicMock(return_value="./emsdk")
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
+
+    result = manager.install_emscripten("3.1.46", force=True)
+
+    assert result == emsdk_dir
+    assert mock_run.call_count == 4
+    assert mock_which.call_count == 1  # install
+    assert marker.read_text() == "3.1.46"
+
+
+def test_install_emscripten_writes_marker_on_success(tmp_path, monkeypatch):
+    manager = CrossBuildEnvManager(tmp_path)
+
+    version_dir = tmp_path / "0.28.0"
+    version_dir.mkdir()
+    manager.use_version("0.28.0")
+
+    emsdk_dir = version_dir / "emsdk"
+    upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
+
+    def mock_run_side_effect(cmd, **kwargs):
+        if isinstance(cmd, list) and "clone" in cmd:
+            upstream_emscripten.mkdir(parents=True, exist_ok=True)
+        return subprocess.CompletedProcess([], 0)
+
+    mock_run = MagicMock(side_effect=mock_run_side_effect)
+    mock_which = MagicMock(return_value="./emsdk")
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
+
+    manager.install_emscripten("3.1.46")
+
+    assert mock_which.call_count == 1  # install
+    marker = version_dir / ".emscripten-version"
+    assert marker.exists()
+    assert marker.read_text() == "3.1.46"
 
 
 def test_install_emscripten_patch_fails(tmp_path, monkeypatch):
@@ -270,6 +418,10 @@ def test_install_emscripten_patch_fails(tmp_path, monkeypatch):
     version_dir = tmp_path / "0.28.0"
     version_dir.mkdir()
     manager.use_version("0.28.0")
+    patches_dir = version_dir / "xbuildenv" / "pyodide-root" / "emsdk" / "patches"
+    patches_dir.mkdir(parents=True)
+    patch_path = patches_dir / "test.patch"
+    patch_path.touch()
 
     emsdk_dir = version_dir / "emsdk"
     upstream_emscripten = emsdk_dir / "upstream" / "emscripten"
@@ -282,11 +434,17 @@ def test_install_emscripten_patch_fails(tmp_path, monkeypatch):
         if isinstance(cmd, list) and "clone" in cmd:
             upstream_emscripten.mkdir(parents=True, exist_ok=True)
         # Fail on patch command (shell=True command with "patch" in it)
-        if kwargs.get("shell") and isinstance(cmd, str) and "patch" in cmd:
+        if (
+            kwargs.get("check")
+            and isinstance(cmd, list)
+            and cmd[:3] == ["git", "apply", "--verbose"]
+        ):
             raise subprocess.CalledProcessError(1, cmd, stderr="Patch failed")
         return subprocess.CompletedProcess(cmd, 0)
 
+    mock_which = MagicMock(return_value="./emsdk")
     monkeypatch.setattr(subprocess, "run", mock_run_with_error)
+    monkeypatch.setattr(shutil, "which", mock_which)
 
     # Execute and verify proper error message is raised
     with pytest.raises(

@@ -83,7 +83,7 @@ FAKE_METADATA = {
 
 
 def test_model():
-    model = CrossBuildEnvMetaSpec(**FAKE_METADATA)
+    model = CrossBuildEnvMetaSpec.from_dict(FAKE_METADATA)
     assert "0.1.0" in model.releases
     assert "0.2.0" in model.releases
     assert "0.3.0" in model.releases
@@ -95,7 +95,7 @@ def test_model():
 
 
 def test_list_compatible_releases():
-    model = CrossBuildEnvMetaSpec(**FAKE_METADATA)
+    model = CrossBuildEnvMetaSpec.from_dict(FAKE_METADATA)
 
     releases = model.list_compatible_releases(
         python_version="3.10.5",
@@ -121,7 +121,7 @@ def test_list_compatible_releases():
 
 
 def test_list_compatible_releases_sort():
-    model = CrossBuildEnvMetaSpec(**FAKE_METADATA)
+    model = CrossBuildEnvMetaSpec.from_dict(FAKE_METADATA)
 
     releases = model.list_compatible_releases()
     assert releases[0].version == "0.6.0"
@@ -130,7 +130,7 @@ def test_list_compatible_releases_sort():
 
 
 def test_get_latest_compatible_release():
-    model = CrossBuildEnvMetaSpec(**FAKE_METADATA)
+    model = CrossBuildEnvMetaSpec.from_dict(FAKE_METADATA)
 
     release = model.get_latest_compatible_release(
         python_version="3.10.5",
@@ -153,7 +153,7 @@ def test_get_latest_compatible_release():
 
 
 def test_get_release():
-    model = CrossBuildEnvMetaSpec(**FAKE_METADATA)
+    model = CrossBuildEnvMetaSpec.from_dict(FAKE_METADATA)
 
     release = model.get_release("0.1.0")
     assert release.version == "0.1.0"
@@ -241,6 +241,31 @@ def test_is_compatible_full():
         emscripten_version="1.39.8",
         pyodide_build_version=None,
     )
+
+
+def test_published_at():
+    release = CrossBuildEnvReleaseSpec(
+        version="0.1.0",
+        url="https://example.com/0.1.0.tar.gz",
+        sha256="1234567890abcdef",
+        python_version="3.8.0",
+        emscripten_version="1.39.8",
+        published_at="2024-01-18T21:52:25Z",
+    )
+    assert release.published_at == "2024-01-18T21:52:25Z"
+
+    release_no_date = CrossBuildEnvReleaseSpec(
+        version="0.1.0",
+        url="https://example.com/0.1.0.tar.gz",
+        sha256="1234567890abcdef",
+        python_version="3.8.0",
+        emscripten_version="1.39.8",
+    )
+    assert release_no_date.published_at == ""
+
+    metadata = CrossBuildEnvMetaSpec.from_dict(FAKE_METADATA)
+    for release in metadata.releases.values():
+        assert release.published_at == ""
 
 
 def test_is_compatible_without_pyodide_build_range():

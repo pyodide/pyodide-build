@@ -1,14 +1,14 @@
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
-from typing import Self
 
-import pydantic
+import attrs
 import pytest
 
 from pyodide_build import common
-from pyodide_build.build_env import BuildArgs, get_build_flag
+from pyodide_build.build_env import BuildArgs, get_build_flag, pyodide_tags
 from pyodide_build.recipe import builder as _builder
 from pyodide_build.recipe.builder import (
     RecipeBuilder,
@@ -203,10 +203,10 @@ def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
     assert data[-3:] == ["numpy < 2.0", "pytest == 7.0", "setuptools < 75"], data
 
 
+@attrs.define
 class MockSourceSpec(_SourceSpec):
-    @pydantic.model_validator(mode="after")
-    def _check_patches_extra(self) -> Self:
-        return self
+    def _check_patches_extra(self) -> None:
+        return None
 
 
 @pytest.mark.parametrize("is_wheel", [False, True])
@@ -218,12 +218,14 @@ def test_needs_rebuild(tmpdir, is_wheel):
     if is_wheel:
         dist_dir = pkg_root / "dist"
         dist_dir.mkdir()
+        platform = next(iter(pyodide_tags())).platform
+        pyver = f"cp{sys.version_info.major}{sys.version_info.minor}"
         # Build of current version with wrong abi
-        (dist_dir / "regex-12-cp311-cp311-pyodide_2024_0_wasm32.whl").touch()
+        (dist_dir / f"regex-12-cp311-cp311-{platform}.whl").touch()
         # Build of old version with current abi
-        (dist_dir / "regex-11-cp312-cp312-pyodide_2024_0_wasm32.whl").touch()
+        (dist_dir / f"regex-11-{pyver}-{pyver}-{platform}.whl").touch()
         # the version we're trying to build
-        packaged = dist_dir / "regex-12-cp312-cp312-pyodide_2024_0_wasm32.whl"
+        packaged = dist_dir / f"regex-12-{pyver}-{pyver}-{platform}.whl"
     else:
         packaged = buildpath / ".packaged"
 
@@ -339,3 +341,31 @@ def test_extract_tarballname():
 
     for header, tarballname in zip(headers, tarballnames, strict=True):
         assert _builder._extract_tarballname(url, header) == tarballname
+
+
+@pytest.mark.parametrize(
+    "disposition,expected",
+    [
+        # Path traversal with Unix separators: strip to basename only (safe)
+        ('attachment; filename="../../evil.tar.gz"', "evil.tar.gz"),
+        # Absolute Unix path: strip to basename only (safe)
+        ('attachment; filename="/abs/path.tar.gz"', "path.tar.gz"),
+        # Empty filename falls back to URL name
+        ('attachment; filename=""', "ball.tar.gz"),
+        # Windows-style path traversal: strip to basename only (safe)
+        ('attachment; filename="..\\\\..\\\\evil.tar.gz"', "evil.tar.gz"),
+        # Normal safe filename is kept unchanged
+        ('attachment; filename="safe-package-1.0.tar.gz"', "safe-package-1.0.tar.gz"),
+    ],
+)
+def test_extract_tarballname_sanitization(disposition, expected):
+    """
+    Content-Disposition filenames with path components must be reduced to a
+    safe basename that cannot escape the build directory.
+    """
+    url = "https://www.test.com/ball.tar.gz"
+    result = _builder._extract_tarballname(url, {"Content-Disposition": disposition})
+    assert result == expected
+    # Extra invariant: the result must never contain a path separator.
+    assert "/" not in result
+    assert "\\" not in result
