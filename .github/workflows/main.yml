@@ -64,6 +64,30 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
 
+  windows-test:
+    name: windows-test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # include tags so that hatch-vcs can infer the version
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . --group test
+
+      # The rest of the suite has never been run on Windows, so for now this
+      # is scoped to the tests that are specifically about Windows behaviour.
+      - name: Run tests marked with windows
+        run: pytest pyodide_build/tests/test_venv.py -m windows
+
   windows-integration-test:
     runs-on: windows-latest
     needs: [check-integration-test-trigger]
@@ -312,6 +336,8 @@ jobs:
             ./scripts/pyodide_venv_test.sh
           fi
 
+      # The runner has administrator rights, so this can use the real Program
+      # Files rather than a workspace directory that merely contains a space.
       - name: Create a venv under Program Files
         if: runner.os == 'Windows'
         shell: pwsh
