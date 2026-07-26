@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PYO3_USE_ABI3_FORWARD_COMPATIBILITY` environment variable is now set for all
   builds so that PyO3 packages will build against the unstable CPython version.
 
+### Fixed
+
+- The wrapper scripts written into a Pyodide virtual environment now quote every
+  interpolated path, so `pyodide venv` works when the host Python, the
+  cross-build environment, or `PATH` contains a space. This previously broke
+  `uv`-managed Pythons on macOS, which live under `Library/Application Support`.
+  [#409](https://github.com/pyodide/pyodide-build/pull/409)
+
 ### Changed
 
 - Replaced the `pydantic` dependency with `attrs` + `cattrs` for recipe
