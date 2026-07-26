@@ -33,7 +33,7 @@ def base_test_dir(tmp_path_factory):
 
     manager = CrossBuildEnvManager(xbuildenv_test_name)
     manager.install(
-        url="https://github.com/pyodide/pyodide/releases/download/0.27.3/xbuildenv-0.27.3.tar.bz2"
+        url="https://github.com/pyodide/pyodide/releases/download/0.29.4/xbuildenv-0.29.4.tar.bz2"
     )
 
     os.chdir(cwd)
