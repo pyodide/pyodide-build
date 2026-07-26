@@ -168,6 +168,10 @@ jobs:
           - task: { name: test-src, installer: pip }
             os: ubuntu-latest
             pyodide-version: minimum
+          - task: { name: test-src, installer: pip }
+            os: ubuntu-latest
+            pyodide-version: stable-debug
+            python-version: "3.14"
 
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
@@ -179,7 +183,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version || '3.13' }}
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -197,6 +201,8 @@ jobs:
             MIN_VERSION=$(pyodide xbuildenv search --json | jq -r '.environments | sort_by(.version) | .[0].version')
             echo "Installing Pyodide xbuildenv version: $MIN_VERSION"
             pyodide xbuildenv install $MIN_VERSION
+          elif [[ "${{ matrix.pyodide-version }}" == "stable-debug" ]]; then
+            pyodide xbuildenv install --debug
           else
             pyodide xbuildenv install
           fi
