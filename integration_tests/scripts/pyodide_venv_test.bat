@@ -1,10 +1,11 @@
 @echo on
 setlocal enabledelayedexpansion
 
-REM Clean up and create test directory
-if exist test-cmdline-runner rmdir /s /q test-cmdline-runner
-mkdir test-cmdline-runner
-cd test-cmdline-runner
+REM Clean up and create test directory. The space in the name is
+REM deliberate, as it lets us test venv paths that need quoting.
+if exist "test cmdline runner" rmdir /s /q "test cmdline runner"
+mkdir "test cmdline runner"
+cd "test cmdline runner"
 if errorlevel 1 exit /b 1
 
 REM Create host virtual environment

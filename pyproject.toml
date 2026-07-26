@@ -96,7 +96,8 @@ exclude = [
 [tool.pytest.ini_options]
 addopts = "-vra --strict-markers"
 markers = [
-  "integration: mark a test as an integration test"
+  "integration: mark a test as an integration test",
+  "windows: mark a test that is useful only on Windows"
 ]
 
 [tool.mypy]

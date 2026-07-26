@@ -1,9 +1,11 @@
 #!/bin/bash
 set -ex
 
-rm -rf test-cmdline-runner
-mkdir test-cmdline-runner
-cd test-cmdline-runner || exit
+# Clean up and create test directory. The space in the name is
+# deliberate, as it lets us test venv paths that need quoting.
+rm -rf "test cmdline runner"
+mkdir "test cmdline runner"
+cd "test cmdline runner" || exit
 
 python -m venv .venv-host
 # shellcheck source=/dev/null

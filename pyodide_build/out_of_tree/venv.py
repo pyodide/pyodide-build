@@ -1,6 +1,7 @@
 import ast
 import json
 import os
+import shlex
 import shutil
 import sys
 import textwrap
@@ -504,10 +505,13 @@ class UnixPyodideVenv(PyodideVenv):
         """
         base_executable = getattr(sys, "_base_executable", sys.executable)
         pythonhome = Path(base_executable).parents[1]
+        # These paths can contain spaces, such as noticed via uv-managed
+        # Python on macOS which lives under "Application Support". See:
+        # https://github.com/pyodide/pyodide-build/issues/399
         return dedent(
             f"""\
             #!/bin/sh
-            exec env PYTHONHOME={pythonhome} {self.host_python_symlink_path} "$@"
+            exec env PYTHONHOME={shlex.quote(str(pythonhome))} {shlex.quote(str(self.host_python_symlink_path))} "$@"
             """
         )
 
@@ -518,7 +522,7 @@ class UnixPyodideVenv(PyodideVenv):
         return dedent(
             f"""
             #!/usr/bin/env bash
-            {self.host_python_path} -s {self.pip_wrapper_path} "$@"
+            {shlex.quote(str(self.host_python_path))} -s {shlex.quote(str(self.pip_wrapper_path))} "$@"
             """
         )
 
@@ -556,7 +560,7 @@ class UnixPyodideVenv(PyodideVenv):
             dedent(
                 f"""
                 #!/usr/bin/env bash
-                PATH="{PATH}:$PATH" PYODIDE_ROOT='{PYODIDE_ROOT}' exec {original_pyodide_cli} "$@"
+                PATH={shlex.quote(PATH)}:"$PATH" PYODIDE_ROOT={shlex.quote(PYODIDE_ROOT)} exec {shlex.quote(original_pyodide_cli)} "$@"
                 """
             )
         )
@@ -654,8 +658,8 @@ class WindowsPyodideVenv(PyodideVenv):
             dedent(
                 f"""
                 @echo off
-                set PATH={PATH};%PATH%
-                set PYODIDE_ROOT={PYODIDE_ROOT}
+                set "PATH={PATH};%PATH%"
+                set "PYODIDE_ROOT={PYODIDE_ROOT}"
                 "{original_pyodide_cli}" %*
                 """
             )
