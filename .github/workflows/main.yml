@@ -321,13 +321,15 @@ jobs:
             ./scripts/pyodide_venv_test.sh
           fi
 
-      # The runner has administrator rights, so this can use the real Program
-      # Files rather than a workspace directory that merely contains a space.
-      - name: Create a venv under Program Files
+      # Pyodide's python.exe launcher mangles the path to python.bat when it
+      # holds a space, so for now this runs somewhere without one.
+      # TODO: move this back to "C:\Program Files\pyodide venv test" when
+      # https://github.com/pyodide/pyodide/pull/6381 is released.
+      - name: Create a venv outside the workspace
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $root = "C:\Program Files\pyodide venv test"
+          $root = "C:\pyodide-venv-test"
           New-Item -ItemType Directory -Force -Path $root | Out-Null
 
           Set-Location $root

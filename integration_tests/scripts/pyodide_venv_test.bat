@@ -1,11 +1,14 @@
 @echo on
 setlocal enabledelayedexpansion
 
-REM Clean up and create test directory. The space in the name is
-REM deliberate, as it lets us test venv paths that need quoting.
-if exist "test cmdline runner" rmdir /s /q "test cmdline runner"
-mkdir "test cmdline runner"
-cd "test cmdline runner"
+REM Clean up and create test directory. This has no space in it, unlike the
+REM POSIX script, because Pyodide's python.exe launcher mangles the path to
+REM python.bat when it contains one.
+REM TODO: rename this back to "test cmdline runner", matching the POSIX script,
+REM when https://github.com/pyodide/pyodide/pull/6381 is released.
+if exist test-cmdline-runner rmdir /s /q test-cmdline-runner
+mkdir test-cmdline-runner
+cd test-cmdline-runner
 if errorlevel 1 exit /b 1
 
 REM Create host virtual environment
