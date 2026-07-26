@@ -630,6 +630,39 @@ def test_windows_pyodide_cli_script_runs_with_spaces_in_paths(tmp_path, monkeypa
     assert result.stdout.splitlines() == [str(pyodide_root), "build ."]
 
 
+def test_windows_interpreter_launcher_is_copied(tmp_path, monkeypatch):
+    """``python.exe`` has to be a copy of the shim, not a symlink to it.
+
+    The shim resolves its own path before looking for ``python.bat`` beside it,
+    so a symlink would resolve into the dist directory and run the interpreter
+    outside the virtualenv.
+    """
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    (dist_dir / "python.exe").write_bytes(b"pyodide launcher shim")
+    monkeypatch.setattr(venv, "pyodide_dist_dir", lambda: dist_dir)
+
+    pyodide_venv = _windows_venv_with_spaces(tmp_path)
+    pyodide_venv._install_interpreter_launcher()
+
+    launcher = pyodide_venv.script_interpreter_path
+    assert launcher.name == "python.exe"
+    assert not launcher.is_symlink()
+    assert launcher.read_bytes() == b"pyodide launcher shim"
+
+
+def test_windows_interpreter_launcher_may_be_absent(tmp_path, monkeypatch):
+    """Cross-build environments older than Pyodide 0.29.3 ship no python.exe."""
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    monkeypatch.setattr(venv, "pyodide_dist_dir", lambda: dist_dir)
+
+    pyodide_venv = _windows_venv_with_spaces(tmp_path)
+    pyodide_venv._install_interpreter_launcher()
+
+    assert not pyodide_venv.script_interpreter_path.exists()
+
+
 @pytest.mark.parametrize(
     "make_venv",
     [_unix_venv_with_spaces, _windows_venv_with_spaces],
@@ -639,10 +672,10 @@ def test_pip_wrapper_executable_is_the_interpreter(tmp_path, make_venv):
     """The path pip bakes into console scripts must be the venv interpreter.
 
     ``pip_wrapper.get_executable`` rewrites ``sys.executable`` (the host python
-    symlink) into the Pyodide interpreter next to it. The two names differ by
-    more than the symlink suffix on Windows, where the host symlink ends in
-    ``.exe`` but the interpreter is a ``.bat``, so dropping the suffix alone
-    used to leave a path that does not exist.
+    symlink) into the interpreter a console script should invoke. The two names
+    differ by more than the symlink suffix on Windows, where the host symlink is
+    ``python-host-link.exe`` and the target is ``python.exe``, so dropping the
+    suffix alone used to leave a path that does not exist.
     """
     pyodide_venv = make_venv(tmp_path)
 
@@ -651,10 +684,10 @@ def test_pip_wrapper_executable_is_the_interpreter(tmp_path, make_venv):
     sys_executable = str(pyodide_venv.host_python_symlink_path)
     executable = (
         sys_executable.removesuffix(pyodide_venv.host_python_symlink_suffix)
-        + pyodide_venv.exe_suffix
+        + pyodide_venv.script_interpreter_suffix
     )
 
-    assert executable == str(pyodide_venv.interpreter_symlink_path)
+    assert executable == str(pyodide_venv.script_interpreter_path)
 
 
 def test_cleanup_skips_preexisting_directory(monkeypatch, tmp_path):

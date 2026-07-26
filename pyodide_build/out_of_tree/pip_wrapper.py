@@ -16,6 +16,7 @@ class Config:
     pip_wrapper_name: str
     platform_data: tuple[str, str, str, str, str]
     pyodide_platform: str
+    script_interpreter_suffix: str
     sysconfigdata_dir: str
 
 
@@ -39,7 +40,7 @@ def get_executable():
         )
     return (
         sys.executable.removesuffix(CONFIG.executable_symlink_suffix)
-        + CONFIG.exe_suffix
+        + CONFIG.script_interpreter_suffix
     )
 
 

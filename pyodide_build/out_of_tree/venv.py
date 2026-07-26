@@ -188,6 +188,21 @@ class PyodideVenv(ABC):
         return self.venv_bin / self.python_exe_name
 
     @property
+    def script_interpreter_suffix(self) -> str:
+        """Get the extension of the interpreter that console scripts invoke.
+
+        This is the ``+ suffix`` half of the calculation that ``pip_wrapper``
+        does to turn ``sys.executable`` into the Pyodide interpreter, the other
+        half being ``host_python_symlink_suffix``.
+        """
+        return ""
+
+    @property
+    def script_interpreter_path(self) -> Path:
+        """Get the path to the interpreter that installed console scripts invoke."""
+        return self.venv_bin / f"python{self.script_interpreter_suffix}"
+
+    @property
     def pyodide_cli_path(self) -> Path:
         """Get the path to the pyodide CLI script in the virtualenv."""
         return self.venv_bin / self.pyodide_exe_name
@@ -348,6 +363,7 @@ class PyodideVenv(ABC):
         return dict(
             executable_symlink_suffix=self.host_python_symlink_suffix,
             exe_suffix=self.exe_suffix,
+            script_interpreter_suffix=self.script_interpreter_suffix,
             pip_patched_name=self.pip_patched_path.name,
             pip_wrapper_name=self.pip_wrapper_path.name,
             platform_data=ast.literal_eval(result.stdout),
@@ -586,6 +602,21 @@ class WindowsPyodideVenv(PyodideVenv):
         return "-host-link.exe"
 
     @property
+    def script_interpreter_suffix(self) -> str:
+        """Get the extension of the interpreter that console scripts invoke.
+
+        The launcher that pip puts in front of a console script can only
+        invoke an ``.exe``, so these point at the ``python.exe`` shim rather
+        than at ``python.bat``.
+        """
+        return ".exe"
+
+    @property
+    def interpreter_launcher_path(self) -> Path:
+        """Get the path to the python.exe shim in the Pyodide dist directory."""
+        return pyodide_dist_dir() / "python.exe"
+
+    @property
     def host_python_wrapper(self) -> str:
         """Get the content of the host python wrapper script.
 
@@ -644,6 +675,31 @@ class WindowsPyodideVenv(PyodideVenv):
             if python_bat != self.interpreter_symlink_path:
                 python_bat.unlink(missing_ok=True)
                 python_bat.symlink_to(self.interpreter_path)
+
+        self._install_interpreter_launcher()
+
+    def _install_interpreter_launcher(self) -> None:
+        """Put the python.exe shim from the Pyodide dist next to python.bat.
+
+        Pyodide ships a small launcher that forwards to python.bat, so that the
+        venv has an ``.exe`` interpreter like an ordinary one does. Without it
+        the launchers pip generates for console scripts have nothing they can
+        invoke, since they refuse any interpreter that is not an ``.exe``.
+        """
+        if not self.interpreter_launcher_path.exists():
+            # Pyodide only started shipping the shim in 0.29.3
+            logger.warning(
+                "%s not found in the cross-build environment. Console scripts "
+                "installed into this virtualenv will not be runnable.",
+                self.interpreter_launcher_path.name,
+            )
+            return
+
+        # Copy rather than symlink. The shim resolves its own path before
+        # looking for python.bat beside it, so a symlink would send it to the
+        # dist directory and it would lose track of the virtualenv.
+        self.script_interpreter_path.unlink(missing_ok=True)
+        shutil.copy(self.interpreter_launcher_path, self.script_interpreter_path)
 
     def _create_pyodide_script(self) -> None:
         """Write pyodide cli script into the virtualenv bin folder."""
