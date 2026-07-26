@@ -342,16 +342,18 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $dest = "C:\Program Files\pyodide venv test\.venv-pyodide"
-          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+          $root = "C:\Program Files\pyodide venv test"
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
 
-          pyodide venv $dest
+          Set-Location $root
+
+          pyodide venv .venv-pyodide
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          & "$dest\Scripts\pip.bat" install six
+          .\.venv-pyodide\Scripts\pip.bat install six
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          & "$dest\Scripts\python.bat" -c "import six; print(six.__version__)"
+          .\.venv-pyodide\Scripts\python.bat -c "import six; print(six.__version__)"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   coverage:
