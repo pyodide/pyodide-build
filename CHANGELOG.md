@@ -21,14 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `uv`-managed Pythons on macOS, which live under `Library/Application Support`.
   [#409](https://github.com/pyodide/pyodide-build/pull/409)
 
-- Pyodide virtual environments on Windows now include the `python.exe` shim that
-  Pyodide ships, and console scripts installed into them point at it. The venv
-  previously had no `.exe` interpreter at all, and the launcher that pip puts in
-  front of a console script refuses to invoke anything else, so no installed
-  script could be run. This needs a cross-build environment from Pyodide 0.29.3
-  or later, which is when the shim was first shipped.
-  [#409](https://github.com/pyodide/pyodide-build/pull/409)
-
 ### Changed
 
 - Replaced the `pydantic` dependency with `attrs` + `cattrs` for recipe

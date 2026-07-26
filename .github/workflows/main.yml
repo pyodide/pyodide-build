@@ -321,32 +321,6 @@ jobs:
             ./scripts/pyodide_venv_test.sh
           fi
 
-      # Pyodide's python.exe launcher mangles the path to python.bat when it
-      # holds a space, so for now this runs somewhere without one.
-      # TODO: move this back to "C:\Program Files\pyodide venv test" when
-      # https://github.com/pyodide/pyodide/pull/6381 is released.
-      - name: Create a venv outside the workspace
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $root = "C:\pyodide-venv-test"
-          New-Item -ItemType Directory -Force -Path $root | Out-Null
-
-          Set-Location $root
-
-          pyodide venv .venv-pyodide
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          .\.venv-pyodide\Scripts\pip.bat install pygments
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          Get-ChildItem .\.venv-pyodide\Scripts
-          $script = Get-ChildItem .\.venv-pyodide\Scripts -Filter "pygmentize*" |
-            Select-Object -First 1
-          if (-not $script) { throw "pygmentize console script was not created" }
-
-          & $script.FullName -V
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   coverage:
     name: Collect and upload coverage
