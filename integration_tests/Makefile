@@ -83,6 +83,9 @@ clean:
 	rm -rf recipes/*/build
 	rm -rf test_venv
 	rm -rf "test cmdline runner"
+# TODO: drop the line below, the Windows script uses the name above again, when
+# https://github.com/pyodide/pyodide/pull/6381 is released
+	rm -rf test-cmdline-runner
 	rm -rf src/numpy-*
 	rm -rf src/numpy-*.tar.gz
 	rm -rf numpy-*
