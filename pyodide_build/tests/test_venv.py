@@ -1,5 +1,6 @@
 import os
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -458,6 +459,107 @@ def test_pip_script_name_helper(tmp_path, script_name, exe_suffix, expected_name
     """``_pip_script_name`` must preserve versioned pip names like ``pip3.12``."""
     result = _pip_script_name(tmp_path / script_name, exe_suffix)
     assert result.name == expected_name
+
+
+def _unix_venv_with_spaces(tmp_path):
+    """Build a ``UnixPyodideVenv`` whose paths all contain spaces"""
+    dest = tmp_path / "my venv"
+    bin_dir = dest / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+
+    pyodide_venv = venv.UnixPyodideVenv(dest)
+    pyodide_venv._venv_root = dest
+    pyodide_venv._venv_bin = bin_dir
+    return pyodide_venv
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
+def test_host_python_wrapper_quotes_paths(tmp_path, monkeypatch):
+    """A host Python under a path with spaces must not be split by the shell.
+
+    Regression test for https://github.com/pyodide/pyodide-build/issues/399:
+    a uv-managed Python on macOS lives under ``Library/Application Support``,
+    and the unquoted ``PYTHONHOME=`` assignment made ``env`` treat everything
+    after the space as a command name.
+    """
+    fake_python = tmp_path / "Application Support" / "uv" / "bin" / "python3"
+    fake_python.parent.mkdir(parents=True)
+    monkeypatch.setattr(sys, "executable", str(fake_python))
+    monkeypatch.setattr(sys, "_base_executable", str(fake_python), raising=False)
+
+    pyodide_venv = _unix_venv_with_spaces(tmp_path)
+    wrapper = pyodide_venv.host_python_wrapper
+
+    tokens = shlex.split(wrapper.splitlines()[-1])
+    assert tokens[0] == "exec"
+    assert tokens[1] == "env"
+    assert tokens[2] == f"PYTHONHOME={tmp_path / 'Application Support' / 'uv'}"
+    assert tokens[3] == str(pyodide_venv.host_python_symlink_path)
+    assert tokens[4] == "$@"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
+def test_host_pip_wrapper_quotes_paths(tmp_path):
+    """The pip wrapper must survive a venv path containing spaces."""
+    pyodide_venv = _unix_venv_with_spaces(tmp_path)
+
+    tokens = shlex.split(pyodide_venv.host_pip_wrapper.splitlines()[-1])
+    assert tokens[0] == str(pyodide_venv.host_python_path)
+    assert tokens[1] == "-s"
+    assert tokens[2] == str(pyodide_venv.pip_wrapper_path)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
+def test_pyodide_cli_script_quotes_paths(tmp_path, monkeypatch):
+    """PATH/PYODIDE_ROOT entries with spaces must not break the pyodide shim."""
+    pyodide_root = tmp_path / "Application Support" / "pyodide-build"
+    pyodide_root.mkdir(parents=True)
+    cli = tmp_path / "some dir" / "pyodide"
+    cli.parent.mkdir()
+
+    monkeypatch.setenv("PATH", f"{tmp_path / 'some dir'}:/usr/bin")
+    monkeypatch.setenv("PYODIDE_ROOT", str(pyodide_root))
+    monkeypatch.setattr(shutil, "which", lambda name: str(cli))
+
+    pyodide_venv = _unix_venv_with_spaces(tmp_path)
+    pyodide_venv._create_pyodide_script()
+
+    tokens = shlex.split(pyodide_venv.pyodide_cli_path.read_text().splitlines()[-1])
+    assert tokens[0] == f"PATH={tmp_path / 'some dir'}:/usr/bin:$PATH"
+    assert tokens[1] == f"PYODIDE_ROOT={pyodide_root}"
+    assert tokens[2] == "exec"
+    assert tokens[3] == str(cli)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
+def test_host_python_wrapper_runs_with_spaces_in_paths(tmp_path, monkeypatch):
+    """Actually execute the wrapper to prove the quoting holds up end to end."""
+    fake_python = tmp_path / "Application Support" / "uv" / "bin" / "python3"
+    fake_python.parent.mkdir(parents=True)
+    monkeypatch.setattr(sys, "executable", str(fake_python), raising=False)
+    monkeypatch.setattr(sys, "_base_executable", str(fake_python), raising=False)
+
+    pyodide_venv = _unix_venv_with_spaces(tmp_path)
+    # Stand in for the real interpreter. Echo back PYTHONHOME and the arguments.
+    pyodide_venv.host_python_symlink_path.write_text(
+        '#!/bin/sh\necho "$PYTHONHOME"\necho "$@"\n'
+    )
+    pyodide_venv.host_python_symlink_path.chmod(0o755)
+
+    pyodide_venv.host_python_path.write_text(pyodide_venv.host_python_wrapper)
+    pyodide_venv.host_python_path.chmod(0o755)
+
+    result = subprocess.run(
+        [str(pyodide_venv.host_python_path), "-c", "pass"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        str(tmp_path / "Application Support" / "uv"),
+        "-c pass",
+    ]
 
 
 def test_cleanup_skips_preexisting_directory(monkeypatch, tmp_path):
