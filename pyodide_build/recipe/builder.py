@@ -516,7 +516,7 @@ class RecipeBuilder:
                 self.src_dist_dir,
                 build_env,
                 config_settings,
-                extra_build_requires=self.recipe.requirements.build,
+                extra_build_requires=self.recipe.requirements.build_extras,
             )
             check_versions_match(self.name, Path(wheel_path).name, self.version)
 

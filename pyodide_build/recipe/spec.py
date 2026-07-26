@@ -155,7 +155,7 @@ class _BuildSpec:
 class _RequirementsSpec:
     run: list[str] = _afield(factory=list)
     host: list[str] = _afield(factory=list)
-    build: list[str] = _afield(factory=list)
+    build_extras: list[str] = _afield(factory=list)
     executable: list[str] = _afield(factory=list)
     constraint: list[str] = _afield(factory=list)
 
