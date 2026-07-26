@@ -279,7 +279,7 @@ jobs:
         run: |
           set -ex
           uv python install 3.13
-          # log the interpreter path so it is obvious whether it has a space in it
+          # log the interpreter path, which on macOS is under Application Support
           uv python find 3.13
           # --seed gives us pip, which the steps below and the venv test need
           uv venv --seed --python 3.13 .venv-uv-host
