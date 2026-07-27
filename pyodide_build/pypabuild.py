@@ -332,7 +332,7 @@ def _build_in_isolated_env(
                     config_settings,
                 )
 
-        install_reqs(build_env, env, build_reqs)
+        install_reqs(build_env, env, build_reqs | set(extra_build_requires))
 
         pkgconfig_dirs = _get_unisolated_pkgconfig_dirs(env.path)
         if pkgconfig_dirs:
