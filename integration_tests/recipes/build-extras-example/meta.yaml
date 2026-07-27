@@ -1,0 +1,24 @@
+package:
+  name: build-extras-example
+  version: 0.1.0
+  top-level:
+    - build_extras_example
+
+source:
+  path: source
+
+requirements:
+  build-extras:
+    # pkgconfig is deliberately missing from [build-system] requires in
+    # pyproject.toml, and setup.py imports it. The build therefore only
+    # succeeds if these extra requirements are installed into the isolated
+    # build environment.
+    - pkgconfig
+    # PEP 508 markers must be honored: this requirement does not exist on
+    # PyPI, so if its marker were ignored the build would fail to resolve.
+    - build-extras-example-does-not-exist; python_version < "3.0"
+
+about:
+  home: https://github.com/pyodide/pyodide-build
+  summary: Minimal integration test that verifies requirements/build-extras is installed into the isolated build environment
+  license: MIT

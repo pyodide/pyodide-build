@@ -425,20 +425,19 @@ def test_build_forwards_extra_build_requires(tmp_path, dummy_xbuildenv, monkeypa
     assert observed == [["cython", "pkgconfig"]]
 
 
-def test_build_in_isolated_env_installs_extra_build_requires(
-    tmp_path, monkeypatch, reset_env_vars
-):
-    """extra_build_requires must be installed along with the build system requires."""
-    installed: list[set[str]] = []
+def _patch_isolated_build(monkeypatch, tmp_path):
+    """Stub out everything _build_in_isolated_env needs except install_reqs.
+
+    Returns the MockIsolatedEnv that the stubbed _DefaultIsolatedEnv yields.
+    """
+    env = MockIsolatedEnv(str(tmp_path / "isolated"))
 
     class DummyIsolatedEnv:
-        path = str(tmp_path / "isolated")
-
         def __init__(self, installer):
             pass
 
         def __enter__(self):
-            return self
+            return env
 
         def __exit__(self, *args):
             return None
@@ -447,7 +446,7 @@ def test_build_in_isolated_env_installs_extra_build_requires(
         build_system_requires = {"setuptools"}
 
         @classmethod
-        def from_isolated_env(cls, env, srcdir, runner=None):
+        def from_isolated_env(cls, isolated_env, srcdir, runner=None):
             return cls()
 
         def get_requires_for_build(self, distribution, config_settings=None):
@@ -462,6 +461,16 @@ def test_build_in_isolated_env_installs_extra_build_requires(
         pypabuild, "_copy_sysconfigdata_to_isolated_env", lambda env: None
     )
     monkeypatch.setattr(pypabuild, "_get_unisolated_pkgconfig_dirs", lambda path: [])
+    return env
+
+
+def test_build_in_isolated_env_installs_extra_build_requires(
+    tmp_path, monkeypatch, reset_env_vars
+):
+    """extra_build_requires must be installed along with the build system requires."""
+    installed: list[set[str]] = []
+
+    _patch_isolated_build(monkeypatch, tmp_path)
     monkeypatch.setattr(
         pypabuild,
         "install_reqs",
@@ -478,6 +487,55 @@ def test_build_in_isolated_env_installs_extra_build_requires(
     )
 
     assert wheel.endswith("pkg-1.0-py3-none-any.whl")
-    # The build system requires and the extra build requires are installed
-    # together, before the backend is queried for its dynamic requirements.
-    assert installed == [{"setuptools", "cython", "pkgconfig"}, {"wheel"}]
+    # The extra build requires are installed with the build system requires,
+    # and again with the dynamic requirements reported by the backend
+    assert installed == [
+        {"setuptools", "cython", "pkgconfig"},
+        {"wheel", "cython", "pkgconfig"},
+    ]
+
+
+def test_build_in_isolated_env_extra_build_requires_with_markers(
+    tmp_path, dummy_xbuildenv, monkeypatch, reset_env_vars, reset_cache
+):
+    """extra_build_requires may carry PEP 508 markers.
+
+    Requirements with markers must survive requirement rewriting, except that:
+     - a marked requirement matching an unisolated package is still pinned to
+       the cross-build version,
+     - a marked requirement that is ignored is still dropped when its marker
+       applies.
+    """
+    env = _patch_isolated_build(monkeypatch, tmp_path)
+    monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: False)
+    monkeypatch.setattr(
+        pypabuild, "get_unisolated_packages", lambda: {"numpy": "2.0.3"}
+    )
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
+
+    pypabuild._build_in_isolated_env(
+        {"PATH": ""},
+        tmp_path,
+        str(tmp_path / "dist"),
+        "wheel",
+        {},
+        extra_build_requires=[
+            'cython; python_version >= "3.0"',
+            'pkgconfig; python_version < "3.0"',
+            'numpy>=1.20; python_version >= "3.0"',
+            'patchelf; python_version >= "3.0"',
+            'patchelf; python_version < "3.0"',
+        ],
+    )
+
+    assert env.installed == {
+        "setuptools",
+        "wheel",
+        # applicable and non-applicable markers are both passed through
+        'cython; python_version >= "3.0"',
+        'pkgconfig; python_version < "3.0"',
+        # unisolated package pinned to the cross-build version
+        "numpy==2.0.3",
+        # ignored requirement dropped only when its marker applies
+        'patchelf; python_version < "3.0"',
+    }
