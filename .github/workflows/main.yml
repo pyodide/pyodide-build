@@ -11,6 +11,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 env:
   FORCE_COLOR: 3
   # Increase this value to reset cache if emscripten_version has not changed
@@ -19,9 +21,12 @@ env:
 
 jobs:
   test:
+    name: test (${{ matrix.os }}, python ${{ matrix.python-version }})
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+        # To add a version, see pyodide_build/tests/_test_xbuildenv/README.md
+        python-version: ["3.13", "3.14"]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
@@ -36,7 +41,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -59,15 +64,20 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage-no-integration-${{ matrix.os }}
+          name: coverage-no-integration-${{ matrix.os }}-${{ matrix.python-version }}
           path: .coverage
           if-no-files-found: error
           include-hidden-files: true
 
   windows-integration-test:
+    name: windows-integration-test (python ${{ matrix.python-version }})
     runs-on: windows-latest
     needs: [check-integration-test-trigger]
     if: needs.check-integration-test-trigger.outputs.run-integration-test
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14"]
     defaults:
       run:
         shell: pwsh
@@ -79,7 +89,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -141,7 +151,7 @@ jobs:
           fi
 
   integration-test:
-    name: integration-test (${{ matrix.task.name }}, ${{ matrix.task.installer }}, ${{ matrix.pyodide-version }}-pyodide, ${{ matrix.os }})
+    name: integration-test (${{ matrix.task.name }}, ${{ matrix.task.installer }}, ${{ matrix.pyodide-version }}-pyodide, python ${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: [check-integration-test-trigger]
     strategy:
@@ -157,18 +167,27 @@ jobs:
         # os: [ubuntu-latest, macos-latest]  # FIXME: https://github.com/oracle/graal/issues/11855
         os: [ubuntu-latest]
         pyodide-version: [stable]
+        python-version: ["3.13", "3.14"]
         include:
         # Run no-isolation tests and Pyodide minimum version testing only
         # for the pip installer and on Linux
           - task: {name: test-src-no-isolation, installer: pip} # installer doesn't matter
             os: ubuntu-latest
             pyodide-version: stable
+            python-version: "3.13"
+          - task: {name: test-src-no-isolation, installer: pip} # installer doesn't matter
+            os: ubuntu-latest
+            pyodide-version: stable
+            python-version: "3.14"
           - task: { name: test-recipe, installer: pip }
             os: ubuntu-latest
             pyodide-version: minimum
+            python-version: "3.13"
           - task: { name: test-src, installer: pip }
             os: ubuntu-latest
             pyodide-version: minimum
+            python-version: "3.13"
+        # Debug xbuildenvs are only published for Python 3.14
           - task: { name: test-src, installer: pip }
             os: ubuntu-latest
             pyodide-version: stable-debug
@@ -184,7 +203,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: ${{ matrix.python-version || '3.13' }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -239,19 +258,20 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: matrix.task.name == 'test-integration-marker'
         with:
-          name: coverage-from-integration-${{ matrix.os }}
+          name: coverage-from-integration-${{ matrix.os }}-${{ matrix.python-version }}
           path: .coverage
           if-no-files-found: error
           include-hidden-files: true
 
   test-venv:
-    name: test-venv (${{ matrix.os }})
+    name: test-venv (${{ matrix.os }}, python ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     needs: [check-integration-test-trigger]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.13", "3.14"]
 
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
@@ -262,7 +282,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
