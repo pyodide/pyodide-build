@@ -326,7 +326,35 @@ def test_xbuildenv_version(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    assert "0.26.0" in result.output, result.output
+    assert result.output.strip() == "0.26.0", result.output
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        ("stable", "0.26.0"),
+        ("nightly", "0.26.0 (nightly)"),
+        ("stable-debug", "0.26.0 (stable-debug)"),
+    ],
+)
+def test_xbuildenv_version_source(tmp_path, source, expected):
+    envpath = Path(tmp_path) / ".xbuildenv"
+
+    (envpath / "0.26.0").mkdir(exist_ok=True, parents=True)
+    (envpath / "0.26.0" / ".xbuildenv-source").write_text(source)
+    (envpath / "xbuildenv").symlink_to(envpath / "0.26.0")
+
+    result = runner.invoke(
+        xbuildenv.app,
+        [
+            "version",
+            "--path",
+            str(envpath),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == expected, result.output
 
 
 def test_xbuildenv_versions(tmp_path):
