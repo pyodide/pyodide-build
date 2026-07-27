@@ -598,6 +598,44 @@ class TestCrossBuildEnvManager:
         # Marker preserved (install did no work).
         assert cross_build_marker.exists()
 
+    def test_install_records_source(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        manager = CrossBuildEnvManager(
+            tmp_path, str(fake_xbuildenv_releases_compatible), source="nightly-debug"
+        )
+        version = "0.1.0"
+
+        manager.install(version)
+
+        assert (tmp_path / version / ".xbuildenv-source").read_text() == "nightly-debug"
+        assert manager.installed_source(tmp_path / version) == "nightly-debug"
+        assert manager.current_source == "nightly-debug"
+
+    def test_install_source_defaults_to_stable(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        manager = CrossBuildEnvManager(
+            tmp_path, str(fake_xbuildenv_releases_compatible)
+        )
+        version = "0.1.0"
+
+        manager.install(version)
+
+        assert manager.current_source == "stable"
+        # An environment installed before the marker existed has no source.
+        (tmp_path / version / ".xbuildenv-source").unlink()
+        assert manager.installed_source(tmp_path / version) is None
+        assert manager.current_source is None
+
     def test_find_latest_version_empty_releases(self, tmp_path):
         # Regression test: empty releases metadata must produce a clear error,
         # not an IndexError.
