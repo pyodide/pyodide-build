@@ -4,9 +4,10 @@
 
 import json
 from dataclasses import dataclass, field
-from typing import Literal
 
-type SourceType = Literal["stable", "stable-debug", "nightly", "nightly-debug"]
+from pyodide_build.xbuildenv_releases import SourceType
+
+__all__ = ["MetadataView"]
 
 
 @dataclass

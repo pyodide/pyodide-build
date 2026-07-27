@@ -3,7 +3,7 @@ import logging
 import os
 from contextlib import contextmanager
 from functools import cache
-from typing import Any
+from typing import Any, Literal
 
 import cattrs
 from attrs import asdict, define, field
@@ -22,6 +22,18 @@ STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL = (
     "https://pyodide.github.io/pyodide/api/v2/debug.json"
 )
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
+
+# Indicate where a cross-build environment was published from
+type SourceType = Literal["stable", "stable-debug", "nightly", "nightly-debug"]
+
+DEFAULT_SOURCE: SourceType = "stable"
+
+CROSS_BUILD_ENV_METADATA_URLS: dict[SourceType, str] = {
+    "stable": DEFAULT_CROSS_BUILD_ENV_METADATA_URL,
+    "stable-debug": STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    "nightly": NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
+    "nightly-debug": NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+}
 
 
 @define
@@ -233,15 +245,26 @@ def _suppress_urllib3_logging():
         logger.setLevel(original_level)
 
 
-def cross_build_env_metadata_url() -> str:
+def cross_build_env_metadata_url(source: SourceType = DEFAULT_SOURCE) -> str:
     """
     Get the URL to the Pyodide cross-build environment metadata
+
+    Parameters
+    ----------
+    source
+        The source to get the metadata for. Only the stable source honours the
+        environment variable override below, since naming any other source is
+        already a choice of metadata file.
 
     Returns
     -------
     str
         The URL to the Pyodide cross-build environment metadata
     """
+
+    # If it's not a stable environment, we know which metadata file to use, so don't check the environment variable
+    if source != DEFAULT_SOURCE:
+        return CROSS_BUILD_ENV_METADATA_URLS[source]
 
     # The default URL can be overridden by the PYODIDE_CROSS_BUILD_ENV_METADATA_URL environment variable
     # This has two purposes:
@@ -254,6 +277,23 @@ def cross_build_env_metadata_url() -> str:
     )
 
     return url
+
+
+def source_for_metadata_url(url: str) -> SourceType | None:
+    """
+    Get the source that publishes its metadata at the given URL.
+
+    Returns
+    -------
+    SourceType | None
+        The matching source, or None if the URL is not one of the known
+        metadata files (a custom metadata file, for instance).
+    """
+    for source, source_url in CROSS_BUILD_ENV_METADATA_URLS.items():
+        if url == source_url:
+            return source
+
+    return None
 
 
 @cache
