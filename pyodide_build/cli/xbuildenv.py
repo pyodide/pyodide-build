@@ -12,7 +12,7 @@ from pyodide_build.xbuildenv_releases import (
     NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     CrossBuildEnvReleaseSpec,
-    SourceType,
+    ReleaseSource,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
@@ -99,7 +99,7 @@ def _install(
     if path is None:
         path = default_xbuildenv_path()
 
-    source: SourceType | None
+    source: ReleaseSource | None
     metadata_url: str | None
     if nightly and debug:
         source = "nightly-debug"
@@ -285,7 +285,7 @@ def _search(
 
     def _make_view(
         release: CrossBuildEnvReleaseSpec,
-        source: SourceType = "stable",
+        source: ReleaseSource = "stable",
     ) -> MetadataView:
         return MetadataView(
             version=release.version,
@@ -304,7 +304,7 @@ def _search(
         )
 
     if nightly or debug:
-        sources: list[tuple[SourceType, str]]
+        sources: list[tuple[ReleaseSource, str]]
         if nightly and debug:
             sources = [("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
         elif nightly:

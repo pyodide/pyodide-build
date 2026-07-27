@@ -15,9 +15,12 @@ from pyodide_build.xbuildenv_releases import (
     CROSS_BUILD_ENV_METADATA_URLS,
     DEFAULT_SOURCE,
     CrossBuildEnvReleaseSpec,
+    ReleaseSource,
     SourceType,
+    SourceURL,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
+    parse_source_url,
     source_for_metadata_url,
 )
 
@@ -37,7 +40,7 @@ class CrossBuildEnvManager:
         self,
         env_dir: str | Path,
         metadata_url: str | None = None,
-        source: SourceType | None = None,
+        source: ReleaseSource | None = None,
     ) -> None:
         """
         Parameters
@@ -64,7 +67,7 @@ class CrossBuildEnvManager:
         if source is None:
             source = source_for_metadata_url(self.metadata_url)
 
-        self.source: SourceType = source or DEFAULT_SOURCE
+        self.source: ReleaseSource = source or DEFAULT_SOURCE
 
         try:
             self.env_dir.mkdir(parents=True, exist_ok=True)
@@ -100,7 +103,8 @@ class CrossBuildEnvManager:
     @property
     def current_source(self) -> SourceType | None:
         """
-        Return the source that the currently in-use xbuildenv was installed from.
+        Return the source that the currently in-use xbuildenv was installed from,
+        either a release stream or the URL it was installed from.
         """
         if not self.symlink_dir.exists():
             return None
@@ -201,8 +205,10 @@ class CrossBuildEnvManager:
         Returns
         -------
         SourceType | None
-            The recorded source, or None when there is no xbuildenv at
-            ``version_path`` or it was installed before the marker existed.
+            A release stream, or the URL an environment installed with ``--url``
+            came from. None when there is no xbuildenv at ``version_path``, it
+            was installed before the marker existed, or the marker does not hold
+            something recognisable.
         """
         if not version_path.is_dir():
             return None
@@ -212,10 +218,10 @@ class CrossBuildEnvManager:
             return None
 
         source = marker.read_text().strip()
-        if source not in CROSS_BUILD_ENV_METADATA_URLS:
-            return None
+        if source in CROSS_BUILD_ENV_METADATA_URLS:
+            return source
 
-        return source
+        return parse_source_url(source)
 
     def _find_remote_release(self, version: str) -> CrossBuildEnvReleaseSpec:
         """
@@ -388,7 +394,18 @@ class CrossBuildEnvManager:
 
         download_path = self._path_for_version(version)
 
-        replaced_path = self._set_aside_if_source_differs(download_path)
+        # An environment installed from a URL records that URL as its source,
+        # since there is no release behind it to name.
+        recorded_source: SourceType = (
+            SourceURL(download_url) if installed_from_url else self.source
+        )
+
+        if installed_from_url:
+            # The directory name is derived from the URL, so anything cached
+            # there came from this same URL and there is no source to reconcile.
+            replaced_path = None
+        else:
+            replaced_path = self._set_aside_if_source_differs(download_path)
 
         # Track whether THIS call created the directory, so that a failure later
         # in this method does not delete a previously-good cached installation.
@@ -448,7 +465,7 @@ class CrossBuildEnvManager:
             install_marker.touch()
             # Written even when the install was a no-op, so that environments
             # predating the marker get labelled.
-            self._source_marker_path(download_path).write_text(self.source)
+            self._source_marker_path(download_path).write_text(recorded_source)
             self.use_version(version)
             # Only (re)write the Python version marker when we actually performed
             # installation work, so a mismatch on a skipped install is not

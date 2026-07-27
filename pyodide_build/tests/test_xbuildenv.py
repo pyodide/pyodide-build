@@ -8,6 +8,12 @@ import pytest
 from pyodide_build import build_env
 from pyodide_build.common import download_and_unpack_archive
 from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
+from pyodide_build.xbuildenv_releases import (
+    NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
+    NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    parse_source_url,
+)
 
 
 @pytest.fixture()
@@ -688,6 +694,159 @@ class TestCrossBuildEnvManager:
         assert debug.installed_source(tmp_path / version) == "stable-debug"
         assert debug.current_source == "stable-debug"
 
+    def test_failed_reinstall_keeps_the_replaced_environment(
+        self,
+        tmp_path,
+        monkeypatch,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        # Replacing an environment must not leave the user with nothing when
+        # the download for its replacement fails.
+        version = "0.1.0"
+        metadata = str(fake_xbuildenv_releases_compatible)
+
+        stable = CrossBuildEnvManager(tmp_path, metadata)
+        stable.install(version)
+
+        canary = tmp_path / version / "canary.txt"
+        canary.touch()
+
+        def fail_download(*args, **kwargs):
+            raise RuntimeError("network is down")
+
+        monkeypatch.setattr(
+            "pyodide_build.xbuildenv.download_and_unpack_archive", fail_download
+        )
+
+        debug = CrossBuildEnvManager(tmp_path, metadata, source="stable-debug")
+        with pytest.raises(RuntimeError, match="network is down"):
+            debug.install(version)
+
+        # The original is back, rather than a half-installed or missing one
+        assert canary.exists()
+        assert stable.installed_source(tmp_path / version) == "stable"
+        assert not (tmp_path / f"{version}.replaced").exists()
+
+    def test_install_url_records_the_url_as_the_source(
+        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        # There is no release behind a URL install to name, and calling it
+        # 'stable' would claim a provenance we cannot check, so record the URL.
+        manager = CrossBuildEnvManager(tmp_path)
+
+        manager.install(version=None, url=dummy_xbuildenv_url)
+        version = _url_to_version(dummy_xbuildenv_url)
+
+        assert (
+            tmp_path / version / ".xbuildenv-source"
+        ).read_text() == dummy_xbuildenv_url
+        assert manager.installed_source(tmp_path / version) == dummy_xbuildenv_url
+        assert manager.current_source == dummy_xbuildenv_url
+
+    def test_install_url_twice_keeps_the_environment(
+        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        # The directory name comes from the URL, so a cached one came from this
+        # same URL and must not be treated as a source mismatch.
+        manager = CrossBuildEnvManager(tmp_path)
+        manager.install(version=None, url=dummy_xbuildenv_url)
+        version = _url_to_version(dummy_xbuildenv_url)
+
+        canary = tmp_path / version / "canary.txt"
+        canary.touch()
+
+        CrossBuildEnvManager(tmp_path).install(version=None, url=dummy_xbuildenv_url)
+
+        assert canary.exists()
+
+    def test_install_source_mismatch_triggers_reinstall(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        # Regression test: a stable release and its debug variant share a version
+        # string, so a cached stable environment must not satisfy a request for
+        # the debug one.
+        version = "0.1.0"
+        metadata = str(fake_xbuildenv_releases_compatible)
+
+        stable = CrossBuildEnvManager(tmp_path, metadata)
+        stable.install(version)
+
+        canary = tmp_path / version / "canary.txt"
+        canary.touch()
+
+        debug = CrossBuildEnvManager(tmp_path, metadata, source="stable-debug")
+        debug.install(version)
+
+        # The environment was downloaded again rather than reused in place.
+        assert not canary.exists()
+        assert debug.installed_source(tmp_path / version) == "stable-debug"
+        assert debug.current_source == "stable-debug"
+
+    def test_install_source_match_reuses_existing(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        version = "0.1.0"
+        metadata = str(fake_xbuildenv_releases_compatible)
+
+        manager = CrossBuildEnvManager(tmp_path, metadata, source="nightly")
+        manager.install(version)
+
+        canary = tmp_path / version / "canary.txt"
+        canary.touch()
+
+        CrossBuildEnvManager(tmp_path, metadata, source="nightly").install(version)
+
+        assert canary.exists()
+
+    def test_source_derived_from_metadata_url(self, tmp_path):
+        manager = CrossBuildEnvManager(
+            tmp_path, NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
+        )
+
+        assert manager.source == "nightly-debug"
+
+    def test_source_derived_from_metadata_url_env_var(
+        self, tmp_path, monkeypatch, reset_cache
+    ):
+        monkeypatch.setenv(
+            "PYODIDE_CROSS_BUILD_ENV_METADATA_URL", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
+        )
+
+        manager = CrossBuildEnvManager(tmp_path)
+
+        assert manager.source == "nightly"
+        assert manager.metadata_url == NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
+
+    def test_source_wins_over_metadata_url_env_var(
+        self, tmp_path, monkeypatch, reset_cache
+    ):
+        # Asking for a source explicitly is already a choice of metadata file,
+        # so the environment variable must not redirect it.
+        monkeypatch.setenv(
+            "PYODIDE_CROSS_BUILD_ENV_METADATA_URL", NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
+        )
+
+        manager = CrossBuildEnvManager(tmp_path, source="stable-debug")
+
+        assert manager.source == "stable-debug"
+        assert manager.metadata_url == STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL
+
+    def test_installed_source_missing_env(self, tmp_path):
+        manager = CrossBuildEnvManager(tmp_path)
+
+        assert manager.installed_source(tmp_path / "0.1.0") is None
+        assert manager.current_source is None
+
     def test_find_latest_version_empty_releases(self, tmp_path):
         # Regression test: empty releases metadata must produce a clear error,
         # not an IndexError.
@@ -719,3 +878,34 @@ class TestCrossBuildEnvManager:
 )
 def test_url_to_version(url: str, version: str) -> None:
     assert _url_to_version(url) == version
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://example.com/xbuildenv-0.25.0.tar.bz2",
+        "http://example.com/a/b.tar.gz",
+        "file:///home/me/xbuildenv.tar.bz2",
+        # urlopen is not limited to http and file, so neither is this
+        "ftp://example.com/xbuildenv.tar.bz2",
+    ],
+)
+def test_parse_source_url_accepts_urls(value: str) -> None:
+    assert parse_source_url(value) == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "stable",
+        "nightly-debug",
+        "",
+        "not a url",
+        # Contains "://" but has no scheme to go with it
+        "://example.com",
+        # A scheme addressing nothing
+        "https://",
+    ],
+)
+def test_parse_source_url_rejects_other_strings(value: str) -> None:
+    assert parse_source_url(value) is None
