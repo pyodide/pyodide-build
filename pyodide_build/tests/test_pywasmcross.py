@@ -287,3 +287,22 @@ def test_is_link_cmd():
     assert is_link_cmd(["test.so"])
     assert is_link_cmd(["test.so.1.2.3"])
     assert not is_link_cmd(["test", "test.a", "test.o", "test.c", "test.cpp", "test.h"])
+
+
+@pytest.mark.parametrize(
+    "flag", ["-fopenmp", "-fopenmp=libomp", "-fopenmp=libgomp", "-pthread"]
+)
+def test_openmp_and_thread_flags_are_dropped(build_args, flag):
+    """Pyodide doesn't support threads.
+
+    Dropping -fopenmp additionally makes autoconf/meson detect OpenMP as
+    unavailable, since they probe for the _OPENMP macro that it defines.
+    """
+    res = generate_args(f"cc -c {flag} test.c", build_args)
+    assert res == 1
+
+
+def test_fopenmp_simd_is_kept(build_args):
+    """-fopenmp-simd does not define _OPENMP and does not imply threads."""
+    res = generate_args("cc -c -fopenmp-simd test.c", build_args)
+    assert "-fopenmp-simd" in res

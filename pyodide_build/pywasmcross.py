@@ -223,7 +223,7 @@ def replay_genargs_handle_linker_opts(arg: str) -> str | None:
         return None
 
 
-def replay_genargs_handle_argument(arg: str) -> str | None:
+def replay_genargs_handle_argument(arg: str) -> str | int | None:
     """
     Figure out how to replace a general argument.
 
@@ -271,6 +271,12 @@ def replay_genargs_handle_argument(arg: str) -> str | None:
 
     if arg.startswith("-J"):  # fortran flag that clang does not support
         return None
+
+    # Emscripten 6.0.3 added OpenMP support but Pyodide doesn't support threads.
+    # Exit with nonzero status code so that we treat OpenMP as unavailable.
+    # Leave -fopenmp-simd alone since simd is okay.
+    if arg.startswith("-fopenmp=") or arg == "-fopenmp":
+        return 1
 
     return arg
 
@@ -485,7 +491,7 @@ def get_export_flags(
 
 def handle_command_generate_args(  # noqa: C901
     line: list[str], build_args: CrossCompileArgs
-) -> list[str]:
+) -> list[str] | int:
     """
     A helper command for `handle_command` that generates the new arguments for
     the compilation.
@@ -583,6 +589,7 @@ def handle_command_generate_args(  # noqa: C901
             del new_args[-1]
             continue
 
+        result: str | int | None
         if arg.startswith("-l"):
             result = replay_genargs_handle_dashl(arg, used_libs, build_args.abi)
         elif arg.startswith("-I"):
@@ -591,6 +598,9 @@ def handle_command_generate_args(  # noqa: C901
             result = replay_genargs_handle_linker_opts(arg)
         else:
             result = replay_genargs_handle_argument(arg)
+
+        if isinstance(result, int):
+            return result
 
         if result:
             new_args.append(result)
@@ -649,6 +659,8 @@ def handle_command(
         line = tmp
 
     new_args = handle_command_generate_args(line, build_args)
+    if isinstance(new_args, int):
+        return new_args
 
     if build_args.pkgname == "scipy":
         from _f2c_fixes import scipy_fixes
