@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - When the target Python is a pre-release, the
   `PYO3_USE_ABI3_FORWARD_COMPATIBILITY` environment variable is now set for all
   builds so that PyO3 packages will build against the unstable CPython version.
+  [#405](https://github.com/pyodide/pyodide-build/pull/405)
+
+- Added `requirements.build-extras` field to meta.yaml spec. Requirements listed
+  will be installed into the isolated build virtual environment.
+  [#412](https://github.com/pyodide/pyodide-build/pull/412)
 
 ### Changed
 
@@ -19,12 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`meta.yaml`) and cross-build environment metadata parsing/validation.
   Recipe validation errors now raise `pyodide_build.recipe.spec.SpecValidationError`
   instead of `pydantic.ValidationError`.
+  [#402](https://github.com/pyodide/pyodide-build/pull/402)
 
 - The `rustflags` config is now applied via the target-specific
   `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS` environment variable instead
   of the global `RUSTFLAGS`, so the flags only affect the
   `wasm32-unknown-emscripten` target and no longer leak into host builds of
   build-dependencies and proc-macros.
+  [#404](https://github.com/pyodide/pyodide-build/pull/404)
 
 ## [0.37.0] - 2026/07/24
 

@@ -98,3 +98,26 @@ def test_wheel_source_with_retain_test_patterns():
     )
     assert pkg.build.unvendor_tests is True
     assert pkg.build.retain_test_patterns == ["*conftest.py", "*test_keep.py"]
+
+
+def test_build_extras_requirements():
+    """requirements/build-extras holds extra reqs for the isolated build env"""
+    pkg = MetaConfig.from_dict(
+        {
+            "package": {"name": "a", "version": "0.2"},
+            "source": {"url": "test.tar.gz", "sha256": "abc123"},
+            "requirements": {"build-extras": ["cython", "pkgconfig"], "host": ["b"]},
+        }
+    )
+    assert pkg.requirements.build_extras == ["cython", "pkgconfig"]
+    assert pkg.requirements.host == ["b"]
+
+
+def test_build_extras_requirements_default_empty():
+    pkg = MetaConfig.from_dict(
+        {
+            "package": {"name": "a", "version": "0.2"},
+            "source": {"url": "test.tar.gz", "sha256": "abc123"},
+        }
+    )
+    assert pkg.requirements.build_extras == []
