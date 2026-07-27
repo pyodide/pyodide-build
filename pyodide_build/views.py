@@ -4,9 +4,10 @@
 
 import json
 from dataclasses import dataclass, field
-from typing import Literal
 
-type SourceType = Literal["stable", "stable-debug", "nightly", "nightly-debug"]
+from pyodide_build.xbuildenv_releases import ReleaseSource
+
+__all__ = ["MetadataView"]
 
 
 @dataclass
@@ -17,7 +18,7 @@ class MetadataView:
     pyodide_build: dict[str, str | None]
     compatible: bool
     published_at: str = ""
-    source: SourceType = field(default="stable")
+    source: ReleaseSource = field(default="stable")
 
     @classmethod
     def to_table(cls, views: list["MetadataView"], show_source: bool = False) -> str:

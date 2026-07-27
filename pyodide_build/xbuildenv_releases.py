@@ -3,7 +3,8 @@ import logging
 import os
 from contextlib import contextmanager
 from functools import cache
-from typing import Any
+from typing import Any, Literal, NewType
+from urllib.parse import urlparse
 
 import cattrs
 from attrs import asdict, define, field
@@ -22,6 +23,56 @@ STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL = (
     "https://pyodide.github.io/pyodide/api/v2/debug.json"
 )
 CROSS_BUILD_ENV_METADATA_URL_ENV_VAR = "PYODIDE_CROSS_BUILD_ENV_METADATA_URL"
+
+# The published streams a cross-build environment can be installed from. These
+# are the ones with release metadata behind them, so only these can be asked for
+# by name, with --nightly and --debug.
+type ReleaseSource = Literal["stable", "stable-debug", "nightly", "nightly-debug"]
+
+# An environment installed with --url has no release behind it to name, so the
+# URL it came from is its source. A distinct type rather than a bare str, so
+# that a URL cannot be passed where a release stream is expected.
+SourceURL = NewType("SourceURL", str)
+
+# Where a cross-build environment came from, once installed
+type SourceType = ReleaseSource | SourceURL
+
+DEFAULT_SOURCE: ReleaseSource = "stable"
+
+CROSS_BUILD_ENV_METADATA_URLS: dict[ReleaseSource, str] = {
+    "stable": DEFAULT_CROSS_BUILD_ENV_METADATA_URL,
+    "stable-debug": STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    "nightly": NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
+    "nightly-debug": NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+}
+
+
+def parse_source_url(value: str) -> SourceURL | None:
+    """
+    Return ``value`` as a `SourceURL`, or None when it is not one.
+
+    Parameters
+    ----------
+    value
+        The string to interpret as a URL an xbuildenv was downloaded from.
+
+    Returns
+    -------
+    SourceURL | None
+        The URL, or None if it does not parse as one. Any scheme is accepted:
+        the archive is fetched with `urlopen`, which handles ftp and whatever
+        else the openers in use support.
+    """
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return None
+
+    # A URL needs a scheme, and something for that scheme to address
+    if not parsed.scheme or not (parsed.netloc or parsed.path):
+        return None
+
+    return SourceURL(value)
 
 
 @define
@@ -233,15 +284,26 @@ def _suppress_urllib3_logging():
         logger.setLevel(original_level)
 
 
-def cross_build_env_metadata_url() -> str:
+def cross_build_env_metadata_url(source: ReleaseSource = DEFAULT_SOURCE) -> str:
     """
     Get the URL to the Pyodide cross-build environment metadata
+
+    Parameters
+    ----------
+    source
+        The source to get the metadata for. Only the stable source honours the
+        environment variable override below, since naming any other source is
+        already a choice of metadata file.
 
     Returns
     -------
     str
         The URL to the Pyodide cross-build environment metadata
     """
+
+    # If it's not a stable environment, we know which metadata file to use, so don't check the environment variable
+    if source != DEFAULT_SOURCE:
+        return CROSS_BUILD_ENV_METADATA_URLS[source]
 
     # The default URL can be overridden by the PYODIDE_CROSS_BUILD_ENV_METADATA_URL environment variable
     # This has two purposes:
@@ -254,6 +316,23 @@ def cross_build_env_metadata_url() -> str:
     )
 
     return url
+
+
+def source_for_metadata_url(url: str) -> ReleaseSource | None:
+    """
+    Get the source that publishes its metadata at the given URL.
+
+    Returns
+    -------
+    ReleaseSource | None
+        The matching source, or None if the URL is not one of the known
+        metadata files (a custom metadata file, for instance).
+    """
+    for source, source_url in CROSS_BUILD_ENV_METADATA_URLS.items():
+        if url == source_url:
+            return source
+
+    return None
 
 
 @cache

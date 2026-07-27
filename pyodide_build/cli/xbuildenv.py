@@ -4,13 +4,15 @@ import click
 
 from pyodide_build.build_env import get_build_flag, local_versions
 from pyodide_build.common import IS_WIN, default_xbuildenv_path
-from pyodide_build.views import MetadataView, SourceType
+from pyodide_build.views import MetadataView
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
+    DEFAULT_SOURCE,
     NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
     NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     CrossBuildEnvReleaseSpec,
+    ReleaseSource,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
@@ -96,16 +98,24 @@ def _install(
     """
     if path is None:
         path = default_xbuildenv_path()
+
+    source: ReleaseSource | None
+    metadata_url: str | None
     if nightly and debug:
+        source = "nightly-debug"
         metadata_url = NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL
     elif nightly:
+        source = "nightly"
         metadata_url = NIGHTLY_CROSS_BUILD_ENV_METADATA_URL
     elif debug:
+        source = "stable-debug"
         metadata_url = STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL
     else:
+        # Both left unset so PYODIDE_CROSS_BUILD_ENV_METADATA_URL can decide
+        source = None
         metadata_url = None
 
-    manager = CrossBuildEnvManager(path, metadata_url=metadata_url)
+    manager = CrossBuildEnvManager(path, metadata_url=metadata_url, source=source)
 
     if url:
         manager.install(url=url, force_install=force_install)
@@ -133,7 +143,13 @@ def _version(path: Path | None) -> None:
         click.echo("No version selected")
         raise SystemExit(1)
     else:
-        click.echo(version)
+        source = manager.current_source
+        # Stable and unlabelled environments print as just the version, for backward
+        # compatibility. Only a source worth reporting is appended, as in "0.29.4 (stable-debug)".
+        if source and source != DEFAULT_SOURCE:
+            click.echo(f"{version} ({source})")
+        else:
+            click.echo(version)
 
 
 @app.command("versions")
@@ -269,7 +285,7 @@ def _search(
 
     def _make_view(
         release: CrossBuildEnvReleaseSpec,
-        source: SourceType = "stable",
+        source: ReleaseSource = "stable",
     ) -> MetadataView:
         return MetadataView(
             version=release.version,
@@ -288,7 +304,7 @@ def _search(
         )
 
     if nightly or debug:
-        sources: list[tuple[SourceType, str]]
+        sources: list[tuple[ReleaseSource, str]]
         if nightly and debug:
             sources = [("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
         elif nightly:

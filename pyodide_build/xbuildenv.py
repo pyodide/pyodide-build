@@ -12,15 +12,23 @@ from pyodide_build.common import download_and_unpack_archive, remove_readonly
 from pyodide_build.create_package_index import create_package_index
 from pyodide_build.logger import logger
 from pyodide_build.xbuildenv_releases import (
+    CROSS_BUILD_ENV_METADATA_URLS,
+    DEFAULT_SOURCE,
     CrossBuildEnvReleaseSpec,
+    ReleaseSource,
+    SourceType,
+    SourceURL,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
+    parse_source_url,
+    source_for_metadata_url,
 )
 
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
 PYTHON_VERSION_MARKER_FILE = ".build-python-version"
 CROSS_BUILD_PACKAGES_MARKER_FILE = ".cross-build-packages-installed"
 EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
+SOURCE_MARKER_FILE = ".xbuildenv-source"
 
 
 class CrossBuildEnvManager:
@@ -28,7 +36,12 @@ class CrossBuildEnvManager:
     Manager for the cross-build environment.
     """
 
-    def __init__(self, env_dir: str | Path, metadata_url: str | None = None) -> None:
+    def __init__(
+        self,
+        env_dir: str | Path,
+        metadata_url: str | None = None,
+        source: ReleaseSource | None = None,
+    ) -> None:
         """
         Parameters
         ----------
@@ -36,10 +49,25 @@ class CrossBuildEnvManager:
             The directory to store the cross-build environments.
         metadata_url
             URL to the metadata file that contains the information about the available
-            cross-build environments. If not specified, the default metadata file is used.
+            cross-build environments. If not specified, the metadata file of ``source``
+            is used.
+        source
+            The source to install cross-build environments from. This is one of ``stable``,
+            ``stable-debug``, ``nightly``, or ``nightly-debug``. If not specified, it
+            is derived from ``metadata_url`` wherever possible, and it falls back to
+            ``stable``.
         """
         self.env_dir = Path(env_dir).resolve()
-        self.metadata_url = metadata_url or cross_build_env_metadata_url()
+        self.metadata_url = metadata_url or cross_build_env_metadata_url(
+            source or DEFAULT_SOURCE
+        )
+        # If source is not provided, derive it from the metadata file, so that
+        # pointing PYODIDE_CROSS_BUILD_ENV_METADATA_URL at the nightly metadata
+        # can still record what was installed.
+        if source is None:
+            source = source_for_metadata_url(self.metadata_url)
+
+        self.source: ReleaseSource = source or DEFAULT_SOURCE
 
         try:
             self.env_dir.mkdir(parents=True, exist_ok=True)
@@ -71,6 +99,129 @@ class CrossBuildEnvManager:
             return None
 
         return self.symlink_dir.resolve().name
+
+    @property
+    def current_source(self) -> SourceType | None:
+        """
+        Return the source that the currently in-use xbuildenv was installed from,
+        either a release stream or the URL it was installed from.
+        """
+        if not self.symlink_dir.exists():
+            return None
+
+        return self.installed_source(self.symlink_dir.resolve())
+
+    def _source_marker_path(self, version_path: Path) -> Path:
+        """
+        Return the path to the ``.xbuildenv-source marker`` file used to record the
+        source of the xbuildenv.
+
+        Parameters
+        ----------
+        version_path
+            Path to a xbuildenv version directory (for example, `.../<version>`).
+        """
+        return version_path / SOURCE_MARKER_FILE
+
+    def _set_aside_if_source_differs(self, download_path: Path) -> Path | None:
+        """
+        Move a cached cross-build environment aside when it came from another
+        source.
+
+        A cached cross-build environment from a different source shares the version
+        string. However, it is not the one that was asked for by the user, so it has
+        to be replaced with the requested environment.
+
+        For example, if the user has a cached `314.0.3` environment that was installed
+        with `--nightly`, and they now request `314.0.3` with `--stable`, the cached
+        environment is moved aside and the requested one is downloaded.
+
+        Parameters
+        ----------
+        download_path
+            Path to the xbuildenv version directory that is about to be used.
+
+        Returns
+        -------
+        Path | None
+            Where the environment was moved to, or None if it was kept. It is
+            moved rather than deleted so that a download failing part way
+            through leaves the working environment behind instead of nothing.
+        """
+        if not download_path.is_dir():
+            return None
+
+        installed_source = self.installed_source(download_path)
+        if installed_source == self.source:
+            return None
+
+        if installed_source is None:
+            # If no marker file is present, this means that the xbuildenv creation
+            # predates source tracking in pyodide-build. The --nightly and
+            # --debug environments have existed since pyodide-build 0.35.0, so it
+            # could have come from any source. Throwing every one of them away would
+            # re-download a working environment for everyone, to catch the few that
+            # were not plain installs, so we assume the common case and let a
+            # --nightly/--debug request replace it. Recording the source afterwards
+            # means this only comes up once.
+            replace = self.source != DEFAULT_SOURCE
+            reason = "predates tracking of xbuildenv source"
+        else:
+            replace = True
+            reason = f"was installed from the '{installed_source}' source"
+
+        if not replace:
+            logger.info(
+                "The cross-build environment at '%s' %s, so it is being "
+                "recorded as '%s'. If it was installed with --nightly or "
+                "--debug, reinstall it with that flag.",
+                download_path,
+                reason,
+                self.source,
+            )
+            return None
+
+        logger.warning(
+            "Reinstalling the cross-build environment at '%s': it %s, "
+            "but the '%s' source was requested.",
+            download_path,
+            reason,
+            self.source,
+        )
+        replaced_path = download_path.with_name(download_path.name + ".replaced")
+        shutil.rmtree(replaced_path, ignore_errors=True)
+        download_path.rename(replaced_path)
+        return replaced_path
+
+    def installed_source(self, version_path: Path) -> SourceType | None:
+        """
+        Return the source recorded for the xbuildenv at ``version_path``.
+
+        Parameters
+        ----------
+        version_path
+            Path to an xbuildenv version directory (or the active symlink).
+
+        Returns
+        -------
+        SourceType | None
+            A release stream, or the URL an environment installed with ``--url``
+            came from. None when there is no xbuildenv at ``version_path``, it
+            was installed before the marker existed, or the marker does not hold
+            something recognisable.
+        """
+        if not version_path.is_dir():
+            return None
+
+        marker = self._source_marker_path(version_path)
+        if not marker.exists():
+            return None
+
+        source = marker.read_text().strip()
+        if source in CROSS_BUILD_ENV_METADATA_URLS:
+            return source
+
+        return parse_source_url(source)
 
     def _find_remote_release(self, version: str) -> CrossBuildEnvReleaseSpec:
         """
@@ -243,21 +394,34 @@ class CrossBuildEnvManager:
 
         download_path = self._path_for_version(version)
 
+        # An environment installed from a URL records that URL as its source,
+        # since there is no release behind it to name.
+        recorded_source: SourceType = (
+            SourceURL(download_url) if installed_from_url else self.source
+        )
+
+        if installed_from_url:
+            # The directory name is derived from the URL, so anything cached
+            # there came from this same URL and there is no source to reconcile.
+            replaced_path = None
+        else:
+            replaced_path = self._set_aside_if_source_differs(download_path)
+
         # Track whether THIS call created the directory, so that a failure later
         # in this method does not delete a previously-good cached installation.
         download_path_preexisted = download_path.exists()
 
-        if download_path_preexisted:
-            logger.info(
-                "The cross-build environment already exists at '%s', skipping download",
-                download_path,
-            )
-        else:
-            download_and_unpack_archive(
-                download_url, download_path, "Pyodide cross-build environment"
-            )
-
         try:
+            if download_path_preexisted:
+                logger.info(
+                    "The cross-build environment already exists at '%s', skipping download",
+                    download_path,
+                )
+            else:
+                download_and_unpack_archive(
+                    download_url, download_path, "Pyodide cross-build environment"
+                )
+
             # there is an redundant directory "xbuildenv" inside the xbuildenv archive
             # TODO: remove the redundant directory from the archive
             xbuildenv_root = download_path / "xbuildenv"
@@ -299,6 +463,9 @@ class CrossBuildEnvManager:
                     self._create_package_index(xbuildenv_pyodide_root, version)
 
             install_marker.touch()
+            # Written even when the install was a no-op, so that environments
+            # predating the marker get labelled.
+            self._source_marker_path(download_path).write_text(recorded_source)
             self.use_version(version)
             # Only (re)write the Python version marker when we actually performed
             # installation work, so a mismatch on a skipped install is not
@@ -310,7 +477,14 @@ class CrossBuildEnvManager:
             # failed, remove it. Do not delete a pre-existing cached install.
             if not download_path_preexisted:
                 shutil.rmtree(download_path, ignore_errors=True)
+            # Put back the environment that was replaced, so a failure here
+            # leaves the one that was working rather than nothing.
+            if replaced_path is not None:
+                replaced_path.rename(download_path)
             raise
+
+        if replaced_path is not None:
+            shutil.rmtree(replaced_path, onexc=remove_readonly)
 
         return xbuildenv_pyodide_root
 

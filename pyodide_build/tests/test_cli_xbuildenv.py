@@ -267,6 +267,56 @@ def test_xbuildenv_install_debug(tmp_path, mock_xbuildenv_url, monkeypatch):
     assert (envpath / "0.30.0").exists()
 
 
+def test_xbuildenv_install_debug_over_stable(
+    tmp_path, mock_xbuildenv_url, monkeypatch, fake_xbuildenv_releases_compatible
+):
+    """A cached stable release must not be handed back for its debug variant.
+
+    Both share the version string 0.1.0, so the debug install has to replace the
+    stable one rather than find the directory and skip the download.
+    """
+    from pyodide_build import build_env
+
+    envpath = Path(tmp_path) / ".xbuildenv"
+    local = build_env.local_versions()
+
+    debug_data = {
+        "releases": {
+            "0.1.0": {
+                "version": "0.1.0",
+                "url": mock_xbuildenv_url,
+                "sha256": None,
+                "python_version": f"{local['python']}.0",
+                "emscripten_version": "5.0.3",
+            }
+        }
+    }
+    metadata_path = tmp_path / "stable-debug.json"
+    metadata_path.write_text(json.dumps(debug_data))
+
+    monkeypatch.setattr(
+        "pyodide_build.cli.xbuildenv.STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL",
+        str(metadata_path),
+    )
+    monkeypatch.setenv(
+        CROSS_BUILD_ENV_METADATA_URL_ENV_VAR, str(fake_xbuildenv_releases_compatible)
+    )
+
+    result = runner.invoke(xbuildenv.app, ["install", "0.1.0", "--path", str(envpath)])
+    assert result.exit_code == 0, result.output
+    assert (envpath / "0.1.0" / ".xbuildenv-source").read_text() == "stable"
+
+    canary = envpath / "0.1.0" / "canary.txt"
+    canary.touch()
+
+    result = runner.invoke(
+        xbuildenv.app, ["install", "0.1.0", "--path", str(envpath), "--debug"]
+    )
+    assert result.exit_code == 0, result.output
+    assert not canary.exists()
+    assert (envpath / "0.1.0" / ".xbuildenv-source").read_text() == "stable-debug"
+
+
 def test_xbuildenv_install_nightly_debug(tmp_path, mock_xbuildenv_url, monkeypatch):
     """Installing with --nightly --debug uses the nightly-debug metadata URL."""
     from pyodide_build import build_env
@@ -326,7 +376,35 @@ def test_xbuildenv_version(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    assert "0.26.0" in result.output, result.output
+    assert result.output.strip() == "0.26.0", result.output
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        ("stable", "0.26.0"),
+        ("nightly", "0.26.0 (nightly)"),
+        ("stable-debug", "0.26.0 (stable-debug)"),
+    ],
+)
+def test_xbuildenv_version_source(tmp_path, source, expected):
+    envpath = Path(tmp_path) / ".xbuildenv"
+
+    (envpath / "0.26.0").mkdir(exist_ok=True, parents=True)
+    (envpath / "0.26.0" / ".xbuildenv-source").write_text(source)
+    (envpath / "xbuildenv").symlink_to(envpath / "0.26.0")
+
+    result = runner.invoke(
+        xbuildenv.app,
+        [
+            "version",
+            "--path",
+            str(envpath),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == expected, result.output
 
 
 def test_xbuildenv_versions(tmp_path):
