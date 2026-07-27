@@ -661,6 +661,33 @@ class TestCrossBuildEnvManager:
         # Now labelled, so later installs do not have to guess.
         assert manager.installed_source(tmp_path / version) == "stable"
 
+    def test_install_unlabelled_replaced_by_debug(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        # An unlabelled environment cannot be shown to be the debug variant, so
+        # a debug install has to replace it rather than trust it.
+        version = "0.1.0"
+        metadata = str(fake_xbuildenv_releases_compatible)
+
+        manager = CrossBuildEnvManager(tmp_path, metadata)
+        manager.install(version)
+        (tmp_path / version / ".xbuildenv-source").unlink()
+
+        canary = tmp_path / version / "canary.txt"
+        canary.touch()
+
+        debug = CrossBuildEnvManager(tmp_path, metadata, source="stable-debug")
+        debug.install(version)
+
+        assert not canary.exists()
+        # Relabelled, so it no longer reports the source it was replaced from
+        assert debug.installed_source(tmp_path / version) == "stable-debug"
+        assert debug.current_source == "stable-debug"
+
     def test_find_latest_version_empty_releases(self, tmp_path):
         # Regression test: empty releases metadata must produce a clear error,
         # not an IndexError.
