@@ -28,6 +28,8 @@ def build_args():
 def generate_args(line: str, args: CrossCompileArgs, is_link_cmd: bool = False) -> str:
     splitline = line.split()
     res = handle_command_generate_args(splitline, args)
+    if isinstance(res, int):
+        return res
 
     if res[0] in ("emcc", "em++"):
         for arg in [
@@ -289,14 +291,11 @@ def test_is_link_cmd():
     assert not is_link_cmd(["test", "test.a", "test.o", "test.c", "test.cpp", "test.h"])
 
 
-@pytest.mark.parametrize(
-    "flag", ["-fopenmp", "-fopenmp=libomp", "-fopenmp=libgomp", "-pthread"]
-)
-def test_openmp_and_thread_flags_are_dropped(build_args, flag):
-    """Pyodide doesn't support threads.
+@pytest.mark.parametrize("flag", ["-fopenmp", "-fopenmp=libomp", "-fopenmp=libgomp"])
+def test_openmp_flags_are_dropped(build_args, flag):
+    """Pyodide doesn't support threads and openmp requires them.
 
-    Dropping -fopenmp additionally makes autoconf/meson detect OpenMP as
-    unavailable, since they probe for the _OPENMP macro that it defines.
+    We error out if they are requested.
     """
     res = generate_args(f"cc -c {flag} test.c", build_args)
     assert res == 1
