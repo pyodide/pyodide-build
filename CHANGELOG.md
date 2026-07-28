@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build-dependencies and proc-macros.
   [#404](https://github.com/pyodide/pyodide-build/pull/404)
 
+- CMake's try_compile now uses the pywasmcross compiler wrappers.
+  [416](https://github.com/pyodide/pyodide-build/pull/416)
+
 ## [0.37.0] - 2026/07/24
 
 ### Changed
