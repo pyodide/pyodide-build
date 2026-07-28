@@ -112,3 +112,14 @@ set(CMAKE_MODULE_LINKER_FLAGS_INIT "${CMAKE_MODULE_LINKER_FLAGS_INIT} $ENV{SIDE_
 if(NOT DEFINED CMAKE_PLATFORM_NO_VERSIONED_SONAME)
   set(CMAKE_PLATFORM_NO_VERSIONED_SONAME 1)
 endif()
+
+# try_compile() configures a fresh subproject whose cache does not contain the
+# -DCMAKE_*_COMPILER values that pywasmcross passes on the command line.
+# Propagate the compiler settings so try_compile() goes through the wrapper too.
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
+  CMAKE_C_COMPILER
+  CMAKE_CXX_COMPILER
+  CMAKE_AR
+  CMAKE_C_COMPILER_AR
+  CMAKE_CXX_COMPILER_AR
+)
