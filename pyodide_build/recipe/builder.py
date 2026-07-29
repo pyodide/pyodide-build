@@ -675,7 +675,10 @@ class RecipeBuilderPackage(RecipeBuilder):
                 Path(self.build_args.host_install_dir)
                 / f"lib/{python_dir}/site-packages"
             )
-            if self.build_metadata.cross_build_env:
+            if (
+                self.build_metadata.cross_build_env
+                and not self.build_metadata.cross_build_env_skip_install
+            ):
                 subprocess.run(
                     [
                         "pip",
@@ -710,11 +713,11 @@ class RecipeBuilderPackage(RecipeBuilder):
                     check=True,
                 )
 
-            for cross_build_file in self.build_metadata.cross_build_files:
-                shutil.copy(
-                    (wheel_dir / cross_build_file),
-                    host_site_packages / cross_build_file,
-                )
+                for cross_build_file in self.build_metadata.cross_build_files:
+                    shutil.copy(
+                        (wheel_dir / cross_build_file),
+                        host_site_packages / cross_build_file,
+                    )
 
 
 class RecipeBuilderStaticLibrary(RecipeBuilder):
