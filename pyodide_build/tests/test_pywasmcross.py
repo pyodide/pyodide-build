@@ -4,6 +4,7 @@ import pytest
 
 from pyodide_build.pywasmcross import (
     CrossCompileArgs,
+    ExitCodeWithReason,
     calculate_exports,
     filter_objects,
     get_cmake_compiler_flags,
@@ -28,7 +29,7 @@ def build_args():
 def generate_args(line: str, args: CrossCompileArgs, is_link_cmd: bool = False) -> str:
     splitline = line.split()
     res = handle_command_generate_args(splitline, args)
-    if isinstance(res, int):
+    if isinstance(res, ExitCodeWithReason):
         return res
 
     if res[0] in ("emcc", "em++"):
@@ -298,7 +299,7 @@ def test_openmp_flags_are_dropped(build_args, flag):
     We error out if they are requested.
     """
     res = generate_args(f"cc -c {flag} test.c", build_args)
-    assert res == 1
+    assert res == ExitCodeWithReason(1, "openmp requires threads and is not supported")
 
 
 def test_fopenmp_simd_is_kept(build_args):
