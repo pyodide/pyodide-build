@@ -12,6 +12,7 @@ import json
 import os
 import sys
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -77,6 +78,12 @@ class CrossCompileArgs(NamedTuple):
     # Pyodide abi, e.g., 2025_0
     # Sometimes we have to inject compile flags only for certain abis.
     abi: str = ""
+
+
+@dataclass
+class ExitCodeWithReason:
+    exitcode: int
+    reason: str
 
 
 def is_link_cmd(line: list[str]) -> bool:
@@ -223,7 +230,7 @@ def replay_genargs_handle_linker_opts(arg: str) -> str | None:
         return None
 
 
-def replay_genargs_handle_argument(arg: str) -> str | None:
+def replay_genargs_handle_argument(arg: str) -> str | ExitCodeWithReason | None:
     """
     Figure out how to replace a general argument.
 
@@ -271,6 +278,12 @@ def replay_genargs_handle_argument(arg: str) -> str | None:
 
     if arg.startswith("-J"):  # fortran flag that clang does not support
         return None
+
+    # Emscripten 6.0.3 added OpenMP support but Pyodide doesn't support threads.
+    # Exit with nonzero status code so that we treat OpenMP as unavailable.
+    # Leave -fopenmp-simd alone since simd is okay.
+    if arg.startswith("-fopenmp=") or arg == "-fopenmp":
+        return ExitCodeWithReason(1, "openmp requires threads and is not supported")
 
     return arg
 
@@ -485,7 +498,7 @@ def get_export_flags(
 
 def handle_command_generate_args(  # noqa: C901
     line: list[str], build_args: CrossCompileArgs
-) -> list[str]:
+) -> list[str] | ExitCodeWithReason:
     """
     A helper command for `handle_command` that generates the new arguments for
     the compilation.
@@ -583,6 +596,7 @@ def handle_command_generate_args(  # noqa: C901
             del new_args[-1]
             continue
 
+        result: str | ExitCodeWithReason | None
         if arg.startswith("-l"):
             result = replay_genargs_handle_dashl(arg, used_libs, build_args.abi)
         elif arg.startswith("-I"):
@@ -591,6 +605,9 @@ def handle_command_generate_args(  # noqa: C901
             result = replay_genargs_handle_linker_opts(arg)
         else:
             result = replay_genargs_handle_argument(arg)
+
+        if isinstance(result, ExitCodeWithReason):
+            return result
 
         if result:
             new_args.append(result)
@@ -625,7 +642,7 @@ def handle_command_generate_args(  # noqa: C901
 def handle_command(
     line: list[str],
     build_args: CrossCompileArgs,
-) -> int:
+) -> int | ExitCodeWithReason:
     """Handle a compilation command. Exit with an appropriate exit code when done.
 
     Parameters
@@ -649,6 +666,8 @@ def handle_command(
         line = tmp
 
     new_args = handle_command_generate_args(line, build_args)
+    if isinstance(new_args, ExitCodeWithReason):
+        return new_args
 
     if build_args.pkgname == "scipy":
         from _f2c_fixes import scipy_fixes
@@ -673,7 +692,13 @@ def compiler_main():
     basename = Path(sys.argv[0]).name
     args = list(sys.argv)
     args[0] = basename
-    sys.exit(handle_command(args, build_args))
+    result = handle_command(args, build_args)
+    if isinstance(result, ExitCodeWithReason):
+        print(result.reason, file=sys.stderr)
+        exitcode = result.exitcode
+    else:
+        exitcode = result
+    sys.exit(exitcode)
 
 
 if IS_COMPILER_INVOCATION:
