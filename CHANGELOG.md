@@ -12,17 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pyodide xbuildenv install` no longer installs cross-build packages at all.
   Instead `pyodide build` and `pyodide build-recipes` install only the
   cross-build packages that the package being built actually needs.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
 
 - `pyodide build-recipes` now installs the cross-build packages listed in a
   recipe's `requirements/host` before the build script runs.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
 
 ### Removed
 
 - Removed the deprecated no-op `--skip-cross-build-packages` flag and the
   `PYODIDE_SKIP_CROSS_BUILD_PACKAGES` environment variable from `pyodide
-  xbuildenv install`, along with the
-  `CrossBuildEnvManager.install(skip_install_cross_build_packages=...)`
-  parameter.
+  xbuildenv install`.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
 
 ## [0.38.0] - 2026/08/01
 
