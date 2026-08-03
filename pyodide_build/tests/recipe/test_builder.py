@@ -161,7 +161,7 @@ def test_ensure_cross_build_packages_for_host_requirements(tmp_path, monkeypatch
 
     class DummyManager:
         def ensure_cross_build_packages_installed(self, packages):
-            calls.append(set(packages))
+            calls.append(dict(packages))
 
     monkeypatch.setattr(_builder, "in_xbuildenv", lambda: True)
     monkeypatch.setattr(_builder, "get_current_xbuildenv_manager", DummyManager)
@@ -171,18 +171,18 @@ def test_ensure_cross_build_packages_for_host_requirements(tmp_path, monkeypatch
         _builder, "get_unisolated_packages", lambda: {"pkg_3": "1.0", "numpy": "2.0"}
     )
     builder._ensure_cross_build_packages_for_host_requirements()
-    assert calls == [{"pkg-3"}]
+    assert calls == [{"pkg_3": "1.0"}]
 
     # None of the host requirements are cross-build packages, so nothing happens.
     monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: {"numpy": "2.0"})
     builder._ensure_cross_build_packages_for_host_requirements()
-    assert calls == [{"pkg-3"}]
+    assert calls == [{"pkg_3": "1.0"}]
 
     # Outside of an xbuildenv, the install is never triggered.
     monkeypatch.setattr(_builder, "in_xbuildenv", lambda: False)
     monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: {"pkg_3": "1.0"})
     builder._ensure_cross_build_packages_for_host_requirements()
-    assert calls == [{"pkg-3"}]
+    assert calls == [{"pkg_3": "1.0"}]
 
 
 def test_get_helper_vars(tmp_path):

@@ -43,7 +43,7 @@ def test_replace_unisolated_packages():
         requires, unisolated
     )
     assert new_requires == {"foo==2.0", "bar==0.5", "baz==1.0", "qux"}
-    assert replaced == {"foo", "bar", "baz"}
+    assert replaced == {"foo": "2.0", "bar": "0.5", "baz": "1.0"}
 
 
 def test_replace_unisolated_packages_normalizes_names():
@@ -57,7 +57,7 @@ def test_replace_unisolated_packages_normalizes_names():
         requires, unisolated
     )
     assert new_requires == {"numpy==2.0.3", "ruamel.yaml==0.18.6"}
-    assert replaced == {"numpy", "ruamel.yaml"}
+    assert replaced == {"numpy": "2.0.3", "ruamel.yaml": "0.18.6"}
 
 
 def test_replace_unisolated_packages_version_mismatch():
@@ -71,7 +71,7 @@ def test_replace_unisolated_packages_version_mismatch():
             requires, unisolated
         )
     assert new_requires == {"baz==1.1"}
-    assert replaced == {"baz"}
+    assert replaced == {"baz": "1.1"}
 
 
 @pytest.mark.parametrize(
@@ -92,7 +92,7 @@ def test_replace_unisolated_packages_oldest_supported_numpy_marker_not_applicabl
 
     new_requires, replaced = pypabuild._replace_unisolated_packages(requires, {})
     assert new_requires == requires
-    assert replaced == set()
+    assert replaced == {}
 
 
 def test_install_reqs(tmp_path, dummy_xbuildenv, monkeypatch):
@@ -182,7 +182,7 @@ def test_install_reqs_triggers_lazy_install(tmp_path, monkeypatch):
     class DummyManager:
         def ensure_cross_build_packages_installed(self, packages):
             called["count"] += 1
-            called["packages"] = set(packages)
+            called["packages"] = dict(packages)
 
     monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: True)
     monkeypatch.setattr(pypabuild, "get_current_xbuildenv_manager", DummyManager)
@@ -199,7 +199,7 @@ def test_install_reqs_triggers_lazy_install(tmp_path, monkeypatch):
     assert called["count"] == 1
     # Only the cross-build packages that are actually build dependencies get
     # installed; scipy is not requested so it is left alone.
-    assert called["packages"] == {"numpy"}
+    assert called["packages"] == {"numpy": "1.0"}
 
 
 def test_install_reqs_skips_lazy_install_when_not_unisolated(tmp_path, monkeypatch):

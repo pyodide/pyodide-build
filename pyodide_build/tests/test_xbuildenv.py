@@ -15,12 +15,18 @@ from pyodide_build.xbuildenv import (
 )
 
 
-def _pinned(manager, name):
-    """The `name==version` pin the xbuildenv ships for a cross-build package."""
+def _pins(manager, *names):
+    """The `(name, version)` pins the xbuildenv ships for cross-build packages."""
     requirements = build_env.read_pinned_requirements(
         manager.symlink_dir.resolve() / "xbuildenv" / "requirements.txt"
     )
-    return f"{name}=={requirements[name]}"
+    return [(name, requirements[name]) for name in names]
+
+
+def _pinned(manager, name):
+    """The `name==version` pin the xbuildenv ships for a cross-build package."""
+    [(name, version)] = _pins(manager, name)
+    return f"{name}=={version}"
 
 
 @pytest.fixture()
@@ -475,33 +481,19 @@ class TestCrossBuildEnvManager:
 
         # First ensure installs once (two pip invocations, see
         # _install_cross_build_packages)
-        manager.ensure_cross_build_packages_installed(["numpy"])
+        manager.ensure_cross_build_packages_installed(_pins(manager, "numpy"))
         assert len(pip_calls) == 2
         assert pip_calls[0][-1] == _pinned(manager, "numpy")
 
         # Second ensure is a no-op: numpy's dist-info is already there
-        manager.ensure_cross_build_packages_installed(["numpy"])
+        manager.ensure_cross_build_packages_installed(_pins(manager, "numpy"))
         assert len(pip_calls) == 2
 
         # ...but a package we have not installed yet still gets installed, and
         # only that package.
-        manager.ensure_cross_build_packages_installed(["numpy", "scipy"])
+        manager.ensure_cross_build_packages_installed(_pins(manager, "numpy", "scipy"))
         assert len(pip_calls) == 4
         assert pip_calls[2][-1] == _pinned(manager, "scipy")
-
-    def test_ensure_cross_build_packages_installed_ignores_unknown(
-        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
-    ):
-        pip_calls = monkeypatch_subprocess_run_pip
-        manager = CrossBuildEnvManager(tmp_path)
-        manager.install(version=None, url=dummy_xbuildenv_url)
-
-        # Not cross-build packages of this xbuildenv, so nothing to install.
-        manager.ensure_cross_build_packages_installed(["setuptools", "wheel"])
-        assert pip_calls == []
-
-        manager.ensure_cross_build_packages_installed([])
-        assert pip_calls == []
 
     def test_ensure_cross_build_packages_installed_normalizes_names(
         self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
@@ -510,11 +502,15 @@ class TestCrossBuildEnvManager:
         manager = CrossBuildEnvManager(tmp_path)
         manager.install(version=None, url=dummy_xbuildenv_url)
 
-        manager.ensure_cross_build_packages_installed(["NumPy"])
-        assert len(pip_calls) == 2
-        assert pip_calls[0][-1] == _pinned(manager, "numpy")
+        [(_, version)] = _pins(manager, "numpy")
 
-        manager.ensure_cross_build_packages_installed(["NUMPY"])
+        manager.ensure_cross_build_packages_installed([("NumPy", version)])
+        assert len(pip_calls) == 2
+        assert pip_calls[0][-1] == f"NumPy=={version}"
+
+        # The already-installed check normalizes names, so this is a no-op even
+        # though the dist-info directory was written as `NumPy-<version>`.
+        manager.ensure_cross_build_packages_installed([("NUMPY", version)])
         assert len(pip_calls) == 2
 
     def test_use_version_dangling_symlink(self, tmp_path):
@@ -631,7 +627,7 @@ class TestCrossBuildEnvManager:
         download_path = tmp_path / version
 
         # Cross-build packages installed under the old Python version.
-        manager.ensure_cross_build_packages_installed(["numpy"])
+        manager.ensure_cross_build_packages_installed(_pins(manager, "numpy"))
         hostsitepackages = manager._host_site_packages_dir()
         numpy_dist_info = hostsitepackages / (
             _pinned(manager, "numpy").replace("==", "-") + ".dist-info"
@@ -670,7 +666,7 @@ class TestCrossBuildEnvManager:
         manager = CrossBuildEnvManager(tmp_path)
 
         manager.install(version=None, url=dummy_xbuildenv_url)
-        manager.ensure_cross_build_packages_installed(["numpy"])
+        manager.ensure_cross_build_packages_installed(_pins(manager, "numpy"))
         hostsitepackages = manager._host_site_packages_dir()
         numpy_dist_info = hostsitepackages / (
             _pinned(manager, "numpy").replace("==", "-") + ".dist-info"

@@ -84,7 +84,9 @@ class CrossBuildEnvManager:
         """Returns the path to the xbuildenv for the given version."""
         return self.env_dir / version
 
-    def ensure_cross_build_packages_installed(self, packages: Iterable[str]) -> None:
+    def ensure_cross_build_packages_installed(
+        self, packages: Iterable[tuple[str, str]]
+    ) -> None:
         """
         Install the given cross-build packages into the host site-packages of
         the active xbuildenv, if they are not installed there already.
@@ -101,41 +103,31 @@ class CrossBuildEnvManager:
         Parameters
         ----------
         packages
-            Names of the cross-build packages to install. Names that are not
-            cross-build packages of this xbuildenv are ignored.
+            `(name, version)` pairs of the cross-build packages to install,
+            where the version is the one pinned by this xbuildenv. Callers
+            select these from the xbuildenv's cross-build packages, see
+            `build_env.get_unisolated_packages`.
 
         Raises
         ------
         RuntimeError
             If package installation fails.
         """
-        requested = {canonicalize_name(name) for name in packages}
-        if not requested:
+        packages = list(packages)
+        if not packages:
             return
 
         xbuildenv_root = self.symlink_dir.resolve() / "xbuildenv"
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
 
-        available = {
-            canonicalize_name(name): (name, version)
-            for name, version in build_env.read_pinned_requirements(
-                xbuildenv_root / "requirements.txt"
-            ).items()
-        }
-
         host_site_packages = self._host_site_packages_dir(xbuildenv_pyodide_root)
         installed = _installed_distributions(host_site_packages)
 
-        to_install = {}
-        for canonical in requested:
-            match = available.get(canonical)
-            if match is None:
-                # Not a cross-build package of this xbuildenv, nothing to do.
-                continue
-            name, version = match
-            if _same_version(installed.get(canonical), version):
-                continue
-            to_install[name] = version
+        to_install = {
+            name: version
+            for name, version in packages
+            if not _same_version(installed.get(canonicalize_name(name)), version)
+        }
 
         if not to_install:
             return

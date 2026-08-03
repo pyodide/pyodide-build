@@ -334,17 +334,19 @@ class RecipeBuilder:
         if not in_xbuildenv():
             return
 
-        unisolated_packages = {
-            canonicalize_name(name) for name in get_unisolated_packages()
-        }
-        needed = unisolated_packages & {
+        host_requirements = {
             canonicalize_name(req) for req in self.recipe.requirements.host
         }
+        needed = [
+            (name, version)
+            for name, version in get_unisolated_packages().items()
+            if canonicalize_name(name) in host_requirements
+        ]
 
-        if needed:
-            get_current_xbuildenv_manager().ensure_cross_build_packages_installed(
-                needed
-            )
+        if not needed:
+            return
+
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed(needed)
 
     def _check_executables(self) -> None:
         """
