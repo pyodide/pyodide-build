@@ -8,7 +8,11 @@ import pytest
 
 from pyodide_build import build_env
 from pyodide_build.common import download_and_unpack_archive
-from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
+from pyodide_build.xbuildenv import (
+    CrossBuildEnvManager,
+    _same_version,
+    _url_to_version,
+)
 
 
 def _pinned(manager, name):
@@ -350,14 +354,19 @@ class TestCrossBuildEnvManager:
             if use_uv
             else [sys.executable, "-m", "pip", "install", "--no-user"]
         )
-        assert len(pip_calls) == 1
-        assert pip_calls[0] == [
-            *install_prefix,
+        install_suffix = [
             "--constraint",
             str(xbuildenv_root / "requirements.txt"),
             "--target",
             str(hostsitepackages),
             f"numpy=={numpy_version}",
+        ]
+        # The requested packages are upgraded without their dependencies, then a
+        # second pass installs the dependencies without replacing anything that
+        # is already there.
+        assert pip_calls == [
+            [*install_prefix, "--upgrade", "--no-deps", *install_suffix],
+            [*install_prefix, *install_suffix],
         ]
 
         assert hostsitepackages.exists()
@@ -464,20 +473,21 @@ class TestCrossBuildEnvManager:
         manager.install(version=None, url=dummy_xbuildenv_url)
         assert pip_calls == []
 
-        # First ensure installs once
+        # First ensure installs once (two pip invocations, see
+        # _install_cross_build_packages)
         manager.ensure_cross_build_packages_installed(["numpy"])
-        assert len(pip_calls) == 1
+        assert len(pip_calls) == 2
         assert pip_calls[0][-1] == _pinned(manager, "numpy")
 
         # Second ensure is a no-op: numpy's dist-info is already there
         manager.ensure_cross_build_packages_installed(["numpy"])
-        assert len(pip_calls) == 1
+        assert len(pip_calls) == 2
 
         # ...but a package we have not installed yet still gets installed, and
         # only that package.
         manager.ensure_cross_build_packages_installed(["numpy", "scipy"])
-        assert len(pip_calls) == 2
-        assert pip_calls[1][-1] == _pinned(manager, "scipy")
+        assert len(pip_calls) == 4
+        assert pip_calls[2][-1] == _pinned(manager, "scipy")
 
     def test_ensure_cross_build_packages_installed_ignores_unknown(
         self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
@@ -501,11 +511,11 @@ class TestCrossBuildEnvManager:
         manager.install(version=None, url=dummy_xbuildenv_url)
 
         manager.ensure_cross_build_packages_installed(["NumPy"])
-        assert len(pip_calls) == 1
+        assert len(pip_calls) == 2
         assert pip_calls[0][-1] == _pinned(manager, "numpy")
 
         manager.ensure_cross_build_packages_installed(["NUMPY"])
-        assert len(pip_calls) == 1
+        assert len(pip_calls) == 2
 
     def test_use_version_dangling_symlink(self, tmp_path):
         # Regression test: a dangling xbuildenv symlink (target removed) must be
@@ -703,3 +713,23 @@ class TestCrossBuildEnvManager:
 )
 def test_url_to_version(url: str, version: str) -> None:
     assert _url_to_version(url) == version
+
+
+@pytest.mark.parametrize(
+    "installed, pinned, expected",
+    [
+        ("1.2.3", "1.2.3", True),
+        ("1.2.3", "1.2.4", False),
+        (None, "1.2.3", False),
+        # pip and uv normalize the version in the .dist-info directory name,
+        # the pin in requirements.txt is not necessarily normalized.
+        ("2024.2.2", "2024.02.02", True),
+        ("1.0", "1.0.0", True),
+        ("1.0rc1", "1.0-rc1", True),
+        # Unparsable versions fall back to a string comparison.
+        ("not+a+version", "not+a+version", True),
+        ("not+a+version", "1.0", False),
+    ],
+)
+def test_same_version(installed: str | None, pinned: str, expected: bool) -> None:
+    assert _same_version(installed, pinned) == expected

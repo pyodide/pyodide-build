@@ -6,7 +6,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from packaging.utils import canonicalize_name
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 from pyodide_lock import PyodideLockSpec
 
 from pyodide_build import build_env, uv_helper
@@ -133,7 +133,7 @@ class CrossBuildEnvManager:
                 # Not a cross-build package of this xbuildenv, nothing to do.
                 continue
             name, version = match
-            if installed.get(canonical) == version:
+            if _same_version(installed.get(canonical), version):
                 continue
             to_install[name] = version
 
@@ -431,28 +431,38 @@ class CrossBuildEnvManager:
             ]
         )
 
-        result = subprocess.run(
-            [
-                *install_prefix,
-                # Constrain to the xbuildenv pins so that a cross-build package
-                # pulled in as a transitive dependency (scipy depends on numpy,
-                # for instance) still lands at the version the xbuildenv ships
-                # cross-build files for.
-                "--constraint",
-                str(requirements_file),
-                "--target",
-                str(host_site_packages),
-                *(f"{name}=={version}" for name, version in sorted(packages.items())),
-            ],
-            capture_output=True,
-            encoding="utf8",
-            check=False,
-        )
+        install_suffix = [
+            # Constrain to the xbuildenv pins so that a cross-build package
+            # pulled in as a transitive dependency (scipy depends on numpy,
+            # for instance) still lands at the version the xbuildenv ships
+            # cross-build files for.
+            "--constraint",
+            str(requirements_file),
+            "--target",
+            str(host_site_packages),
+            *(f"{name}=={version}" for name, version in sorted(packages.items())),
+        ]
 
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Failed to install cross-build packages: {result.stderr}"
+        # `pip install --target` skips every entry that already exists in the
+        # target directory unless `--upgrade` is passed, so without it a package
+        # that is present at a different version would keep its old contents
+        # while gaining a second `.dist-info`. Upgrade the packages we were asked
+        # for, but with `--no-deps`: their dependencies may be cross-build
+        # packages themselves, and replacing those would drop the cross-build
+        # files that were copied over them. A second pass without `--upgrade`
+        # then installs the dependencies that are still missing.
+        for extra_args in (["--upgrade", "--no-deps"], []):
+            result = subprocess.run(
+                [*install_prefix, *extra_args, *install_suffix],
+                capture_output=True,
+                encoding="utf8",
+                check=False,
             )
+
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Failed to install cross-build packages: {result.stderr}"
+                )
 
         self._copy_site_packages_extras(xbuildenv_root, host_site_packages)
 
@@ -473,14 +483,16 @@ class CrossBuildEnvManager:
         if not extras_root.is_dir():
             return
 
-        for extras_dir in extras_root.iterdir():
-            if not (host_site_packages / extras_dir.name).exists():
+        for extras_entry in extras_root.iterdir():
+            target = host_site_packages / extras_entry.name
+            if not extras_entry.is_dir():
+                # A cross-build file at the root of the wheel. There is no
+                # package directory to key it off, so always copy it.
+                shutil.copy2(extras_entry, target)
                 continue
-            shutil.copytree(
-                extras_dir,
-                host_site_packages / extras_dir.name,
-                dirs_exist_ok=True,
-            )
+            if not target.exists():
+                continue
+            shutil.copytree(extras_entry, target, dirs_exist_ok=True)
 
     def _host_site_packages_dir(
         self, xbuildenv_pyodide_root: Path | None = None
@@ -766,3 +778,20 @@ def _installed_distributions(site_packages: Path) -> dict[str, str]:
             continue
         installed[canonicalize_name(name)] = version
     return installed
+
+
+def _same_version(installed_version: str | None, pinned_version: str) -> bool:
+    """
+    Compare an installed version against a pinned one.
+
+    pip and uv write the PEP 440 normalized version into the `.dist-info`
+    directory name, whereas the pin in the xbuildenv `requirements.txt` is not
+    necessarily normalized, so a plain string comparison would report a
+    mismatch for e.g. `2024.02.02` versus `2024.2.2`.
+    """
+    if installed_version is None:
+        return False
+    try:
+        return Version(installed_version) == Version(pinned_version)
+    except InvalidVersion:
+        return installed_version == pinned_version

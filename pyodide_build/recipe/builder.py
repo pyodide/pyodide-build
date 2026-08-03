@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, cast
 
 import requests
-from packaging.utils import parse_wheel_filename
+from packaging.utils import canonicalize_name, parse_wheel_filename
 
 from pyodide_build import common, pypabuild
 from pyodide_build.build_env import (
@@ -334,9 +334,11 @@ class RecipeBuilder:
         if not in_xbuildenv():
             return
 
-        unisolated_packages = {name.lower() for name in get_unisolated_packages()}
+        unisolated_packages = {
+            canonicalize_name(name) for name in get_unisolated_packages()
+        }
         needed = unisolated_packages & {
-            req.lower() for req in self.recipe.requirements.host
+            canonicalize_name(req) for req in self.recipe.requirements.host
         }
 
         if needed:
