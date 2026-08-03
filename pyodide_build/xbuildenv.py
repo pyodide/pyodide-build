@@ -2,9 +2,11 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-from packaging.version import Version
+from packaging.utils import canonicalize_name
+from packaging.version import InvalidVersion, Version
 from pyodide_lock import PyodideLockSpec
 
 from pyodide_build import build_env, uv_helper
@@ -19,7 +21,6 @@ from pyodide_build.xbuildenv_releases import (
 
 CDN_BASE = "https://cdn.jsdelivr.net/pyodide/v{version}/full/"
 PYTHON_VERSION_MARKER_FILE = ".build-python-version"
-CROSS_BUILD_PACKAGES_MARKER_FILE = ".cross-build-packages-installed"
 EMSCRIPTEN_VERSION_MARKER_FILE = ".emscripten-version"
 
 
@@ -83,43 +84,62 @@ class CrossBuildEnvManager:
         """Returns the path to the xbuildenv for the given version."""
         return self.env_dir / version
 
-    def _cross_build_packages_marker_path(self, version_path: Path) -> Path:
+    def ensure_cross_build_packages_installed(
+        self, packages: Iterable[tuple[str, str]]
+    ) -> None:
         """
-        Return the marker file path used to record cross-build package installation.
+        Install the given cross-build packages into the host site-packages of
+        the active xbuildenv, if they are not installed there already.
+
+        Cross-build packages are not installed when the xbuildenv itself is
+        installed; instead `pyodide build` and `pyodide build-recipes` call this
+        with the subset of cross-build packages that the package being built
+        actually needs, so that we never pay for (say) a scipy install when
+        building something that only depends on numpy.
+
+        This method is idempotent: packages that are already present in the host
+        site-packages at the pinned version are skipped.
 
         Parameters
         ----------
-        version_path
-            Path to a concrete xbuildenv version directory (for example, `.../<version>`).
-        """
-        return version_path / CROSS_BUILD_PACKAGES_MARKER_FILE
-
-    def ensure_cross_build_packages_installed(self) -> None:
-        """
-        Install cross-build packages for the active xbuildenv only when needed.
-
-        This method is idempotent: if the marker file is already present, it does
-        nothing. Otherwise it installs packages into HOSTSITEPACKAGES and writes
-        the marker on success.
+        packages
+            `(name, version)` pairs of the cross-build packages to install,
+            where the version is the one pinned by this xbuildenv. Callers
+            select these from the xbuildenv's cross-build packages, see
+            `build_env.get_unisolated_packages`.
 
         Raises
         ------
-        ValueError
-            If no active xbuildenv is selected.
         RuntimeError
             If package installation fails.
         """
-        version_path = self.symlink_dir.resolve()
-        marker = self._cross_build_packages_marker_path(version_path)
-        if marker.exists():
+        packages = list(packages)
+        if not packages:
             return
 
-        xbuildenv_root = version_path / "xbuildenv"
+        xbuildenv_root = self.symlink_dir.resolve() / "xbuildenv"
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
 
-        logger.info("Installing cross-build packages for %s", version_path.name)
-        self._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
-        marker.touch()
+        host_site_packages = self._host_site_packages_dir(xbuildenv_pyodide_root)
+        installed = _installed_distributions(host_site_packages)
+
+        to_install = {
+            name: version
+            for name, version in packages
+            if not _same_version(installed.get(canonicalize_name(name)), version)
+        }
+
+        if not to_install:
+            return
+
+        logger.info(
+            "Installing cross-build packages %s for %s",
+            ", ".join(sorted(to_install)),
+            self.symlink_dir.resolve().name,
+        )
+        self._install_cross_build_packages(
+            xbuildenv_root, xbuildenv_pyodide_root, to_install
+        )
 
     def list_versions(self) -> list[str]:
         """
@@ -180,7 +200,6 @@ class CrossBuildEnvManager:
         version: str | None = None,
         *,
         url: str | None = None,
-        skip_install_cross_build_packages: bool = True,
         force_install: bool = False,
     ) -> Path:
         """
@@ -199,8 +218,6 @@ class CrossBuildEnvManager:
             Warning: if you are downloading from a version that is not the same
             as the current version of pyodide-build, make sure that the cross-build
             environment is compatible with the current version of Pyodide.
-        skip_install_cross_build_packages
-            If True, skip installing the cross-build packages. This is mostly for testing purposes.
         force_install
             If True, force the installation even if the cross-build environment is not compatible
 
@@ -279,19 +296,14 @@ class CrossBuildEnvManager:
                 )
                 did_install_work = True
 
-                cross_build_packages_marker = self._cross_build_packages_marker_path(
-                    download_path
-                )
-
-                if not skip_install_cross_build_packages:
-                    self._install_cross_build_packages(
-                        xbuildenv_root, xbuildenv_pyodide_root
+                if version_marker_mismatch:
+                    # Any host packages present were installed under a different
+                    # Python version, so they are unusable. Drop them; the builds
+                    # that need them will reinstall them.
+                    shutil.rmtree(
+                        self._host_site_packages_dir(xbuildenv_pyodide_root),
+                        ignore_errors=True,
                     )
-                    cross_build_packages_marker.touch()
-                elif version_marker_mismatch:
-                    # The host packages were installed under a different Python
-                    # version. Drop the marker so they get reinstalled lazily.
-                    cross_build_packages_marker.unlink(missing_ok=True)
 
                 if not installed_from_url:
                     # If installed from url, skip creating the PyPI index
@@ -372,10 +384,13 @@ class CrossBuildEnvManager:
         return build_env.get_host_build_flag("DEFAULT_CROSS_BUILD_ENV_URL")
 
     def _install_cross_build_packages(
-        self, xbuildenv_root: Path, xbuildenv_pyodide_root: Path
+        self,
+        xbuildenv_root: Path,
+        xbuildenv_pyodide_root: Path,
+        packages: Mapping[str, str],
     ) -> None:
         """
-        Install package that are used in the cross-build environment.
+        Install the given cross-build packages into the host site-packages.
 
         Parameters
         ----------
@@ -383,9 +398,14 @@ class CrossBuildEnvManager:
             Path to the xbuildenv directory.
         xbuildenv_pyodide_root
             Path to the pyodide-root directory inside the xbuildenv directory.
+        packages
+            Mapping of cross-build package name to the version pinned by this
+            xbuildenv.
         """
         host_site_packages = self._host_site_packages_dir(xbuildenv_pyodide_root)
         host_site_packages.mkdir(exist_ok=True, parents=True)
+
+        requirements_file = xbuildenv_root / "requirements.txt"
 
         install_prefix = (
             [
@@ -403,31 +423,68 @@ class CrossBuildEnvManager:
             ]
         )
 
-        result = subprocess.run(
-            [
-                *install_prefix,
-                "-r",
-                str(xbuildenv_root / "requirements.txt"),
-                "--target",
-                str(host_site_packages),
-            ],
-            capture_output=True,
-            encoding="utf8",
-            check=False,
-        )
+        install_suffix = [
+            # Constrain to the xbuildenv pins so that a cross-build package
+            # pulled in as a transitive dependency (scipy depends on numpy,
+            # for instance) still lands at the version the xbuildenv ships
+            # cross-build files for.
+            "--constraint",
+            str(requirements_file),
+            "--target",
+            str(host_site_packages),
+            *(f"{name}=={version}" for name, version in sorted(packages.items())),
+        ]
 
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Failed to install cross-build packages: {result.stderr}"
+        # `pip install --target` skips every entry that already exists in the
+        # target directory unless `--upgrade` is passed, so without it a package
+        # that is present at a different version would keep its old contents
+        # while gaining a second `.dist-info`. Upgrade the packages we were asked
+        # for, but with `--no-deps`: their dependencies may be cross-build
+        # packages themselves, and replacing those would drop the cross-build
+        # files that were copied over them. A second pass without `--upgrade`
+        # then installs the dependencies that are still missing.
+        for extra_args in (["--upgrade", "--no-deps"], []):
+            result = subprocess.run(
+                [*install_prefix, *extra_args, *install_suffix],
+                capture_output=True,
+                encoding="utf8",
+                check=False,
             )
 
-        # Copy the site-packages-extras (coming from the cross-build-files meta.yaml
-        # key) over the site-packages directory with the newly installed packages.
-        shutil.copytree(
-            xbuildenv_root / "site-packages-extras",
-            host_site_packages,
-            dirs_exist_ok=True,
-        )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Failed to install cross-build packages: {result.stderr}"
+                )
+
+        self._copy_site_packages_extras(xbuildenv_root, host_site_packages)
+
+    def _copy_site_packages_extras(
+        self, xbuildenv_root: Path, host_site_packages: Path
+    ) -> None:
+        """
+        Copy the site-packages-extras (coming from the cross-build-files
+        meta.yaml key) over the host site-packages.
+
+        Only extras belonging to a package that is actually present in the host
+        site-packages are copied. We re-copy the extras of every such package on
+        each install rather than only those of the packages we just installed,
+        because installing one cross-build package can overwrite the files of
+        another one that it depends on.
+        """
+        extras_root = xbuildenv_root / "site-packages-extras"
+        if not extras_root.is_dir():
+            return
+
+        for extras_entry in extras_root.iterdir():
+            target = host_site_packages / extras_entry.name
+            if not extras_entry.is_dir():
+                # A cross-build file at the root of the wheel. There is no
+                # package directory to key it off, so always copy it.
+                shutil.copy2(extras_entry, target)
+                continue
+            if not target.exists():
+                continue
+            shutil.copytree(extras_entry, target, dirs_exist_ok=True)
 
     def _host_site_packages_dir(
         self, xbuildenv_pyodide_root: Path | None = None
@@ -692,3 +749,41 @@ class CrossBuildEnvManager:
 def _url_to_version(url: str) -> str:
     # : - invalid character on Windows.
     return url.replace("://", "_").replace(".", "_").replace("/", "_").replace(":", "_")
+
+
+def _installed_distributions(site_packages: Path) -> dict[str, str]:
+    """
+    Return the distributions installed in `site_packages` as a mapping of
+    canonicalized name to version, by looking at the `.dist-info` directories.
+
+    We use this instead of a marker file so that adding a package to an
+    xbuildenv whose cross-build packages were partially installed earlier
+    installs just the missing package.
+    """
+    installed: dict[str, str] = {}
+    if not site_packages.is_dir():
+        return installed
+
+    for dist_info in site_packages.glob("*.dist-info"):
+        name, _, version = dist_info.name.removesuffix(".dist-info").rpartition("-")
+        if not name or not version:
+            continue
+        installed[canonicalize_name(name)] = version
+    return installed
+
+
+def _same_version(installed_version: str | None, pinned_version: str) -> bool:
+    """
+    Compare an installed version against a pinned one.
+
+    pip and uv write the PEP 440 normalized version into the `.dist-info`
+    directory name, whereas the pin in the xbuildenv `requirements.txt` is not
+    necessarily normalized, so a plain string comparison would report a
+    mismatch for e.g. `2024.02.02` versus `2024.2.2`.
+    """
+    if installed_version is None:
+        return False
+    try:
+        return Version(installed_version) == Version(pinned_version)
+    except InvalidVersion:
+        return installed_version == pinned_version
