@@ -259,7 +259,9 @@ def install_reqs(
     reqs = remove_avoided_requirements(reqs, IGNORED_BUILD_REQUIREMENTS)
 
     if in_xbuildenv() and unisolated:
-        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed(
+            unisolated
+        )
 
     # propagate PIP config from build_env to current environment
     with common.replace_env(

@@ -149,6 +149,42 @@ def test_check_executables(tmp_path, monkeypatch):
         builder._check_executables()
 
 
+def test_ensure_cross_build_packages_for_host_requirements(tmp_path, monkeypatch):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_1",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+    )
+    assert builder.recipe.requirements.host == ["pkg_1_1", "pkg_3", "libtest_shared"]
+
+    calls = []
+
+    class DummyManager:
+        def ensure_cross_build_packages_installed(self, packages):
+            calls.append(set(packages))
+
+    monkeypatch.setattr(_builder, "in_xbuildenv", lambda: True)
+    monkeypatch.setattr(_builder, "get_current_xbuildenv_manager", DummyManager)
+
+    # Only the host requirements that are cross-build packages get installed.
+    monkeypatch.setattr(
+        _builder, "get_unisolated_packages", lambda: {"pkg_3": "1.0", "numpy": "2.0"}
+    )
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert calls == [{"pkg_3"}]
+
+    # None of the host requirements are cross-build packages, so nothing happens.
+    monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: {"numpy": "2.0"})
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert calls == [{"pkg_3"}]
+
+    # Outside of an xbuildenv, the install is never triggered.
+    monkeypatch.setattr(_builder, "in_xbuildenv", lambda: False)
+    monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: {"pkg_3": "1.0"})
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert calls == [{"pkg_3"}]
+
+
 def test_get_helper_vars(tmp_path):
     builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "pkg_1",

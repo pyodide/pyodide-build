@@ -225,6 +225,35 @@ def get_hostsitepackages() -> str:
     return get_build_flag("HOSTSITEPACKAGES")
 
 
+def read_pinned_requirements(requirements_file: Path) -> dict[str, str]:
+    """
+    Read the xbuildenv's `requirements.txt`, which lists the cross-build
+    packages as pinned `name==version` entries.
+
+    Returns
+    -------
+    A dictionary of package names and versions.
+    """
+    if not requirements_file.exists():
+        raise FileNotFoundError(
+            f"Expected {requirements_file} to exist in the xbuildenv. "
+            "The xbuildenv archive may be corrupt or from an incompatible version."
+        )
+
+    requirements: dict[str, str] = {}
+    for line in requirements_file.read_text().splitlines():
+        line = line.strip()
+        # The xbuildenv requirements.txt is machine-generated and always
+        # uses pinned name==version entries, but we skip blank lines,
+        # comments, and any non-pinned specs just in case. Shouldn't
+        # really happen though.
+        if not line or line.startswith("#") or "==" not in line:
+            continue
+        name, version = line.split("==", 1)
+        requirements[name] = version
+    return requirements
+
+
 # TODO: Remove this function (and use remote package index)
 # https://github.com/pyodide/pyodide-build/issues/43
 @functools.cache
@@ -245,23 +274,9 @@ def get_unisolated_packages() -> dict[str, str]:
 
     unisolated_packages: dict[str, str] = {}
     if in_xbuildenv():
-        unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
-
-        if not unisolated_packages_file.exists():
-            raise FileNotFoundError(
-                f"Expected {unisolated_packages_file} to exist in the xbuildenv. "
-                "The xbuildenv archive may be corrupt or from an incompatible version."
-            )
-        for line in unisolated_packages_file.read_text().splitlines():
-            line = line.strip()
-            # The xbuildenv requirements.txt is machine-generated and always
-            # uses pinned name==version entries, but we skip blank lines,
-            # comments, and any non-pinned specs just in case. Shouldn't
-            # really happen though.
-            if not line or line.startswith("#") or "==" not in line:
-                continue
-            name, version = line.split("==", 1)
-            unisolated_packages[name] = version
+        unisolated_packages = read_pinned_requirements(
+            PYODIDE_ROOT / ".." / "requirements.txt"
+        )
     else:
         from pyodide_build.recipe.loader import load_all_recipes
 

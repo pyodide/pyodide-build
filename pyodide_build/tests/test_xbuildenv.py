@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 from collections import namedtuple
+from pathlib import Path
 
 import pytest
 
@@ -10,22 +11,57 @@ from pyodide_build.common import download_and_unpack_archive
 from pyodide_build.xbuildenv import CrossBuildEnvManager, _url_to_version
 
 
+def _pinned(manager, name):
+    """The `name==version` pin the xbuildenv ships for a cross-build package."""
+    requirements = build_env.read_pinned_requirements(
+        manager.symlink_dir.resolve() / "xbuildenv" / "requirements.txt"
+    )
+    return f"{name}=={requirements[name]}"
+
+
 @pytest.fixture()
 def monkeypatch_subprocess_run_pip(monkeypatch):
+    """
+    Intercept `pip install` / `uv pip install` invocations, recording each
+    call's argv and faking the resulting installation (a top-level package
+    directory plus a .dist-info directory per pinned requirement) inside the
+    --target directory.
+    """
     import subprocess
 
-    called_with = []
+    calls: list[list[str]] = []
     orig_run = subprocess.run
 
+    def is_pip_install(cmds):
+        cmds = [str(cmd) for cmd in cmds]
+        if cmds[0:3] == [sys.executable, "-m", "pip"]:
+            return True
+        if cmds[0] == "pip":
+            return True
+        # uv: `<path-to-uv> pip install ...`
+        return Path(cmds[0]).name.split(".")[0] == "uv" and cmds[1:2] == ["pip"]
+
+    def fake_install(cmds):
+        if "--target" not in cmds:
+            return
+        target = Path(cmds[cmds.index("--target") + 1])
+        for arg in cmds:
+            if arg.startswith("-") or "==" not in arg:
+                continue
+            name, _, version = arg.partition("==")
+            (target / name).mkdir(parents=True, exist_ok=True)
+            (target / f"{name}-{version}.dist-info").mkdir(parents=True, exist_ok=True)
+
     def monkeypatch_func(cmds, *args, **kwargs):
-        if cmds[0] == "pip" or cmds[0:3] == [sys.executable, "-m", "pip"]:
-            called_with.extend(cmds)
+        if is_pip_install(cmds):
+            calls.append(list(cmds))
+            fake_install(cmds)
             return subprocess.CompletedProcess(cmds, 0, "", "")
         else:
             return orig_run(cmds, *args, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", monkeypatch_func)
-    yield called_with
+    yield calls
 
 
 class TestCrossBuildEnvManager:
@@ -278,10 +314,21 @@ class TestCrossBuildEnvManager:
         assert (tmp_path / version / ".installed").exists()
         assert manager.current_version == version
 
+    @pytest.mark.parametrize("use_uv", [False, True])
     def test_install_cross_build_packages(
-        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        monkeypatch,
+        use_uv,
     ):
-        pip_called_with = monkeypatch_subprocess_run_pip
+        from pyodide_build import uv_helper
+
+        monkeypatch.setattr(uv_helper, "should_use_uv", lambda: use_uv)
+        monkeypatch.setattr(uv_helper, "find_uv_bin", lambda: "/fake/bin/uv")
+
+        pip_calls = monkeypatch_subprocess_run_pip
         manager = CrossBuildEnvManager(tmp_path)
 
         download_path = tmp_path / "test"
@@ -289,29 +336,36 @@ class TestCrossBuildEnvManager:
 
         xbuildenv_root = download_path / "xbuildenv"
         xbuildenv_pyodide_root = xbuildenv_root / "pyodide-root"
-        manager._install_cross_build_packages(xbuildenv_root, xbuildenv_pyodide_root)
+        hostsitepackages = manager._host_site_packages_dir(xbuildenv_pyodide_root)
+        numpy_version = build_env.read_pinned_requirements(
+            xbuildenv_root / "requirements.txt"
+        )["numpy"]
 
-        assert len(pip_called_with) == 9
-        assert pip_called_with[0:8] == [
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "--no-user",
-            "-r",
+        manager._install_cross_build_packages(
+            xbuildenv_root, xbuildenv_pyodide_root, {"numpy": numpy_version}
+        )
+
+        install_prefix = (
+            ["/fake/bin/uv", "pip", "install"]
+            if use_uv
+            else [sys.executable, "-m", "pip", "install", "--no-user"]
+        )
+        assert len(pip_calls) == 1
+        assert pip_calls[0] == [
+            *install_prefix,
+            "--constraint",
             str(xbuildenv_root / "requirements.txt"),
             "--target",
+            str(hostsitepackages),
+            f"numpy=={numpy_version}",
         ]
-        assert pip_called_with[8].startswith(
-            str(xbuildenv_pyodide_root)
-        )  # hostsitepackages
 
-        hostsitepackages = manager._host_site_packages_dir(xbuildenv_pyodide_root)
         assert hostsitepackages.exists()
 
-        cross_build_files = xbuildenv_root / "site-packages-extras"
-        for file in cross_build_files.iterdir():
-            assert (hostsitepackages / file.name).exists()
+        # The extras of the installed package are overlaid...
+        assert (hostsitepackages / "numpy" / "_core" / "lib" / "libnpymath.a").exists()
+        # ...but the extras of packages we did not install are not.
+        assert not (hostsitepackages / "scipy").exists()
 
     def test_create_package_index(self, tmp_path, dummy_xbuildenv_url):
         manager = CrossBuildEnvManager(tmp_path)
@@ -403,27 +457,55 @@ class TestCrossBuildEnvManager:
     def test_ensure_cross_build_packages_installed_idempotent(
         self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
     ):
-        pip_called_with = monkeypatch_subprocess_run_pip
+        pip_calls = monkeypatch_subprocess_run_pip
         manager = CrossBuildEnvManager(tmp_path)
 
-        # Lazy install path: no cross-build packages installed yet
-        manager.install(
-            version=None,
-            url=dummy_xbuildenv_url,
-            skip_install_cross_build_packages=True,
-        )
-        assert pip_called_with == []
+        # Installing the xbuildenv never installs cross-build packages
+        manager.install(version=None, url=dummy_xbuildenv_url)
+        assert pip_calls == []
 
         # First ensure installs once
-        manager.ensure_cross_build_packages_installed()
-        assert len(pip_called_with) == 9
+        manager.ensure_cross_build_packages_installed(["numpy"])
+        assert len(pip_calls) == 1
+        assert pip_calls[0][-1] == _pinned(manager, "numpy")
 
-        # Second ensure is a no-op
-        manager.ensure_cross_build_packages_installed()
-        assert len(pip_called_with) == 9
+        # Second ensure is a no-op: numpy's dist-info is already there
+        manager.ensure_cross_build_packages_installed(["numpy"])
+        assert len(pip_calls) == 1
 
-        marker = manager.symlink_dir.resolve() / ".cross-build-packages-installed"
-        assert marker.exists()
+        # ...but a package we have not installed yet still gets installed, and
+        # only that package.
+        manager.ensure_cross_build_packages_installed(["numpy", "scipy"])
+        assert len(pip_calls) == 2
+        assert pip_calls[1][-1] == _pinned(manager, "scipy")
+
+    def test_ensure_cross_build_packages_installed_ignores_unknown(
+        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        pip_calls = monkeypatch_subprocess_run_pip
+        manager = CrossBuildEnvManager(tmp_path)
+        manager.install(version=None, url=dummy_xbuildenv_url)
+
+        # Not cross-build packages of this xbuildenv, so nothing to install.
+        manager.ensure_cross_build_packages_installed(["setuptools", "wheel"])
+        assert pip_calls == []
+
+        manager.ensure_cross_build_packages_installed([])
+        assert pip_calls == []
+
+    def test_ensure_cross_build_packages_installed_normalizes_names(
+        self, tmp_path, dummy_xbuildenv_url, monkeypatch_subprocess_run_pip
+    ):
+        pip_calls = monkeypatch_subprocess_run_pip
+        manager = CrossBuildEnvManager(tmp_path)
+        manager.install(version=None, url=dummy_xbuildenv_url)
+
+        manager.ensure_cross_build_packages_installed(["NumPy"])
+        assert len(pip_calls) == 1
+        assert pip_calls[0][-1] == _pinned(manager, "numpy")
+
+        manager.ensure_cross_build_packages_installed(["NUMPY"])
+        assert len(pip_calls) == 1
 
     def test_use_version_dangling_symlink(self, tmp_path):
         # Regression test: a dangling xbuildenv symlink (target removed) must be
@@ -534,30 +616,27 @@ class TestCrossBuildEnvManager:
         # than skipping work and leaving the stale marker / silently passing.
         manager = CrossBuildEnvManager(tmp_path)
 
-        manager.install(
-            version=None,
-            url=dummy_xbuildenv_url,
-            skip_install_cross_build_packages=True,
-        )
+        manager.install(version=None, url=dummy_xbuildenv_url)
         version = _url_to_version(dummy_xbuildenv_url)
         download_path = tmp_path / version
 
-        # Simulate the env having been installed under a different Python and
-        # mark cross-build packages as already installed.
+        # Cross-build packages installed under the old Python version.
+        manager.ensure_cross_build_packages_installed(["numpy"])
+        hostsitepackages = manager._host_site_packages_dir()
+        numpy_dist_info = hostsitepackages / (
+            _pinned(manager, "numpy").replace("==", "-") + ".dist-info"
+        )
+        assert numpy_dist_info.exists()
+
+        # Simulate the env having been installed under a different Python.
         marker_file = download_path / ".build-python-version"
         marker_file.write_text("2.7.10")
-        cross_build_marker = download_path / ".cross-build-packages-installed"
-        cross_build_marker.touch()
 
         matches, _ = manager.version_marker_matches()
         assert not matches
 
         # Reinstall should rewrite the marker to the current Python version.
-        manager.install(
-            version=None,
-            url=dummy_xbuildenv_url,
-            skip_install_cross_build_packages=True,
-        )
+        manager.install(version=None, url=dummy_xbuildenv_url)
 
         matches, err = manager.version_marker_matches()
         assert matches, err
@@ -565,8 +644,9 @@ class TestCrossBuildEnvManager:
             marker_file.read_text()
             == f"{sys.version_info.major}.{sys.version_info.minor}"
         )
-        # Host-package marker dropped so packages get reinstalled lazily.
-        assert not cross_build_marker.exists()
+        # Host packages from the old Python version dropped, so they get
+        # reinstalled by the next build that needs them.
+        assert not numpy_dist_info.exists()
 
     def test_install_version_marker_match_no_marker_rewrite(
         self,
@@ -576,27 +656,21 @@ class TestCrossBuildEnvManager:
         monkeypatch_subprocess_run_pip,
     ):
         # When the marker already matches, a repeat install() should be a no-op
-        # and must not re-run installation work or drop the cross-build marker.
+        # and must not discard already-installed cross-build packages.
         manager = CrossBuildEnvManager(tmp_path)
 
-        manager.install(
-            version=None,
-            url=dummy_xbuildenv_url,
-            skip_install_cross_build_packages=True,
+        manager.install(version=None, url=dummy_xbuildenv_url)
+        manager.ensure_cross_build_packages_installed(["numpy"])
+        hostsitepackages = manager._host_site_packages_dir()
+        numpy_dist_info = hostsitepackages / (
+            _pinned(manager, "numpy").replace("==", "-") + ".dist-info"
         )
-        version = _url_to_version(dummy_xbuildenv_url)
-        download_path = tmp_path / version
-        cross_build_marker = download_path / ".cross-build-packages-installed"
-        cross_build_marker.touch()
+        assert numpy_dist_info.exists()
 
-        manager.install(
-            version=None,
-            url=dummy_xbuildenv_url,
-            skip_install_cross_build_packages=True,
-        )
+        manager.install(version=None, url=dummy_xbuildenv_url)
 
-        # Marker preserved (install did no work).
-        assert cross_build_marker.exists()
+        # Host packages preserved (install did no work).
+        assert numpy_dist_info.exists()
 
     def test_find_latest_version_empty_releases(self, tmp_path):
         # Regression test: empty releases metadata must produce a clear error,

@@ -177,28 +177,36 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
 
 
 def test_install_reqs_triggers_lazy_install(tmp_path, monkeypatch):
-    called = {"count": 0}
+    called = {"count": 0, "packages": None}
 
     class DummyManager:
-        def ensure_cross_build_packages_installed(self):
+        def ensure_cross_build_packages_installed(self, packages):
             called["count"] += 1
+            called["packages"] = set(packages)
 
     monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: True)
     monkeypatch.setattr(pypabuild, "get_current_xbuildenv_manager", DummyManager)
-    monkeypatch.setattr(pypabuild, "get_unisolated_packages", lambda: {"numpy": "1.0"})
+    monkeypatch.setattr(
+        pypabuild,
+        "get_unisolated_packages",
+        lambda: {"numpy": "1.0", "scipy": "2.0"},
+    )
     monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
 
     env = MockIsolatedEnv(tmp_path)
     pypabuild.install_reqs({}, env, {"numpy>=1.0"})
 
     assert called["count"] == 1
+    # Only the cross-build packages that are actually build dependencies get
+    # installed; scipy is not requested so it is left alone.
+    assert called["packages"] == {"numpy"}
 
 
 def test_install_reqs_skips_lazy_install_when_not_unisolated(tmp_path, monkeypatch):
     called = {"count": 0}
 
     class DummyManager:
-        def ensure_cross_build_packages_installed(self):
+        def ensure_cross_build_packages_installed(self, packages):
             called["count"] += 1
 
     monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: True)
