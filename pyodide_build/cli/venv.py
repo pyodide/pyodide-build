@@ -8,7 +8,7 @@ from pyodide_build.out_of_tree import venv
 
 # TODO: disabled options that can be later supported have been commented out, fix them
 # --copies/--always-copy and symlink_app_data
-@click.command()
+@click.command("venv")
 @click.argument("dest", type=click.Path(path_type=Path))
 @click.option(
     "--clear/--no-clear",

@@ -16,7 +16,7 @@ from pyodide_build.xbuildenv_releases import (
 )
 
 
-@click.group(invoke_without_command=True)
+@click.group("xbuildenv", invoke_without_command=True)
 @click.pass_context
 def app(ctx: click.Context) -> None:
     """Manage cross-build environment for building packages for Pyodide."""

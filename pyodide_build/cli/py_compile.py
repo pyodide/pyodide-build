@@ -6,7 +6,7 @@ import click
 from pyodide_build._py_compile import _py_compile_archive, _py_compile_archive_dir
 
 
-@click.command()
+@click.command("py-compile")
 @click.argument("path", type=click.Path(exists=True, path_type=Path))
 @click.option(
     "--silent/--no-silent",

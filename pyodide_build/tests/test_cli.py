@@ -1,9 +1,12 @@
 import shutil
 import sys
+import tomllib
 import zipfile
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -31,6 +34,19 @@ def assert_runner_succeeded(result):
 
         traceback.print_exception(result.exception)
     assert result.exit_code == 0
+
+
+def test_cli_entry_point_names_match_click_command_names():
+    pyproject = Path(__file__).parents[2] / "pyproject.toml"
+    entry_points = tomllib.loads(pyproject.read_text())["project"]["entry-points"][
+        "pyodide.cli"
+    ]
+
+    for entry_point_name, value in entry_points.items():
+        module_name, object_name = value.split(":")
+        command = getattr(import_module(module_name), object_name)
+        assert isinstance(command, click.Command)
+        assert command.name == entry_point_name
 
 
 def test_cli_import_does_not_resolve_xbuildenv_path(monkeypatch):
