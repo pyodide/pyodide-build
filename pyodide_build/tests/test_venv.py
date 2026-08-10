@@ -549,7 +549,7 @@ def test_pyodide_cli_script_runs_with_spaces_in_paths(tmp_path, monkeypatch):
 
     monkeypatch.setenv("PATH", f"{cli.parent}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("PYODIDE_ROOT", str(pyodide_root))
-    monkeypatch.setattr(shutil, "which", lambda name: str(cli))
+    monkeypatch.setattr(venv, "find_pyodide_cli", lambda: cli)
 
     pyodide_venv = _unix_venv_with_spaces(tmp_path)
     pyodide_venv._create_pyodide_script()
@@ -612,7 +612,7 @@ def test_windows_pyodide_cli_script_runs_with_spaces_in_paths(tmp_path, monkeypa
 
     monkeypatch.setenv("PATH", f"{cli.parent}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("PYODIDE_ROOT", str(pyodide_root))
-    monkeypatch.setattr(shutil, "which", lambda name: str(cli))
+    monkeypatch.setattr(venv, "find_pyodide_cli", lambda: cli)
 
     pyodide_venv = _windows_venv_with_spaces(tmp_path)
     pyodide_venv._create_pyodide_script()
@@ -625,6 +625,57 @@ def test_windows_pyodide_cli_script_runs_with_spaces_in_paths(tmp_path, monkeypa
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == [str(pyodide_root), "build ."]
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows resolves executables via PATHEXT"
+)
+def test_find_pyodide_cli_from_argv(monkeypatch, tmp_path):
+    """The CLI must be found when invoked by path with its dir not on PATH."""
+    bin_dir = tmp_path / "somevenv" / "bin"
+    bin_dir.mkdir(parents=True)
+    cli = bin_dir / "pyodide"
+    cli.touch()
+
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.setattr(sys, "argv", [str(cli), "venv"])
+    assert shutil.which("pyodide") is None
+
+    assert venv.find_pyodide_cli() == cli.resolve()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows resolves executables via PATHEXT"
+)
+def test_find_pyodide_cli_from_interpreter_dir(monkeypatch, tmp_path):
+    """Fall back to the scripts dir of the running interpreter."""
+    bin_dir = tmp_path / "somevenv" / "bin"
+    bin_dir.mkdir(parents=True)
+    cli = bin_dir / "pyodide"
+    cli.touch()
+    cli.chmod(0o755)
+
+    monkeypatch.setenv("PATH", "")
+    # argv[0] is a bare name, so it cannot be used to locate the CLI
+    monkeypatch.setattr(sys, "argv", ["pyodide", "venv"])
+    monkeypatch.setattr(sys, "executable", str(bin_dir / "python"))
+    monkeypatch.setattr(venv.sysconfig, "get_path", lambda name: str(tmp_path / "nope"))
+
+    assert venv.find_pyodide_cli() == cli.resolve()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows resolves executables via PATHEXT"
+)
+def test_find_pyodide_cli_not_found(monkeypatch, tmp_path):
+    """A helpful error is raised when the CLI really cannot be found."""
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.setattr(sys, "argv", ["pyodide", "venv"])
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "empty" / "python"))
+    monkeypatch.setattr(venv.sysconfig, "get_path", lambda name: str(tmp_path / "nope"))
+
+    with pytest.raises(RuntimeError, match="pyodide cli not found"):
+        venv.find_pyodide_cli()
 
 
 def test_cleanup_skips_preexisting_directory(monkeypatch, tmp_path):

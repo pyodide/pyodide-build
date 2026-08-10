@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
 ### Fixed
 
@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cross-build environment, or `PATH` contains a space. This previously broke
   `uv`-managed Pythons on macOS, which live under `Library/Application Support`.
   [#409](https://github.com/pyodide/pyodide-build/pull/409)
+
+- `pyodide venv` no longer fails with "pyodide cli not found" when the CLI is
+  invoked through an explicit path (e.g. `.venv/bin/pyodide venv`) without the
+  environment being activated. The CLI is now located relative to the running
+  interpreter instead of relying solely on `PATH`.
+  [#425](https://github.com/pyodide/pyodide-build/pull/425)
 
 ## [0.39.0] - 2026/08/03
 
@@ -65,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CMake's try_compile now uses the pywasmcross compiler wrappers.
   [416](https://github.com/pyodide/pyodide-build/pull/416)
+
 
 ## [0.37.0] - 2026/07/24
 
