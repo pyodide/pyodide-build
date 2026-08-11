@@ -6,7 +6,7 @@ import sys
 import sysconfig
 import traceback
 import warnings
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
@@ -141,7 +141,7 @@ def _copy_sysconfigdata_to_isolated_env(env: DefaultIsolatedEnv) -> None:
 
 def _replace_unisolated_packages(
     reqs: set[str], unisolated_packages: dict[str, str]
-) -> tuple[set[str], set[str]]:
+) -> tuple[set[str], dict[str, str]]:
     """
     Replace unisolated packages with the correct version.
 
@@ -154,7 +154,8 @@ def _replace_unisolated_packages(
 
     Returns
     -------
-    A tuple of (the filtered set of requirements, the set of unisolated requirements)
+    A tuple of (the filtered set of requirements, the unisolated requirements
+    that were found in ``reqs`` as a [name: version] dictionary)
     """
     canonical_unisolated = {
         canonicalize_name(name): (name, version)
@@ -162,7 +163,7 @@ def _replace_unisolated_packages(
     }
 
     new_reqs = reqs.copy()
-    unisolated: set[str] = set()
+    unisolated: dict[str, str] = {}
     for reqstr in reqs:
         req = Requirement(reqstr)
         # Evaluate the PEP 508 marker to see if the requirement
@@ -189,11 +190,11 @@ def _replace_unisolated_packages(
             )
         new_reqs.discard(reqstr)
         new_reqs.add(f"{name}=={version}")
-        unisolated.add(name)
+        unisolated[name] = version
     return new_reqs, unisolated
 
 
-def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
+def _install_cross_build_files(venv_path: str, unisolated: Collection[str]) -> None:
     """
     Install the cross build files (headers, .a libs, .pxd files) to the
     isolated environment's site packages.
@@ -204,7 +205,7 @@ def _install_cross_build_files(venv_path: str, unisolated: set[str]) -> None:
         The path to the isolated environment.
 
     unisolated
-        The set of unisolated packages.
+        The names of the unisolated packages.
     """
     if not unisolated:
         return
@@ -259,7 +260,9 @@ def install_reqs(
     reqs = remove_avoided_requirements(reqs, IGNORED_BUILD_REQUIREMENTS)
 
     if in_xbuildenv() and unisolated:
-        get_current_xbuildenv_manager().ensure_cross_build_packages_installed()
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed(
+            unisolated.items()
+        )
 
     # propagate PIP config from build_env to current environment
     with common.replace_env(
@@ -290,6 +293,7 @@ def _build_in_isolated_env(
     distribution: Literal["sdist", "wheel"],
     config_settings: ConfigSettingsType,
     verbosity: int = 0,
+    extra_build_requires: Sequence[str] = (),
 ) -> str:
     # For debugging: The following line disables removal of the isolated venv.
     # It will be left in the /tmp folder and can be inspected or entered as
@@ -305,7 +309,9 @@ def _build_in_isolated_env(
 
         # first install the build dependencies
         _copy_sysconfigdata_to_isolated_env(env)
-        install_reqs(build_env, env, builder.build_system_requires)
+        install_reqs(
+            build_env, env, builder.build_system_requires | set(extra_build_requires)
+        )
         build_reqs: set[str] | None = None
         try:
             build_reqs = builder.get_requires_for_build(
@@ -329,7 +335,7 @@ def _build_in_isolated_env(
                     config_settings,
                 )
 
-        install_reqs(build_env, env, build_reqs)
+        install_reqs(build_env, env, build_reqs | set(extra_build_requires))
 
         pkgconfig_dirs = _get_unisolated_pkgconfig_dirs(env.path)
         if pkgconfig_dirs:
@@ -547,6 +553,7 @@ def build(
     isolation: bool = True,
     skip_dependency_check: bool = False,
     verbosity: int = 0,
+    extra_build_requires: Sequence[str] = (),
 ) -> str:
     with _configure_build_verbosity(verbosity, _make_pypa_build_logger(verbosity)):
         try:
@@ -559,6 +566,7 @@ def build(
                         "wheel",
                         config_settings,
                         verbosity=verbosity,
+                        extra_build_requires=extra_build_requires,
                     )
                 else:
                     built = _build_in_current_env(

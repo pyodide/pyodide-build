@@ -12,7 +12,7 @@ from pyodide_build.logger import logger
 from pyodide_build.recipe import skeleton
 
 
-@click.group(invoke_without_command=True)
+@click.group("skeleton", invoke_without_command=True)
 @click.pass_context
 def app(ctx: click.Context) -> None:
     """Add a new package build recipe or update an existing recipe."""

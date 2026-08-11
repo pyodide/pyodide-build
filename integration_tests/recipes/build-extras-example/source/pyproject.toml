@@ -1,0 +1,14 @@
+[build-system]
+# NOTE: pkgconfig is intentionally *not* listed here. It is supplied by
+# requirements/build_extras in meta.yaml and imported by setup.py.
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "build-extras-example"
+version = "0.1.0"
+requires-python = ">=3.9"
+description = "Checks that requirements/build_extras reaches the isolated build environment"
+
+[tool.setuptools]
+packages = ["build_extras_example"]

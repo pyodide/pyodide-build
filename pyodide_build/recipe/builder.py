@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, cast
 
 import requests
-from packaging.utils import parse_wheel_filename
+from packaging.utils import canonicalize_name, parse_wheel_filename
 
 from pyodide_build import common, pypabuild
 from pyodide_build.build_env import (
@@ -26,9 +26,12 @@ from pyodide_build.build_env import (
     _create_constraints_file,
     get_build_environment_vars,
     get_build_flag,
+    get_current_xbuildenv_manager,
     get_pyodide_root,
     get_pyversion_major,
     get_pyversion_minor,
+    get_unisolated_packages,
+    in_xbuildenv,
     pyodide_tags,
     replace_so_abi_tags,
     wheel_platform,
@@ -310,11 +313,40 @@ class RecipeBuilder:
             self._prepare_source()
             self._patch()
 
+        self._ensure_cross_build_packages_for_host_requirements()
+
         with (
             chdir(self.pkg_root),
             get_bash_runner(self._get_helper_vars() | os.environ.copy()) as bash_runner,
         ):
             self._build_package(bash_runner)
+
+    def _ensure_cross_build_packages_for_host_requirements(self) -> None:
+        """
+        Install the cross-build packages this recipe lists in
+        `requirements/host` into the host site-packages before the build starts.
+
+        The PEP 517 build requirements are handled later by
+        `pypabuild.install_reqs`, but some recipes reach into the host
+        site-packages directly from their build script, which runs first. See
+        https://github.com/pyodide/pyodide-build/issues/365 for reference.
+        """
+        if not in_xbuildenv():
+            return
+
+        host_requirements = {
+            canonicalize_name(req) for req in self.recipe.requirements.host
+        }
+        needed = [
+            (name, version)
+            for name, version in get_unisolated_packages().items()
+            if canonicalize_name(name) in host_requirements
+        ]
+
+        if not needed:
+            return
+
+        get_current_xbuildenv_manager().ensure_cross_build_packages_installed(needed)
 
     def _check_executables(self) -> None:
         """
@@ -512,7 +544,11 @@ class RecipeBuilder:
             build_env["UV_BUILD_CONSTRAINT"] = constraints_file
 
             wheel_path = pypabuild.build(
-                self.src_extract_dir, self.src_dist_dir, build_env, config_settings
+                self.src_extract_dir,
+                self.src_dist_dir,
+                build_env,
+                config_settings,
+                extra_build_requires=self.recipe.requirements.build_extras,
             )
             check_versions_match(self.name, Path(wheel_path).name, self.version)
 
@@ -671,7 +707,10 @@ class RecipeBuilderPackage(RecipeBuilder):
                 Path(self.build_args.host_install_dir)
                 / f"lib/{python_dir}/site-packages"
             )
-            if self.build_metadata.cross_build_env:
+            if (
+                self.build_metadata.cross_build_env
+                and not self.build_metadata.cross_build_env_skip_install
+            ):
                 subprocess.run(
                     [
                         "pip",
@@ -706,11 +745,11 @@ class RecipeBuilderPackage(RecipeBuilder):
                     check=True,
                 )
 
-            for cross_build_file in self.build_metadata.cross_build_files:
-                shutil.copy(
-                    (wheel_dir / cross_build_file),
-                    host_site_packages / cross_build_file,
-                )
+                for cross_build_file in self.build_metadata.cross_build_files:
+                    shutil.copy(
+                        (wheel_dir / cross_build_file),
+                        host_site_packages / cross_build_file,
+                    )
 
 
 class RecipeBuilderStaticLibrary(RecipeBuilder):

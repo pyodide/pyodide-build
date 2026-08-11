@@ -181,6 +181,7 @@ lint.ignore = [
   "C408",    # Unnecessary `dict()` call
   "PERF401", # Replace for loops that build lists with list comprehension
   "PLW2901", # Redefined loop variable
+  "PLR0911", # Too many returns in function
   "PLR0912", # Too many branches in function
   "PLC0415"  # Import inside function or class
 ]

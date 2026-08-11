@@ -5,13 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Added
-
-- When the target Python is a pre-release, the
-  `PYO3_USE_ABI3_FORWARD_COMPATIBILITY` environment variable is now set for all
-  builds so that PyO3 packages will build against the unstable CPython version.
+## [Unreleased]
 
 ### Fixed
 
@@ -21,18 +15,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `uv`-managed Pythons on macOS, which live under `Library/Application Support`.
   [#409](https://github.com/pyodide/pyodide-build/pull/409)
 
+## [0.39.0] - 2026/08/03
+
+### Changed
+
+- `pyodide xbuildenv install` no longer installs cross-build packages at all.
+  Instead `pyodide build` and `pyodide build-recipes` install only the
+  cross-build packages that the package being built actually needs.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
+
+- `pyodide build-recipes` now installs the cross-build packages listed in a
+  recipe's `requirements/host` before the build script runs.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
+
+### Removed
+
+- Removed the deprecated no-op `--skip-cross-build-packages` flag and the
+  `PYODIDE_SKIP_CROSS_BUILD_PACKAGES` environment variable from `pyodide
+  xbuildenv install`.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
+
+## [0.38.0] - 2026/08/01
+
+### Added
+
+- When the target Python is a pre-release, the
+  `PYO3_USE_ABI3_FORWARD_COMPATIBILITY` environment variable is now set for all
+  builds so that PyO3 packages will build against the unstable CPython version.
+  [#405](https://github.com/pyodide/pyodide-build/pull/405)
+
+- Added `requirements.build-extras` field to meta.yaml spec. Requirements listed
+  will be installed into the isolated build virtual environment.
+  [#412](https://github.com/pyodide/pyodide-build/pull/412)
+
 ### Changed
 
 - Replaced the `pydantic` dependency with `attrs` + `cattrs` for recipe
   (`meta.yaml`) and cross-build environment metadata parsing/validation.
   Recipe validation errors now raise `pyodide_build.recipe.spec.SpecValidationError`
   instead of `pydantic.ValidationError`.
+  [#402](https://github.com/pyodide/pyodide-build/pull/402)
 
 - The `rustflags` config is now applied via the target-specific
   `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS` environment variable instead
   of the global `RUSTFLAGS`, so the flags only affect the
   `wasm32-unknown-emscripten` target and no longer leak into host builds of
   build-dependencies and proc-macros.
+  [#404](https://github.com/pyodide/pyodide-build/pull/404)
+
+- CMake's try_compile now uses the pywasmcross compiler wrappers.
+  [416](https://github.com/pyodide/pyodide-build/pull/416)
 
 ## [0.37.0] - 2026/07/24
 

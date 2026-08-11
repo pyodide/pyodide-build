@@ -119,6 +119,9 @@ class _BuildSpec:
     )
     vendor_sharedlib: bool = _afield(True, alias="vendor-sharedlib")
     cross_build_env: bool = _afield(False, alias="cross-build-env")
+    cross_build_env_skip_install: bool = _afield(
+        False, alias="_cross-build-env-skip-install"
+    )
     cross_build_files: list[str] = _afield(factory=list, alias="cross-build-files")
 
     @classmethod
@@ -155,6 +158,7 @@ class _BuildSpec:
 class _RequirementsSpec:
     run: list[str] = _afield(factory=list)
     host: list[str] = _afield(factory=list)
+    build_extras: list[str] = _afield(factory=list, alias="build-extras")
     executable: list[str] = _afield(factory=list)
     constraint: list[str] = _afield(factory=list)
 
@@ -256,6 +260,7 @@ class MetaConfig:
             allowed_keys = {
                 "post",
                 "cross_build_env",
+                "cross_build_env_skip_install",
                 "cross_build_files",
                 "exports",
                 "unvendor_tests",
