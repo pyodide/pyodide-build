@@ -460,6 +460,173 @@ def test_pip_script_name_helper(tmp_path, script_name, exe_suffix, expected_name
     assert result.name == expected_name
 
 
+def _unix_venv_with_spaces(tmp_path):
+    """Build a ``UnixPyodideVenv`` whose paths all contain spaces"""
+    dest = tmp_path / "my venv"
+    bin_dir = dest / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+
+    pyodide_venv = venv.UnixPyodideVenv(dest)
+    pyodide_venv._venv_root = dest
+    pyodide_venv._venv_bin = bin_dir
+    return pyodide_venv
+
+
+def _run_shell_wrapper(script: Path, *args: str) -> subprocess.CompletedProcess:
+    """Run a wrapper script through bash and capture what it printed.
+
+    The wrapper's shebang is not always on the first line, which is fine for a
+    shell but not for ``execve``, so the interpreter is named explicitly here.
+    """
+    return subprocess.run(
+        ["bash", str(script), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
+def test_host_python_wrapper_runs_with_spaces_in_paths(tmp_path, monkeypatch):
+    """A host Python under a path with spaces must not be split by the shell.
+
+    Regression test for https://github.com/pyodide/pyodide-build/issues/399:
+    a uv-managed Python on macOS lives under ``Library/Application Support``,
+    and the unquoted ``PYTHONHOME=`` assignment made ``env`` treat everything
+    after the space as a command name.
+    """
+    fake_python = tmp_path / "Application Support" / "uv" / "bin" / "python3"
+    fake_python.parent.mkdir(parents=True)
+    monkeypatch.setattr(sys, "executable", str(fake_python), raising=False)
+    monkeypatch.setattr(sys, "_base_executable", str(fake_python), raising=False)
+
+    pyodide_venv = _unix_venv_with_spaces(tmp_path)
+    # Stand in for the real interpreter. Echo back PYTHONHOME and the arguments.
+    pyodide_venv.host_python_symlink_path.write_text(
+        '#!/bin/sh\necho "$PYTHONHOME"\necho "$@"\n'
+    )
+    pyodide_venv.host_python_symlink_path.chmod(0o755)
+
+    pyodide_venv.host_python_path.write_text(pyodide_venv.host_python_wrapper)
+    pyodide_venv.host_python_path.chmod(0o755)
+
+    result = _run_shell_wrapper(pyodide_venv.host_python_path, "-c", "pass")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        str(tmp_path / "Application Support" / "uv"),
+        "-c pass",
+    ]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
+def test_host_pip_wrapper_runs_with_spaces_in_paths(tmp_path):
+    """``pip_patched`` must reach the host Python across a path with spaces."""
+    pyodide_venv = _unix_venv_with_spaces(tmp_path)
+
+    # Stand in for the real interpreter. Echo back the arguments.
+    pyodide_venv.host_python_path.write_text('#!/bin/sh\necho "$@"\n')
+    pyodide_venv.host_python_path.chmod(0o755)
+
+    pip = pyodide_venv.pip_patched_path
+    pip.write_text(pyodide_venv.host_pip_wrapper)
+    pip.chmod(0o755)
+
+    result = _run_shell_wrapper(pip, "install", "six")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == f"-s {pyodide_venv.pip_wrapper_path} install six"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
+def test_pyodide_cli_script_runs_with_spaces_in_paths(tmp_path, monkeypatch):
+    """PATH/PYODIDE_ROOT entries with spaces must not break the pyodide shim."""
+    pyodide_root = tmp_path / "Application Support" / "pyodide-build"
+    pyodide_root.mkdir(parents=True)
+    cli = tmp_path / "some dir" / "pyodide"
+    cli.parent.mkdir()
+    # Stand in for the real CLI. Echo back PYODIDE_ROOT and the arguments.
+    cli.write_text('#!/bin/sh\necho "$PYODIDE_ROOT"\necho "$@"\n')
+    cli.chmod(0o755)
+
+    monkeypatch.setenv("PATH", f"{cli.parent}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("PYODIDE_ROOT", str(pyodide_root))
+    monkeypatch.setattr(shutil, "which", lambda name: str(cli))
+
+    pyodide_venv = _unix_venv_with_spaces(tmp_path)
+    pyodide_venv._create_pyodide_script()
+
+    result = _run_shell_wrapper(pyodide_venv.pyodide_cli_path, "build", ".")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [str(pyodide_root), "build ."]
+
+
+def _windows_venv_with_spaces(tmp_path):
+    """Build a ``WindowsPyodideVenv`` rooted somewhere like ``C:\\Program Files``"""
+    dest = tmp_path / "Program Files" / "my venv"
+    scripts_dir = dest / "Scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+
+    pyodide_venv = venv.WindowsPyodideVenv(dest)
+    pyodide_venv._venv_root = dest
+    pyodide_venv._venv_bin = scripts_dir
+    return pyodide_venv
+
+
+@pytest.mark.windows
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only batch wrappers")
+def test_windows_host_pip_wrapper_runs_with_spaces_in_paths(tmp_path):
+    """``pip_patched`` must reach the host Python across a path with spaces."""
+    pyodide_venv = _windows_venv_with_spaces(tmp_path)
+
+    # Stand in for the real interpreter. Echo back the arguments.
+    pyodide_venv.host_python_path.write_text("@echo off\r\necho %*\r\n")
+    # In a real venv ``pip.bat`` is a symlink to ``pip_patched``. Here the
+    # ``.bat`` extension is what makes the file executable by cmd.
+    pip = pyodide_venv.venv_bin / "pip.bat"
+    pip.write_text(pyodide_venv.host_pip_wrapper)
+
+    result = subprocess.run(
+        [str(pip), "install", "six"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == f'-s "{pyodide_venv.pip_wrapper_path}" install six'
+
+
+@pytest.mark.windows
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only batch wrappers")
+def test_windows_pyodide_cli_script_runs_with_spaces_in_paths(tmp_path, monkeypatch):
+    """PATH/PYODIDE_ROOT with spaces must round-trip through ``pyodide.bat``.
+
+    ``set`` needs its quoted form here. Without the quotes cmd takes the rest
+    of the line verbatim, so a trailing space ends up in the value and an
+    ``&`` in a directory name is read as a command separator.
+    """
+    pyodide_root = tmp_path / "Program Files" / "pyodide-build"
+    pyodide_root.mkdir(parents=True)
+    cli = tmp_path / "Program Files (x86)" / "pyodide.bat"
+    cli.parent.mkdir(parents=True)
+    # Stand in for the real CLI. Echo back PYODIDE_ROOT and the arguments.
+    cli.write_text("@echo off\r\necho %PYODIDE_ROOT%\r\necho %*\r\n")
+
+    monkeypatch.setenv("PATH", f"{cli.parent}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("PYODIDE_ROOT", str(pyodide_root))
+    monkeypatch.setattr(shutil, "which", lambda name: str(cli))
+
+    pyodide_venv = _windows_venv_with_spaces(tmp_path)
+    pyodide_venv._create_pyodide_script()
+
+    result = subprocess.run(
+        [str(pyodide_venv.pyodide_cli_path), "build", "."],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [str(pyodide_root), "build ."]
+
+
 def test_cleanup_skips_preexisting_directory(monkeypatch, tmp_path):
     """A failed venv creation must not delete a pre-existing destination."""
     dest = tmp_path / "existing-venv"

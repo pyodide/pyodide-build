@@ -24,7 +24,7 @@ jobs:
     name: test (${{ matrix.os }}, python ${{ matrix.python-version }})
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         # To add a version, see pyodide_build/tests/_test_xbuildenv/README.md
         python-version: ["3.13", "3.14"]
       fail-fast: false
@@ -54,6 +54,7 @@ jobs:
           pip install -e ".[resolve]" --group test
 
       - name: Run tests
+        if: runner.os != 'Windows'
         run: |
           pytest \
             --junitxml=test-results/junit.xml \
@@ -61,7 +62,15 @@ jobs:
             pyodide_build \
             -m "not integration"
 
+      # The rest of the suite has never been run on Windows, so for now this
+      # is scoped to the tests that are specifically about Windows behaviour.
+      - name: Run tests marked with windows
+        if: runner.os == 'Windows'
+        run: pytest pyodide_build/tests/test_venv.py -m windows
+
       - name: Upload coverage
+        # the Windows leg runs too little of the suite to be worth measuring
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-no-integration-${{ matrix.os }}-${{ matrix.python-version }}
@@ -264,7 +273,7 @@ jobs:
           include-hidden-files: true
 
   test-venv:
-    name: test-venv (${{ matrix.os }}, python ${{ matrix.python-version }})
+    name: test-venv (${{ matrix.os }}, python ${{ matrix.python-version }}, ${{ matrix.python-source }})
     runs-on: ${{ matrix.os }}
     needs: [check-integration-test-trigger]
     strategy:
@@ -272,6 +281,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.13", "3.14"]
+        python-source: [gha-python, uv-managed]
 
     if: needs.check-integration-test-trigger.outputs.run-integration-test
     steps:
@@ -280,9 +290,34 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Python
+        if: matrix.python-source == 'gha-python'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        if: matrix.python-source == 'uv-managed'
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Set up a uv-managed Python
+        if: matrix.python-source == 'uv-managed'
+        shell: bash
+        env:
+          # never fall back to a system Python
+          UV_PYTHON_PREFERENCE: only-managed
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: |
+          set -ex
+          uv python install "$PYTHON_VERSION"
+          # log the interpreter path, which on macOS is under Application Support
+          uv python find "$PYTHON_VERSION"
+          # --seed gives us pip, which the steps below and the venv test need
+          uv venv --seed --python "$PYTHON_VERSION" .venv-uv-host
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "$GITHUB_WORKSPACE/.venv-uv-host/Scripts" >> "$GITHUB_PATH"
+          else
+            echo "$GITHUB_WORKSPACE/.venv-uv-host/bin" >> "$GITHUB_PATH"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

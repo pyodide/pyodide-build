@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The wrapper scripts written into a Pyodide virtual environment now quote every
+  interpolated path, so `pyodide venv` works when the host Python, the
+  cross-build environment, or `PATH` contains a space. This previously broke
+  `uv`-managed Pythons on macOS, which live under `Library/Application Support`.
+  [#409](https://github.com/pyodide/pyodide-build/pull/409)
+
 ## [0.39.0] - 2026/08/03
 
 ### Changed
