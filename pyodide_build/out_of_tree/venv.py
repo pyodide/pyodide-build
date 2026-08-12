@@ -4,6 +4,7 @@ import os
 import shlex
 import shutil
 import sys
+import sysconfig
 import textwrap
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -67,6 +68,44 @@ def _pip_script_name(pip: Path, exe_suffix: str) -> Path:
         return pip
     base_name = pip.stem if pip.suffix else pip.name
     return pip.parent / (base_name + exe_suffix)
+
+
+def find_pyodide_cli() -> Path:
+    """Locate the ``pyodide`` CLI executable
+
+    Priority:
+    1. If sys.argv[0] is a fully qualified path, use that.
+    2. Search in the venv scripts directory.
+    3. Search next to the current running executable.
+    4. Look on the path
+    """
+    # sys.argv[0] is the script itself for console entrypoints, but it may be a
+    # bare name if the shell resolved it through PATH.
+    argv0 = Path(sys.argv[0])
+    is_bare = argv0.parent == Path()
+    if (not is_bare) and argv0.is_file():
+        return argv0.resolve()
+
+    # Directories that belong to the environment that is currently running,
+    # searched with `shutil.which` so that PATHEXT is honored on Windows.
+    search_dirs = [
+        sysconfig.get_path("scripts"),
+        str(Path(sys.executable).parent),
+    ]
+    for search_dir in search_dirs:
+        cli = shutil.which("pyodide", path=search_dir)
+        if cli:
+            return Path(cli).resolve()
+
+    cli = shutil.which("pyodide")
+    if cli:
+        return Path(cli).resolve()
+
+    raise RuntimeError(
+        "ERROR: pyodide cli not found. "
+        "Make sure the pyodide-build package is installed in the environment "
+        f"of {sys.executable}"
+    )
 
 
 def get_pyversion() -> str:
@@ -552,15 +591,13 @@ class UnixPyodideVenv(PyodideVenv):
         PATH = os.environ["PATH"]
         PYODIDE_ROOT = os.environ["PYODIDE_ROOT"]
 
-        original_pyodide_cli = shutil.which("pyodide")
-        if original_pyodide_cli is None:
-            raise RuntimeError("ERROR: pyodide cli not found")
+        original_pyodide_cli = find_pyodide_cli()
 
         self.pyodide_cli_path.write_text(
             dedent(
                 f"""
                 #!/usr/bin/env bash
-                PATH={shlex.quote(PATH)}:"$PATH" PYODIDE_ROOT={shlex.quote(PYODIDE_ROOT)} exec {shlex.quote(original_pyodide_cli)} "$@"
+                PATH={shlex.quote(PATH)}:"$PATH" PYODIDE_ROOT={shlex.quote(PYODIDE_ROOT)} exec {shlex.quote(str(original_pyodide_cli))} "$@"
                 """
             )
         )
@@ -650,9 +687,7 @@ class WindowsPyodideVenv(PyodideVenv):
         PATH = os.environ["PATH"]
         PYODIDE_ROOT = os.environ["PYODIDE_ROOT"]
 
-        original_pyodide_cli = shutil.which("pyodide")
-        if original_pyodide_cli is None:
-            raise RuntimeError("ERROR: pyodide cli not found")
+        original_pyodide_cli = find_pyodide_cli()
 
         self.pyodide_cli_path.write_text(
             dedent(
