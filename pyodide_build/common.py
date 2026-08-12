@@ -106,13 +106,17 @@ def default_xbuildenv_path() -> Path:
 
 def _has_write_access(folder: Path) -> bool:
     """
-    Checks if the current user has write access to the given folder using pathlib.
+    Checks if the current user has write access to the given folder by creating
+    a file in it.
     """
     try:
         if not folder.exists() and folder.parent != folder:
             return _has_write_access(folder.parent)
 
-        return os.access(str(folder), os.W_OK)
+        probe = folder / f".write-probe-{os.urandom(8).hex()}"
+        probe.touch(exist_ok=False)
+        probe.unlink(missing_ok=True)
+        return True
     except OSError:
         return False
 
