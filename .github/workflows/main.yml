@@ -66,7 +66,7 @@ jobs:
       # is scoped to the tests that are specifically about Windows behaviour.
       - name: Run tests marked with windows
         if: runner.os == 'Windows'
-        run: pytest pyodide_build/tests/test_venv.py -m windows
+        run: pytest pyodide_build -m windows
 
       - name: Upload coverage
         # the Windows leg runs too little of the suite to be worth measuring
