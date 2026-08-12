@@ -272,6 +272,7 @@ def test_default_xbuildenv_path_env_var(tmp_path, reset_cache, monkeypatch):
     assert default_xbuildenv_path() == baseline_path
 
 
+@pytest.mark.windows
 def test_default_xbuildenv_path_env_var_non_writable(
     tmp_path, reset_cache, monkeypatch, request
 ):
