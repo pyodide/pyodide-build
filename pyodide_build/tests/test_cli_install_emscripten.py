@@ -3,6 +3,7 @@
 import subprocess
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from pyodide_build.cli import xbuildenv
@@ -11,6 +12,7 @@ from pyodide_build.common import emsdk_activation_command
 runner = CliRunner()
 
 
+@pytest.mark.windows
 def test_install_emscripten_no_xbuildenv(tmp_path):
     """Test that install-emscripten fails when no xbuildenv exists"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -28,6 +30,7 @@ def test_install_emscripten_no_xbuildenv(tmp_path):
     assert "Cross-build environment not found" in result.output, result.output
 
 
+@pytest.mark.windows
 def test_install_emscripten_default_version(tmp_path, monkeypatch):
     """Test installing Emscripten with default version"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -66,6 +69,7 @@ def test_install_emscripten_default_version(tmp_path, monkeypatch):
     assert called["version"] == "3.1.46"
 
 
+@pytest.mark.windows
 def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     """Test installing Emscripten with a specific version"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -100,6 +104,7 @@ def test_install_emscripten_specific_version(tmp_path, monkeypatch):
     assert called["version"] == emscripten_version
 
 
+@pytest.mark.windows
 def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     """Test installing Emscripten when emsdk already exists (should pull updates)"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -138,6 +143,7 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     assert emsdk_activation_command(existing_emsdk) in result.output
 
 
+@pytest.mark.windows
 def test_install_emscripten_git_failure(tmp_path, monkeypatch):
     """Test handling of git clone failure"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -164,6 +170,7 @@ def test_install_emscripten_git_failure(tmp_path, monkeypatch):
     assert isinstance(result.exception, subprocess.CalledProcessError)
 
 
+@pytest.mark.windows
 def test_install_emscripten_emsdk_install_failure(tmp_path, monkeypatch):
     """Test handling of emsdk install command failure"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -190,6 +197,7 @@ def test_install_emscripten_emsdk_install_failure(tmp_path, monkeypatch):
     assert isinstance(result.exception, subprocess.CalledProcessError)
 
 
+@pytest.mark.windows
 def test_install_emscripten_force_flag(tmp_path, monkeypatch):
     """Test that --force flag triggers reinstallation"""
     envpath = Path(tmp_path) / ".xbuildenv"
@@ -226,6 +234,7 @@ def test_install_emscripten_force_flag(tmp_path, monkeypatch):
     assert called["version"] == "3.1.46"
 
 
+@pytest.mark.windows
 def test_install_emscripten_output_format(tmp_path, monkeypatch):
     """Test that the output message format is correct"""
     envpath = Path(tmp_path) / ".xbuildenv"
