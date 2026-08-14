@@ -6,6 +6,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from pyodide_build.cli import xbuildenv
+from pyodide_build.common import emsdk_activation_command
 
 runner = CliRunner()
 
@@ -60,8 +61,8 @@ def test_install_emscripten_default_version(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "Installing emsdk..." in result.output, result.output
     assert "Installing emsdk complete." in result.output, result.output
-    assert "Use `source" in result.output, result.output
-    assert "emsdk_env.sh` to set up the environment." in result.output, result.output
+    cmd = emsdk_activation_command(envpath / "emsdk")
+    assert f"Use `{cmd}` to set up the environment." in result.output, result.output
     assert called["version"] == "3.1.46"
 
 
@@ -134,7 +135,7 @@ def test_install_emscripten_with_existing_emsdk(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "Installing emsdk..." in result.output, result.output
     assert "Installing emsdk complete." in result.output, result.output
-    assert str(existing_emsdk / "emsdk_env.sh") in result.output
+    assert emsdk_activation_command(existing_emsdk) in result.output
 
 
 def test_install_emscripten_git_failure(tmp_path, monkeypatch):
@@ -256,5 +257,5 @@ def test_install_emscripten_output_format(tmp_path, monkeypatch):
     # Verify output format - check for key messages (logger adds extra lines)
     assert "Installing emsdk..." in result.output
     assert "Installing emsdk complete." in result.output
-    assert "Use `source" in result.output
-    assert "emsdk_env.sh` to set up the environment." in result.output
+    cmd = emsdk_activation_command(expected_path)
+    assert f"Use `{cmd}` to set up the environment." in result.output, result.output
