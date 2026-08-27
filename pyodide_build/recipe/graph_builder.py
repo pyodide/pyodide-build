@@ -907,7 +907,7 @@ def generate_lockfile(
     [platform, _, arch] = build_env.platform().rpartition("_")
     info = InfoSpec(
         arch=cast(Literal["wasm32", "wasm64"], arch),
-        platform=platform,
+        platform=build_env.wheel_platform(),
         version=build_env.get_build_flag("PYODIDE_VERSION"),
         python=build_env.get_build_flag("PYVERSION"),
         abi_version=build_env.get_build_flag("PYODIDE_ABI_VERSION"),
