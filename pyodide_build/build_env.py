@@ -503,15 +503,17 @@ def ensure_emscripten(skip_install: bool = False) -> None:
 
     # Parse and check version
     installed_version = None
-    try:
-        for x in reversed(version_info.partition("\n")[0].split(" ")):
+    for line in version_info.splitlines():
+        if not line.startswith("emcc "):
+            continue
+        for x in reversed(line.split()):
             # (X.Y.Z) or (X.Y.Z)-git
             match = re.match(r"(\d+\.\d+\.\d+)(-\w+)?", x)
             if match:
                 installed_version = match.group(1)
                 break
-    except Exception:
-        raise RuntimeError("Failed to determine Emscripten version.") from None
+        if installed_version is not None:
+            break
 
     if installed_version is None:
         raise RuntimeError("Failed to determine Emscripten version.")
