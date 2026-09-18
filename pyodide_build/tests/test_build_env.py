@@ -409,9 +409,7 @@ def test_ensure_emscripten_already_installed(dummy_xbuildenv, monkeypatch):
     assert not install_called
 
 
-def test_ensure_emscripten_ignores_output_before_version(
-    dummy_xbuildenv, monkeypatch
-):
+def test_ensure_emscripten_ignores_output_before_version(dummy_xbuildenv, monkeypatch):
     needed_version = build_env.emscripten_version()
 
     def mock_get_emscripten_version_info():
