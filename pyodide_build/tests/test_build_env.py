@@ -409,6 +409,24 @@ def test_ensure_emscripten_already_installed(dummy_xbuildenv, monkeypatch):
     assert not install_called
 
 
+def test_ensure_emscripten_ignores_output_before_version(dummy_xbuildenv, monkeypatch):
+    needed_version = build_env.emscripten_version()
+
+    def mock_get_emscripten_version_info():
+        return (
+            "config:DEBUG: using config file with Python 3.12.1\n"
+            "shared:INFO: (Emscripten: Running sanity checks)\n"
+            f"emcc (Emscripten) {needed_version} (abc123)\n"
+            "clang version 15.0.0"
+        )
+
+    monkeypatch.setattr(
+        build_env, "get_emscripten_version_info", mock_get_emscripten_version_info
+    )
+
+    build_env.ensure_emscripten()
+
+
 def test_ensure_emscripten_version_mismatch(dummy_xbuildenv, monkeypatch):
     needed_version = build_env.emscripten_version()
     wrong_version = "3.1.0"
