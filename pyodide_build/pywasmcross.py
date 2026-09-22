@@ -669,11 +669,6 @@ def handle_command(
     if isinstance(new_args, ExitCodeWithReason):
         return new_args
 
-    if build_args.pkgname == "scipy":
-        from _f2c_fixes import scipy_fixes
-
-        scipy_fixes(new_args)
-
     result = sp_run(new_args, check=False)
     return result.returncode
 
