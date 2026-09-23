@@ -66,7 +66,7 @@ repos:
           - unearth
           - resolvelib
           - rich
-          - auditwheel_emscripten
+          - auditwheel_emscripten~=0.3.0
           - pyodide-lock~=0.2.0
           - virtualenv
           - sphinx
