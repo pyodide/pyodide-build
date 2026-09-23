@@ -857,6 +857,7 @@ def copy_sharedlibs(
     modify_rpath: bool = False,
 ) -> dict[str, Path]:
     from auditwheel_emscripten import copylib, modify_runtime_path, resolve_sharedlib
+    from auditwheel_emscripten.repair import modify_needed
     from auditwheel_emscripten.wheel_utils import WHEEL_INFO_RE
 
     match = WHEEL_INFO_RE.match(wheel_file.name)
@@ -869,7 +870,13 @@ def copy_sharedlibs(
     )
     lib_sdir: str = match.group("name") + ".libs"
     if dep_map:
+        # The copied libraries get a content hash appended to their names, and
+        # the dylink "needed" entries of every shared library in the wheel are
+        # rewritten to match. This ensures that the vendored copy is the one
+        # that gets loaded even when a library with the same name is present
+        # on LD_LIBRARY_PATH (e.g., from a shared library package in /usr/lib).
         dep_map_new = copylib(wheel_dir, dep_map, lib_sdir)
+        modify_needed(wheel_dir, dep_map_new)
         if modify_rpath:
             modify_runtime_path(wheel_dir, lib_sdir)
         logger.info("Copied shared libraries:")
