@@ -672,3 +672,25 @@ def remove_readonly(func, path, _):
     """
     os.chmod(path, stat.S_IWRITE)
     func(path)
+
+
+def emsdk_activation_command(emsdk_dir: Path) -> str:
+    """
+    Get the command to activate the given emsdk directory for the current shell.
+
+    Parameters
+    ----------
+    emsdk_dir
+        Path to the emsdk directory containing the emsdk_env script
+
+    Returns
+    -------
+    str
+        The command to run to activate the emsdk environment.
+    """
+    if IS_WIN:
+        return f"{emsdk_dir}/emsdk_env.bat"
+
+    shell = os.getenv("SHELL")
+    suffix = "fish" if shell and Path(shell).name == "fish" else "sh"
+    return f"source {emsdk_dir}/emsdk_env.{suffix}"
