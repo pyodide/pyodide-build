@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- Bumped the `auditwheel-emscripten` requirement to `~=0.3.0`. Shared libraries
+  copied into a wheel, both by `pyodide auditwheel repair` and when vendoring
+  shared libraries in `pyodide build-recipes`, now get a content hash appended
+  to their filenames, and the dependent modules are patched to match. This
+  ensures that the vendored copy is the one that gets loaded, even if a
+  library with the same name is present on `LD_LIBRARY_PATH`. Pass
+  `--no-mangle` to `pyodide auditwheel repair` to keep the previous filenames.
+  [#434](https://github.com/pyodide/pyodide-build/pull/434)
+
 ### Fixed
 
 - The wrapper scripts written into a Pyodide virtual environment now quote every

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import attrs
 import pytest
+from auditwheel_emscripten.emscripten_tools.webassembly import parse_dylink_section
+from auditwheel_emscripten.lib_utils import get_all_shared_libs_in_dir
 
 from pyodide_build import common
 from pyodide_build.build_env import BuildArgs, get_build_flag, pyodide_tags
@@ -353,9 +355,24 @@ def test_copy_sharedlib(tmp_path, modify_rpath):
 
     dep_map = _builder.copy_sharedlibs(wheel_copy, wheel_dir, libdir, modify_rpath)
 
+    lib_dir = wheel_dir / "sharedlib_test_py.libs"
     deps = ("sharedlib-test.so", "sharedlib-test-dep.so", "sharedlib-test-dep2.so")
     for dep in deps:
         assert dep in dep_map
+        copied = dep_map[dep]
+        assert copied.is_file()
+        assert copied.parent == lib_dir
+        # The copied library is renamed with a content hash
+        stem = dep.split(".", 1)[0]
+        assert copied.name != dep
+        assert copied.name.startswith(f"{stem}-")
+
+    # Every dependency declared by a shared library in the wheel must refer
+    # to a (mangled) file that exists in the wheel
+    copied_names = {path.name for path in lib_dir.iterdir()}
+    for shared_lib in get_all_shared_libs_in_dir(wheel_dir):
+        for needed in parse_dylink_section(shared_lib).needed:
+            assert needed in copied_names, f"{shared_lib.name} needs {needed}"
 
 
 def test_extract_tarballname():
