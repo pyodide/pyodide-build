@@ -1,6 +1,10 @@
+import ast
+import json
 import os
+import shlex
 import shutil
 import sys
+import sysconfig
 import textwrap
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -66,6 +70,44 @@ def _pip_script_name(pip: Path, exe_suffix: str) -> Path:
     return pip.parent / (base_name + exe_suffix)
 
 
+def find_pyodide_cli() -> Path:
+    """Locate the ``pyodide`` CLI executable
+
+    Priority:
+    1. If sys.argv[0] is a fully qualified path, use that.
+    2. Search in the venv scripts directory.
+    3. Search next to the current running executable.
+    4. Look on the path
+    """
+    # sys.argv[0] is the script itself for console entrypoints, but it may be a
+    # bare name if the shell resolved it through PATH.
+    argv0 = Path(sys.argv[0])
+    is_bare = argv0.parent == Path()
+    if (not is_bare) and argv0.is_file():
+        return argv0.resolve()
+
+    # Directories that belong to the environment that is currently running,
+    # searched with `shutil.which` so that PATHEXT is honored on Windows.
+    search_dirs = [
+        sysconfig.get_path("scripts"),
+        str(Path(sys.executable).parent),
+    ]
+    for search_dir in search_dirs:
+        cli = shutil.which("pyodide", path=search_dir)
+        if cli:
+            return Path(cli).resolve()
+
+    cli = shutil.which("pyodide")
+    if cli:
+        return Path(cli).resolve()
+
+    raise RuntimeError(
+        "ERROR: pyodide cli not found. "
+        "Make sure the pyodide-build package is installed in the environment "
+        f"of {sys.executable}"
+    )
+
+
 def get_pyversion() -> str:
     return f"{sys.version_info.major}.{sys.version_info.minor}"
 
@@ -103,7 +145,7 @@ class PyodideVenv(ABC):
         self._pyodide_pyversion: tuple[int, int] | None = None
 
     @property
-    def venv_root(self) -> Path | None:
+    def venv_root(self) -> Path:
         """Get the path to the virtualenv's root directory."""
         if self._venv_root is None:
             raise RuntimeError("venv_root is not set")
@@ -111,7 +153,7 @@ class PyodideVenv(ABC):
         return self._venv_root
 
     @property
-    def venv_bin(self) -> Path | None:
+    def venv_bin(self) -> Path:
         """Get the path to the virtualenv's bin directory."""
         if self._venv_bin is None:
             raise RuntimeError("venv_bin is not set")
@@ -312,10 +354,11 @@ class PyodideVenv(ABC):
             err_msg="ERROR: failed to install unvendored stdlib modules",
         )
 
-    def _get_pip_monkeypatch(self) -> str:
-        """Monkey patch pip's environment to show info about Pyodide's environment.
+    def _get_pyodide_pip_config(self) -> dict[str, Any]:
+        """Compute the config used by the pip wrapper to emulate Pyodide's environment.
 
-        The code returned is injected at the beginning of the pip script.
+        The returned dict is serialized to ``pyodide_pip_config.json`` next to the
+        pip wrapper script and loaded by ``pip_wrapper.py`` at runtime.
         """
         result = run_command(
             [
@@ -338,151 +381,17 @@ class PyodideVenv(ABC):
             ],
             err_msg="ERROR: failed to invoke Pyodide",
         )
-        platform_data = result.stdout
-        sysconfigdata_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
-        pip_patched_name = self.pip_patched_path.name
-        exe_suffix = self.exe_suffix
-        pyodide_platform = wheel_platform()
-        return dedent(
-            """\
-            import os
-            import platform
-            import sys
-            import pathlib
-            """
-            # when pip installs an executable it uses sys.executable to create the
-            # shebang for the installed executable. The shebang for pip points to
-            # python-host but we want the shebang of the executable that we install
-            # to point to Pyodide python. We monkeypatch distlib.scripts.get_executable
-            # to return the value with the host suffix removed.
-            f"""
-            from pip._vendor.distlib import scripts
-            EXECUTABLE_SUFFIX = "{self.host_python_symlink_suffix}"
-            def get_executable():
-                if not sys.executable.endswith(EXECUTABLE_SUFFIX):
-                    raise RuntimeError(f'Internal Pyodide error: expected sys.executable="{{sys.executable}}" to end with "{{EXECUTABLE_SUFFIX}}"')
-                return sys.executable.removesuffix(EXECUTABLE_SUFFIX)
-
-            scripts.get_executable = get_executable
-
-            from pip._vendor.packaging import tags
-            orig_platform_tags = tags.platform_tags
-            """
-            # TODO: Remove the following monkeypatch when we merge and pull in
-            # https://github.com/pypa/packaging/pull/804
-            """
-            def _emscripten_platforms():
-                pyodide_abi_version = sysconfig.get_config_var("PYODIDE_ABI_VERSION")
-                if pyodide_abi_version:
-                    yield f"pyemscripten_{pyodide_abi_version}_wasm32"
-                    yield f"pyodide_{pyodide_abi_version}_wasm32"
-                yield from tags._generic_platforms()
-
-            def platform_tags():
-                if platform.system() == "Emscripten":
-                    yield from _emscripten_platforms()
-                    return
-                return orig_platform_tags()
-
-            tags.platform_tags = platform_tags
-            """
-            f"""
-            os_name, sys_platform, platform_system, multiarch, host_platform = {platform_data}
-
-            os.getuid = os.getuid if hasattr(os, "getuid") else lambda: 0
-            sys.platlibdir = "lib"
-            sys.implementation._multiarch = multiarch
-            sys.abiflags = getattr(sys, "abiflags", "")  # ensure abiflags exists even in Windows
-            platform.system = lambda: platform_system
-            platform.machine = lambda: "wasm32"
-            os.environ["_PYTHON_HOST_PLATFORM"] = host_platform
-            os.environ["_PYTHON_SYSCONFIGDATA_NAME"] = f'_sysconfigdata_{{sys.abiflags}}_{{sys_platform}}_{{sys.implementation._multiarch}}'
-            sys.path.append("{sysconfigdata_dir}")
-            import sysconfig
-            sysconfig._init_config_vars()
-            del os.environ["_PYTHON_SYSCONFIGDATA_NAME"]
-            """
-            # On windows, patching sys.platform or os.name breaks how pip internals work (e.g. Pathlib)
-            # So instead, we use `--platform` option to inject the correct platform to pip commands.
-            # However, pip does not allow cross-platform installation unless `--target` flag is given,
-            # but `--target` behaves differently from normal installation (e.g. it does not support upgrading/downgrading packages very well, etc).
-            # so we ended up monkey-patching the cli option check function to allow using `--platform` without `--target`.
-            f"""
-            if os.name == "nt":
-                import pip._internal.cli.cmdoptions as cmdoptions
-
-                _original_check = cmdoptions.check_dist_restriction
-
-                def _patched_check_dist_restriction(options, check_target=False):
-                    _original_check(options, check_target=False)  # always skip target check
-
-                cmdoptions.check_dist_restriction = _patched_check_dist_restriction
-
-                if len(sys.argv) > 1 and sys.argv[1] in ("install", "wheel", "download", "lock"):
-                    if "--platform" not in sys.argv:
-                        sys.argv.extend(["--platform", "{pyodide_platform}"])
-                    if "--only-binary" not in sys.argv:
-                        sys.argv.extend(["--only-binary", ":all:"])
-            else:
-            """
-            # Newer versions of pip vendor Emscripten-supporting urllib3, so
-            # import urllib3 before patching sys.platform to make sure we don't
-            # run the Emscripten-compatibility path. It won't work because we
-            # are really in a native Python.
-            """
-                import pip._vendor.urllib3
-                sys.platform = sys_platform
-            """
-            # Handle pip updates.
-            #
-            # The pip executable should be a symlink to pip_patched. If it is not a
-            # link, or it is a symlink to something else, pip has been updated. We
-            # have to restore the correct value of pip. Iterate through all of the
-            # pip variants in the folder and remove them and replace with a symlink
-            # to pip_patched.
-            # Avoid using pathlib as it might mess up the path calculation on cross-platform environments.
-            f"""
-            file_path = os.path.join(os.path.dirname(__file__), "pip{exe_suffix}")
-
-
-            def pip_is_okay():
-                try:
-                    return os.readlink(file_path) == os.path.join(os.path.dirname(file_path), "{pip_patched_name}")
-                except OSError as e:
-                    if e.strerror != "Invalid argument":
-                        raise
-                return False
-
-
-            def maybe_repair_after_pip_update():
-                if pip_is_okay():
-                    return
-
-                venv_bin = os.path.dirname(file_path)
-                pip_patched = os.path.join(venv_bin, "{pip_patched_name}")
-                for pip in os.listdir(venv_bin):
-                    if not pip.startswith("pip"):
-                        continue
-                    if pip == "{pip_patched_name}":
-                        continue
-                    pip_path = os.path.join(venv_bin, pip)
-                    try:
-                        os.unlink(pip_path)
-                    except FileNotFoundError:
-                        pass
-                    patched_pip_exe = os.path.join(venv_bin, f"pip{exe_suffix}")
-                    if patched_pip_exe != pip_patched:
-                        try:
-                            os.unlink(patched_pip_exe)
-                        except FileNotFoundError:
-                            pass
-                        os.symlink(pip_patched, patched_pip_exe)
-
-
-            import atexit
-
-            atexit.register(maybe_repair_after_pip_update)
-            """
+        sysconfigdata_dir = str(
+            Path(get_build_flag("TARGETINSTALLDIR")) / "sysconfigdata"
+        )
+        return dict(
+            executable_symlink_suffix=self.host_python_symlink_suffix,
+            exe_suffix=self.exe_suffix,
+            pip_patched_name=self.pip_patched_path.name,
+            pip_wrapper_name=self.pip_wrapper_path.name,
+            platform_data=ast.literal_eval(result.stdout),
+            pyodide_platform=wheel_platform(),
+            sysconfigdata_dir=sysconfigdata_dir,
         )
 
     def _create_pip_script(self) -> None:
@@ -524,21 +433,10 @@ class PyodideVenv(ABC):
         self.pip_patched_path.write_text(self.host_pip_wrapper)
         self.pip_patched_path.chmod(0o777)
 
-        pip_wrapper_name = self.pip_wrapper_path.name
-        self.pip_wrapper_path.write_text(
-            (
-                self._get_pip_monkeypatch()
-                + dedent(
-                    f"""
-                    import re
-                    import sys
-                    from pip._internal.cli.main import main
-                    if __name__ == '__main__':
-                        sys.argv[0] = sys.argv[0].replace('{pip_wrapper_name}', 'pip')
-                        sys.exit(main())
-                    """
-                )
-            ).replace("\\", "\\\\")  # Escape backslashes for Windows batch files
+        pip_wrapper_src = Path(__file__).parent / "pip_wrapper.py"
+        shutil.copy(pip_wrapper_src, self.pip_wrapper_path)
+        (self.venv_bin / "pyodide_pip_config.json").write_text(
+            json.dumps(self._get_pyodide_pip_config())
         )
 
         # On windows, link the venv site-packages to the host site-packages so that the packages
@@ -644,11 +542,15 @@ class UnixPyodideVenv(PyodideVenv):
         """Get the content of the host python wrapper script.
         This script allows invoking the host python with the correct PYTHONHOME.
         """
-        pythonhome = Path(sys._base_executable).parents[1]
+        base_executable = getattr(sys, "_base_executable", sys.executable)
+        pythonhome = Path(base_executable).parents[1]
+        # These paths can contain spaces, such as noticed via uv-managed
+        # Python on macOS which lives under "Application Support". See:
+        # https://github.com/pyodide/pyodide-build/issues/399
         return dedent(
             f"""\
             #!/bin/sh
-            exec env PYTHONHOME={pythonhome} {self.host_python_symlink_path} "$@"
+            exec env PYTHONHOME={shlex.quote(str(pythonhome))} {shlex.quote(str(self.host_python_symlink_path))} "$@"
             """
         )
 
@@ -659,7 +561,7 @@ class UnixPyodideVenv(PyodideVenv):
         return dedent(
             f"""
             #!/usr/bin/env bash
-            {self.host_python_path} -s {self.pip_wrapper_path} "$@"
+            {shlex.quote(str(self.host_python_path))} -s {shlex.quote(str(self.pip_wrapper_path))} "$@"
             """
         )
 
@@ -689,15 +591,13 @@ class UnixPyodideVenv(PyodideVenv):
         PATH = os.environ["PATH"]
         PYODIDE_ROOT = os.environ["PYODIDE_ROOT"]
 
-        original_pyodide_cli = shutil.which("pyodide")
-        if original_pyodide_cli is None:
-            raise RuntimeError("ERROR: pyodide cli not found")
+        original_pyodide_cli = find_pyodide_cli()
 
         self.pyodide_cli_path.write_text(
             dedent(
                 f"""
                 #!/usr/bin/env bash
-                PATH="{PATH}:$PATH" PYODIDE_ROOT='{PYODIDE_ROOT}' exec {original_pyodide_cli} "$@"
+                PATH={shlex.quote(PATH)}:"$PATH" PYODIDE_ROOT={shlex.quote(PYODIDE_ROOT)} exec {shlex.quote(str(original_pyodide_cli))} "$@"
                 """
             )
         )
@@ -787,16 +687,14 @@ class WindowsPyodideVenv(PyodideVenv):
         PATH = os.environ["PATH"]
         PYODIDE_ROOT = os.environ["PYODIDE_ROOT"]
 
-        original_pyodide_cli = shutil.which("pyodide")
-        if original_pyodide_cli is None:
-            raise RuntimeError("ERROR: pyodide cli not found")
+        original_pyodide_cli = find_pyodide_cli()
 
         self.pyodide_cli_path.write_text(
             dedent(
                 f"""
                 @echo off
-                set PATH={PATH};%PATH%
-                set PYODIDE_ROOT={PYODIDE_ROOT}
+                set "PATH={PATH};%PATH%"
+                set "PYODIDE_ROOT={PYODIDE_ROOT}"
                 "{original_pyodide_cli}" %*
                 """
             )

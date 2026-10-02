@@ -2,6 +2,7 @@
 
 set -e
 
+# Keep in sync with the version in integration_tests/src/numpy_no_isolation.sh
 VERSION="2.2.5"
 URL="https://files.pythonhosted.org/packages/source/n/numpy/numpy-${VERSION}.tar.gz"
 

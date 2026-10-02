@@ -5,6 +5,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.39.1] - 2026/09/24
+
+### Changed
+
+- Bumped the `auditwheel-emscripten` requirement to `~=0.3.0`. Shared libraries
+  copied into a wheel, both by `pyodide auditwheel repair` and when vendoring
+  shared libraries in `pyodide build-recipes`, now get a content hash appended
+  to their filenames, and the dependent modules are patched to match. This
+  ensures that the vendored copy is the one that gets loaded, even if a
+  library with the same name is present on `LD_LIBRARY_PATH`. Pass
+  `--no-mangle` to `pyodide auditwheel repair` to keep the previous filenames.
+  [#434](https://github.com/pyodide/pyodide-build/pull/434)
+
+### Fixed
+
+- The wrapper scripts written into a Pyodide virtual environment now quote every
+  interpolated path, so `pyodide venv` works when the host Python, the
+  cross-build environment, or `PATH` contains a space. This previously broke
+  `uv`-managed Pythons on macOS, which live under `Library/Application Support`.
+  [#409](https://github.com/pyodide/pyodide-build/pull/409)
+
+- `pyodide venv` no longer fails with "pyodide cli not found" when the CLI is
+  invoked through an explicit path (e.g. `.venv/bin/pyodide venv`) without the
+  environment being activated. The CLI is now located relative to the running
+  interpreter instead of relying solely on `PATH`.
+  [#425](https://github.com/pyodide/pyodide-build/pull/425)
+
+## [0.39.0] - 2026/08/03
+
+### Changed
+
+- `pyodide xbuildenv install` no longer installs cross-build packages at all.
+  Instead `pyodide build` and `pyodide build-recipes` install only the
+  cross-build packages that the package being built actually needs.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
+
+- `pyodide build-recipes` now installs the cross-build packages listed in a
+  recipe's `requirements/host` before the build script runs.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
+
+### Removed
+
+- Removed the deprecated no-op `--skip-cross-build-packages` flag and the
+  `PYODIDE_SKIP_CROSS_BUILD_PACKAGES` environment variable from `pyodide
+  xbuildenv install`.
+  [#421](https://github.com/pyodide/pyodide-build/pull/421)
+
+## [0.38.0] - 2026/08/01
+
+### Added
+
+- When the target Python is a pre-release, the
+  `PYO3_USE_ABI3_FORWARD_COMPATIBILITY` environment variable is now set for all
+  builds so that PyO3 packages will build against the unstable CPython version.
+  [#405](https://github.com/pyodide/pyodide-build/pull/405)
+
+- Added `requirements.build-extras` field to meta.yaml spec. Requirements listed
+  will be installed into the isolated build virtual environment.
+  [#412](https://github.com/pyodide/pyodide-build/pull/412)
+
+### Changed
+
+- Replaced the `pydantic` dependency with `attrs` + `cattrs` for recipe
+  (`meta.yaml`) and cross-build environment metadata parsing/validation.
+  Recipe validation errors now raise `pyodide_build.recipe.spec.SpecValidationError`
+  instead of `pydantic.ValidationError`.
+  [#402](https://github.com/pyodide/pyodide-build/pull/402)
+
+- The `rustflags` config is now applied via the target-specific
+  `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS` environment variable instead
+  of the global `RUSTFLAGS`, so the flags only affect the
+  `wasm32-unknown-emscripten` target and no longer leak into host builds of
+  build-dependencies and proc-macros.
+  [#404](https://github.com/pyodide/pyodide-build/pull/404)
+
+- CMake's try_compile now uses the pywasmcross compiler wrappers.
+  [416](https://github.com/pyodide/pyodide-build/pull/416)
+
+
+## [0.37.0] - 2026/07/24
+
+### Changed
+
+- Unvendored tests that are generated from the package recipes are now compressed as a
+  `.zip` file instead of a `.tar` file. This should not affect any user-facing
+  functionality.
+  [#401](https://github.com/pyodide/pyodide-build/pull/401)
+
 ## [0.36.0] - 2026/06/30
 
 ### Fixed

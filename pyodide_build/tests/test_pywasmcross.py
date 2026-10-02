@@ -4,6 +4,7 @@ import pytest
 
 from pyodide_build.pywasmcross import (
     CrossCompileArgs,
+    ExitCodeWithReason,
     calculate_exports,
     filter_objects,
     get_cmake_compiler_flags,
@@ -28,6 +29,8 @@ def build_args():
 def generate_args(line: str, args: CrossCompileArgs, is_link_cmd: bool = False) -> str:
     splitline = line.split()
     res = handle_command_generate_args(splitline, args)
+    if isinstance(res, ExitCodeWithReason):
+        return res
 
     if res[0] in ("emcc", "em++"):
         for arg in [
@@ -287,3 +290,19 @@ def test_is_link_cmd():
     assert is_link_cmd(["test.so"])
     assert is_link_cmd(["test.so.1.2.3"])
     assert not is_link_cmd(["test", "test.a", "test.o", "test.c", "test.cpp", "test.h"])
+
+
+@pytest.mark.parametrize("flag", ["-fopenmp", "-fopenmp=libomp", "-fopenmp=libgomp"])
+def test_openmp_flags_are_dropped(build_args, flag):
+    """Pyodide doesn't support threads and openmp requires them.
+
+    We error out if they are requested.
+    """
+    res = generate_args(f"cc -c {flag} test.c", build_args)
+    assert res == ExitCodeWithReason(1, "openmp requires threads and is not supported")
+
+
+def test_fopenmp_simd_is_kept(build_args):
+    """-fopenmp-simd does not define _OPENMP and does not imply threads."""
+    res = generate_args("cc -c -fopenmp-simd test.c", build_args)
+    assert "-fopenmp-simd" in res

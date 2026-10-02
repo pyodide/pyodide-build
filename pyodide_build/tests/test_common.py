@@ -1,3 +1,6 @@
+import os
+import stat
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -193,7 +196,6 @@ def test_xbuildenv_dirname_is_installation_scoped(tmp_path, monkeypatch):
 
 
 def test_default_xbuildenv_path_xdg_cache_home(tmp_path, reset_cache):
-    import os
     import sys
 
     import platformdirs
@@ -270,11 +272,9 @@ def test_default_xbuildenv_path_env_var(tmp_path, reset_cache, monkeypatch):
     assert default_xbuildenv_path() == baseline_path
 
 
-@pytest.mark.skipif(
-    IS_WIN, reason="Permission-based fallback is not reliable on Windows"
-)
+@pytest.mark.windows
 def test_default_xbuildenv_path_env_var_non_writable(
-    tmp_path, reset_cache, monkeypatch
+    tmp_path, reset_cache, monkeypatch, request
 ):
     import platformdirs
 
@@ -283,7 +283,28 @@ def test_default_xbuildenv_path_env_var_non_writable(
 
     non_writable_path = tmp_path / "non_writable"
     non_writable_path.mkdir(exist_ok=True)
-    non_writable_path.chmod(0o444)
+
+    # Remove write permissions
+    if IS_WIN:
+        # Windows ignores the read-only attribute on directories, so write
+        # access has to be denied through the directory's ACL instead.
+        username = os.environ["USERNAME"]
+        subprocess.run(
+            ["icacls", str(non_writable_path), "/deny", f"{username}:W"],
+            check=True,
+            capture_output=True,
+        )
+        request.addfinalizer(
+            lambda: subprocess.run(
+                ["icacls", str(non_writable_path), "/remove:d", username],
+                check=True,
+                capture_output=True,
+            )
+        )
+    else:
+        mode = stat.S_IMODE(non_writable_path.stat().st_mode)
+        non_writable_path.chmod(mode & ~stat.S_IWRITE)
+        request.addfinalizer(lambda: non_writable_path.chmod(mode))
 
     monkeypatch.setenv("PYODIDE_XBUILDENV_PATH", str(non_writable_path))
 

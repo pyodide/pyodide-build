@@ -4,18 +4,19 @@ import click
 
 from pyodide_build.build_env import get_build_flag, local_versions
 from pyodide_build.common import IS_WIN, default_xbuildenv_path
-from pyodide_build.views import MetadataView
+from pyodide_build.views import MetadataView, SourceType
 from pyodide_build.xbuildenv import CrossBuildEnvManager
 from pyodide_build.xbuildenv_releases import (
     NIGHTLY_CROSS_BUILD_ENV_METADATA_URL,
     NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
     STABLE_DEBUG_CROSS_BUILD_ENV_METADATA_URL,
+    CrossBuildEnvReleaseSpec,
     cross_build_env_metadata_url,
     load_cross_build_env_metadata,
 )
 
 
-@click.group(invoke_without_command=True)
+@click.group("xbuildenv", invoke_without_command=True)
 @click.pass_context
 def app(ctx: click.Context) -> None:
     """Manage cross-build environment for building packages for Pyodide."""
@@ -64,15 +65,6 @@ def check_xbuildenv_root(path: Path) -> None:
     default=False,
     help="install the debug variant of the cross-build environment. Combine with --nightly to install the nightly debug variant.",
 )
-@click.option(
-    "--skip-cross-build-packages",
-    is_flag=True,
-    default=False,
-    envvar="PYODIDE_SKIP_CROSS_BUILD_PACKAGES",
-    show_envvar=True,
-    help="Deprecated, no-op. Cross-build packages are installed lazily "
-    "when required by build dependencies.",
-)
 def _install(
     version: str | None,
     path: Path | None,
@@ -80,7 +72,6 @@ def _install(
     force_install: bool,
     nightly: bool,
     debug: bool,
-    skip_cross_build_packages: bool,
 ) -> None:
     """Install cross-build environment.
 
@@ -258,7 +249,7 @@ def _search(
 
     local = local_versions()
 
-    def _compat_kwargs() -> dict:
+    def _compat_kwargs() -> dict[str, str]:
         if show_all:
             return {}
         return {
@@ -266,7 +257,10 @@ def _search(
             "pyodide_build_version": local["pyodide-build"],
         }
 
-    def _make_view(release, source: str = "stable") -> MetadataView:
+    def _make_view(
+        release: CrossBuildEnvReleaseSpec,
+        source: SourceType = "stable",
+    ) -> MetadataView:
         return MetadataView(
             version=release.version,
             python=release.python_version,
@@ -284,6 +278,7 @@ def _search(
         )
 
     if nightly or debug:
+        sources: list[tuple[SourceType, str]]
         if nightly and debug:
             sources = [("nightly-debug", NIGHTLY_DEBUG_CROSS_BUILD_ENV_METADATA_URL)]
         elif nightly:

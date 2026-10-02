@@ -13,6 +13,7 @@ from io import StringIO
 from pathlib import Path
 
 from packaging.tags import Tag, compatible_tags, cpython_tags
+from packaging.version import Version
 
 from pyodide_build import __version__
 from pyodide_build.common import (
@@ -166,6 +167,11 @@ def get_build_environment_vars(pyodide_root: Path) -> dict[str, str]:
         }
     )
 
+    # If the target Python is a pre-release, tell PyO3 to allow building against it.
+    pyversion = env.get("PYVERSION")
+    if pyversion and Version(pyversion).is_prerelease:
+        env["PYO3_USE_ABI3_FORWARD_COMPATIBILITY"] = "1"
+
     return env
 
 
@@ -219,6 +225,35 @@ def get_hostsitepackages() -> str:
     return get_build_flag("HOSTSITEPACKAGES")
 
 
+def read_pinned_requirements(requirements_file: Path) -> dict[str, str]:
+    """
+    Read the xbuildenv's `requirements.txt`, which lists the cross-build
+    packages as pinned `name==version` entries.
+
+    Returns
+    -------
+    A dictionary of package names and versions.
+    """
+    if not requirements_file.exists():
+        raise FileNotFoundError(
+            f"Expected {requirements_file} to exist in the xbuildenv. "
+            "The xbuildenv archive may be corrupt or from an incompatible version."
+        )
+
+    requirements: dict[str, str] = {}
+    for line in requirements_file.read_text().splitlines():
+        line = line.strip()
+        # The xbuildenv requirements.txt is machine-generated and always
+        # uses pinned name==version entries, but we skip blank lines,
+        # comments, and any non-pinned specs just in case. Shouldn't
+        # really happen though.
+        if not line or line.startswith("#") or "==" not in line:
+            continue
+        name, version = line.split("==", 1)
+        requirements[name] = version
+    return requirements
+
+
 # TODO: Remove this function (and use remote package index)
 # https://github.com/pyodide/pyodide-build/issues/43
 @functools.cache
@@ -239,23 +274,9 @@ def get_unisolated_packages() -> dict[str, str]:
 
     unisolated_packages: dict[str, str] = {}
     if in_xbuildenv():
-        unisolated_packages_file = PYODIDE_ROOT / ".." / "requirements.txt"
-
-        if not unisolated_packages_file.exists():
-            raise FileNotFoundError(
-                f"Expected {unisolated_packages_file} to exist in the xbuildenv. "
-                "The xbuildenv archive may be corrupt or from an incompatible version."
-            )
-        for line in unisolated_packages_file.read_text().splitlines():
-            line = line.strip()
-            # The xbuildenv requirements.txt is machine-generated and always
-            # uses pinned name==version entries, but we skip blank lines,
-            # comments, and any non-pinned specs just in case. Shouldn't
-            # really happen though.
-            if not line or line.startswith("#") or "==" not in line:
-                continue
-            name, version = line.split("==", 1)
-            unisolated_packages[name] = version
+        unisolated_packages = read_pinned_requirements(
+            PYODIDE_ROOT / ".." / "requirements.txt"
+        )
     else:
         from pyodide_build.recipe.loader import load_all_recipes
 
@@ -482,15 +503,17 @@ def ensure_emscripten(skip_install: bool = False) -> None:
 
     # Parse and check version
     installed_version = None
-    try:
-        for x in reversed(version_info.partition("\n")[0].split(" ")):
+    for line in version_info.splitlines():
+        if not line.startswith("emcc "):
+            continue
+        for x in reversed(line.split()):
             # (X.Y.Z) or (X.Y.Z)-git
             match = re.match(r"(\d+\.\d+\.\d+)(-\w+)?", x)
             if match:
                 installed_version = match.group(1)
                 break
-    except Exception:
-        raise RuntimeError("Failed to determine Emscripten version.") from None
+        if installed_version is not None:
+            break
 
     if installed_version is None:
         raise RuntimeError("Failed to determine Emscripten version.")

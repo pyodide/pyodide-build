@@ -8,7 +8,7 @@ from pyodide_build.build_env import (
 from pyodide_build.config import PYODIDE_CLI_CONFIGS
 
 
-@click.group(invoke_without_command=True)
+@click.group("config", invoke_without_command=True)
 @click.pass_context
 def app(ctx: click.Context) -> None:
     """Manage config variables used in pyodide."""

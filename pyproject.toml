@@ -16,9 +16,10 @@ requires-python = ">=3.12"
 dependencies = [
     "build>=1.4,<1.6,!=1.4.4", # keep in sync with uv extra
     "pyodide-cli>=0.4.1",
-    "pyodide-lock~=0.1.0",
-    "auditwheel-emscripten~=0.2.0",
-    "pydantic>=2,<3",
+    "pyodide-lock~=0.2.0",
+    "auditwheel-emscripten~=0.3.0",
+    "attrs",
+    "cattrs",
     "wheel",
     "ruamel.yaml",
     "packaging",
@@ -95,16 +96,15 @@ exclude = [
 [tool.pytest.ini_options]
 addopts = "-vra --strict-markers"
 markers = [
-  "integration: mark a test as an integration test"
+  "integration: mark a test as an integration test",
+  "windows: mark a test to run on Windows"
 ]
 
 [tool.mypy]
 python_version = "3.12"
-mypy_path = ["pyodide_build"]
 show_error_codes = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-plugins = ["pydantic.mypy"]
 
 # Strict checks
 warn_unused_configs = true
@@ -124,19 +124,31 @@ strict_equality = true
 
 [[tool.mypy.overrides]]
 module = [
-  "loky",
+  "_f2c_fixes",
+  "pip",
+  "pip.*",
   "resolvelib",
   "ruamel.yaml",
-  "termcolor",
-  "test",
-  "tomli",
   "tomllib",
   "unearth",
   "unearth.*",
-  "virtualenv>=20.31.2",
+  "uv",
+  "virtualenv",
+  "virtualenv.*",
   "auditwheel_emscripten.*"
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyodide_build.vendor.*"]
+ignore_errors = true
+
+# This module monkeypatches pip internals whose stubs differ between the local
+# and CI mypy environments, so the required "type: ignore" comments look unused
+# locally. Don't warn about that here.
+[[tool.mypy.overrides]]
+module = ["pyodide_build.out_of_tree.pip_wrapper"]
+warn_unused_ignores = false
 
 
 [tool.ruff]
@@ -166,8 +178,10 @@ lint.ignore = [
   "E501",    # Line too long
   "E731",    # Do not assign a lambda expression, use a def
   "E741",    # Ambiguous variable name (l, O, I)
+  "C408",    # Unnecessary `dict()` call
   "PERF401", # Replace for loops that build lists with list comprehension
   "PLW2901", # Redefined loop variable
+  "PLR0911", # Too many returns in function
   "PLR0912", # Too many branches in function
   "PLC0415"  # Import inside function or class
 ]

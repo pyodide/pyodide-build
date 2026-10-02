@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 
@@ -122,6 +123,41 @@ class TestOutOfTree(TestInTree):
         # Additionally we set these variables
         for var in extra_vars:
             assert var in build_vars, f"Missing {var}"
+
+        # PYVERSION of the dummy xbuildenv is a stable release, so the PyO3
+        # forward compatibility flag should not be set.
+        assert "PYO3_USE_ABI3_FORWARD_COMPATIBILITY" not in build_vars
+
+    @pytest.mark.parametrize(
+        "pyversion, expected",
+        [
+            ("3.13.2", False),
+            ("3.14.0a1", True),
+            ("3.14.0b2", True),
+            ("3.14.0rc1", True),
+        ],
+    )
+    def test_get_build_environment_vars_prerelease(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache, pyversion, expected
+    ):
+        manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
+        makefile_envs = manager.pyodide_root / "Makefile.envs"
+        contents = makefile_envs.read_text()
+        contents, replaced = re.subn(
+            r"^export PYVERSION \?= .*$",
+            f"export PYVERSION ?= {pyversion}",
+            contents,
+            flags=re.MULTILINE,
+        )
+        assert replaced == 1, "PYVERSION is not set the way this test expects"
+        makefile_envs.write_text(contents)
+
+        build_env.get_build_environment_vars.cache_clear()
+        build_vars = build_env.get_build_environment_vars(manager.pyodide_root)
+
+        assert (
+            build_vars.get("PYO3_USE_ABI3_FORWARD_COMPATIBILITY") == "1"
+        ) is expected
 
     def test_get_build_flag(self, dummy_xbuildenv, reset_env_vars, reset_cache):
         manager = CrossBuildEnvManager(dummy_xbuildenv / common.xbuildenv_dirname())
@@ -371,6 +407,24 @@ def test_ensure_emscripten_already_installed(dummy_xbuildenv, monkeypatch):
     build_env.ensure_emscripten()
 
     assert not install_called
+
+
+def test_ensure_emscripten_ignores_output_before_version(dummy_xbuildenv, monkeypatch):
+    needed_version = build_env.emscripten_version()
+
+    def mock_get_emscripten_version_info():
+        return (
+            "config:DEBUG: using config file with Python 3.12.1\n"
+            "shared:INFO: (Emscripten: Running sanity checks)\n"
+            f"emcc (Emscripten) {needed_version} (abc123)\n"
+            "clang version 15.0.0"
+        )
+
+    monkeypatch.setattr(
+        build_env, "get_emscripten_version_info", mock_get_emscripten_version_info
+    )
+
+    build_env.ensure_emscripten()
 
 
 def test_ensure_emscripten_version_mismatch(dummy_xbuildenv, monkeypatch):

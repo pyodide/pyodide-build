@@ -15,14 +15,16 @@ from pyodide_build.xbuildenv_releases import CROSS_BUILD_ENV_METADATA_URL_ENV_VA
 
 
 def mock_pyodide_lock() -> PyodideLockSpec:
-    return PyodideLockSpec(
-        info={
-            "version": "0.22.1",
-            "arch": "wasm32",
-            "platform": "emscripten_xxx",
-            "python": "3.11",
-        },
-        packages={},
+    return PyodideLockSpec.from_dict(
+        {
+            "info": {
+                "version": "0.22.1",
+                "arch": "wasm32",
+                "platform": "emscripten_xxx",
+                "python": "3.11",
+            },
+            "packages": {},
+        }
     )
 
 

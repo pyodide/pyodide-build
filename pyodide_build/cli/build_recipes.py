@@ -61,7 +61,7 @@ class InstallOptions:
     metadata_files: bool
 
 
-@click.command()
+@click.command("build-recipes-no-deps")
 @click.argument("packages", nargs=-1, required=True)
 @click.option(
     "--recipe-dir",
@@ -212,7 +212,7 @@ def build_recipes_no_deps_impl(
             builder.clean(include_dist=False)
 
 
-@click.command()
+@click.command("build-recipes")
 @click.argument("packages", nargs=-1, required=True)
 @click.option(
     "--recipe-dir",

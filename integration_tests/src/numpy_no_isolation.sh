@@ -6,7 +6,8 @@
 
 set -e
 
-VERSION="2.0.2"
+# Keep in sync with the version in integration_tests/src/numpy.sh
+VERSION="2.2.5"
 URL="https://files.pythonhosted.org/packages/source/n/numpy/numpy-${VERSION}.tar.gz"
 
 wget $URL

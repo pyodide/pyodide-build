@@ -118,7 +118,7 @@ def test_generate_lockfile(tmp_path, dummy_xbuildenv):
 
     package_data = graph_builder.generate_lockfile(tmp_path, pkg_map)
     assert package_data.info.arch == "wasm32"
-    assert package_data.info.platform.startswith("emscripten")
+    assert package_data.info.platform.startswith("pyemscripten")
     assert package_data.info.version == build_env.get_build_flag("PYODIDE_VERSION")
     assert package_data.info.python == build_env.get_build_flag("PYVERSION")
 

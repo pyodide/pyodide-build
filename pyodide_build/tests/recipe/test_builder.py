@@ -3,10 +3,11 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Self
 
-import pydantic
+import attrs
 import pytest
+from auditwheel_emscripten.emscripten_tools.webassembly import parse_dylink_section
+from auditwheel_emscripten.lib_utils import get_all_shared_libs_in_dir
 
 from pyodide_build import common
 from pyodide_build.build_env import BuildArgs, get_build_flag, pyodide_tags
@@ -150,6 +151,42 @@ def test_check_executables(tmp_path, monkeypatch):
         builder._check_executables()
 
 
+def test_ensure_cross_build_packages_for_host_requirements(tmp_path, monkeypatch):
+    builder = RecipeBuilder.get_builder(
+        recipe=RECIPE_DIR / "pkg_1",
+        build_args=BuildArgs(),
+        build_dir=tmp_path,
+    )
+    assert builder.recipe.requirements.host == ["pkg_1_1", "pkg_3", "libtest_shared"]
+
+    calls = []
+
+    class DummyManager:
+        def ensure_cross_build_packages_installed(self, packages):
+            calls.append(dict(packages))
+
+    monkeypatch.setattr(_builder, "in_xbuildenv", lambda: True)
+    monkeypatch.setattr(_builder, "get_current_xbuildenv_manager", DummyManager)
+
+    # Only the host requirements that are cross-build packages get installed.
+    monkeypatch.setattr(
+        _builder, "get_unisolated_packages", lambda: {"pkg_3": "1.0", "numpy": "2.0"}
+    )
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert calls == [{"pkg_3": "1.0"}]
+
+    # None of the host requirements are cross-build packages, so nothing happens.
+    monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: {"numpy": "2.0"})
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert calls == [{"pkg_3": "1.0"}]
+
+    # Outside of an xbuildenv, the install is never triggered.
+    monkeypatch.setattr(_builder, "in_xbuildenv", lambda: False)
+    monkeypatch.setattr(_builder, "get_unisolated_packages", lambda: {"pkg_3": "1.0"})
+    builder._ensure_cross_build_packages_for_host_requirements()
+    assert calls == [{"pkg_3": "1.0"}]
+
+
 def test_get_helper_vars(tmp_path):
     builder = RecipeBuilder.get_builder(
         recipe=RECIPE_DIR / "pkg_1",
@@ -204,10 +241,10 @@ def test_create_constraints_file_override(tmp_path, dummy_xbuildenv):
     assert data[-3:] == ["numpy < 2.0", "pytest == 7.0", "setuptools < 75"], data
 
 
+@attrs.define
 class MockSourceSpec(_SourceSpec):
-    @pydantic.model_validator(mode="after")
-    def _check_patches_extra(self) -> Self:
-        return self
+    def _check_patches_extra(self) -> None:
+        return None
 
 
 @pytest.mark.parametrize("is_wheel", [False, True])
@@ -318,9 +355,24 @@ def test_copy_sharedlib(tmp_path, modify_rpath):
 
     dep_map = _builder.copy_sharedlibs(wheel_copy, wheel_dir, libdir, modify_rpath)
 
+    lib_dir = wheel_dir / "sharedlib_test_py.libs"
     deps = ("sharedlib-test.so", "sharedlib-test-dep.so", "sharedlib-test-dep2.so")
     for dep in deps:
         assert dep in dep_map
+        copied = dep_map[dep]
+        assert copied.is_file()
+        assert copied.parent == lib_dir
+        # The copied library is renamed with a content hash
+        stem = dep.split(".", 1)[0]
+        assert copied.name != dep
+        assert copied.name.startswith(f"{stem}-")
+
+    # Every dependency declared by a shared library in the wheel must refer
+    # to a (mangled) file that exists in the wheel
+    copied_names = {path.name for path in lib_dir.iterdir()}
+    for shared_lib in get_all_shared_libs_in_dir(wheel_dir):
+        for needed in parse_dylink_section(shared_lib).needed:
+            assert needed in copied_names, f"{shared_lib.name} needs {needed}"
 
 
 def test_extract_tarballname():

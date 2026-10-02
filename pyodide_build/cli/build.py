@@ -234,6 +234,7 @@ def _extract_extras(source_location: str) -> tuple[str, list[str]]:
 
 
 @click.command(
+    "build",
     context_settings={
         "ignore_unknown_options": True,
         "allow_extra_args": True,

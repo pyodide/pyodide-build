@@ -54,6 +54,7 @@ pyodide-build sets the following environment variables automatically during the 
 |---|---|---|
 | `CARGO_BUILD_TARGET` | `wasm32-unknown-emscripten` | Tells Cargo to cross-compile for Emscripten |
 | `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_LINKER` | `emcc` | Uses Emscripten as the linker |
+| `CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS` | `-C link-arg=-sSIDE_MODULE=2 ...` | Rust compiler flags for the Emscripten target only |
 | `PYO3_CROSS_INCLUDE_DIR` | `<xbuildenv>/include` | PyO3 cross-compilation: Python headers location |
 | `PYO3_CROSS_LIB_DIR` | `<xbuildenv>/lib` | PyO3 cross-compilation: Python library location |
 | `PYO3_CROSS_PYTHON_VERSION` | `3.x` | PyO3 cross-compilation: target Python version |

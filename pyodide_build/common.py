@@ -106,13 +106,17 @@ def default_xbuildenv_path() -> Path:
 
 def _has_write_access(folder: Path) -> bool:
     """
-    Checks if the current user has write access to the given folder using pathlib.
+    Checks if the current user has write access to the given folder by creating
+    a file in it.
     """
     try:
         if not folder.exists() and folder.parent != folder:
             return _has_write_access(folder.parent)
 
-        return os.access(str(folder), os.W_OK)
+        probe = folder / f".write-probe-{os.urandom(8).hex()}"
+        probe.touch(exist_ok=False)
+        probe.unlink(missing_ok=True)
+        return True
     except OSError:
         return False
 
@@ -302,12 +306,12 @@ def exit_with_stdio(result: subprocess.CompletedProcess[str]) -> NoReturn:
 
 
 def run_command(
-    cmd: list[str],
+    cmd: Sequence[str | Path],
     *,
     text: bool = True,
-    err_msg: str | tuple[str, ...] | None = None,
+    err_msg: str | tuple[Any, ...] | None = None,
     capture_output: bool = True,
-    **kwargs,
+    **kwargs: Any,
 ) -> subprocess.CompletedProcess[str]:
     """
     Run command. If it returns a nonzero status code, log an error message and
@@ -323,7 +327,7 @@ def run_command(
         return result
 
     if err_msg is None:
-        err_msg = ("ERROR: command failed %s", " ".join(cmd))
+        err_msg = ("ERROR: command failed %s", " ".join(str(c) for c in cmd))
     elif not isinstance(err_msg, tuple):
         err_msg = ("ERROR: %s", err_msg)
 
@@ -426,7 +430,7 @@ def _format_missing_dependencies(missing: set[tuple[str, ...]]) -> str:
 
 
 def unpack_wheel(
-    wheel_path: Path, target_dir: Path | None = None, verbose=True
+    wheel_path: Path, target_dir: Path | None = None, verbose: bool = True
 ) -> None:
     if target_dir is None:
         target_dir = wheel_path.parent
@@ -437,7 +441,9 @@ def unpack_wheel(
     )
 
 
-def pack_wheel(wheel_dir: Path, target_dir: Path | None = None, verbose=True) -> None:
+def pack_wheel(
+    wheel_dir: Path, target_dir: Path | None = None, verbose: bool = True
+) -> None:
     if target_dir is None:
         target_dir = wheel_dir.parent
     run_command(
@@ -448,7 +454,7 @@ def pack_wheel(wheel_dir: Path, target_dir: Path | None = None, verbose=True) ->
 
 
 @contextmanager
-def modify_wheel(wheel: Path, verbose=True) -> Iterator[Path]:
+def modify_wheel(wheel: Path, verbose: bool = True) -> Iterator[Path]:
     """Unpacks the wheel into a temp directory and yields the path to the
     unpacked directory.
 

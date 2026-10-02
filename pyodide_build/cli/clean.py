@@ -7,7 +7,7 @@ from pyodide_build.logger import logger
 from pyodide_build.recipe import cleanup
 
 
-@click.group(invoke_without_command=True)
+@click.group("clean", invoke_without_command=True)
 @click.pass_context
 def app(ctx: click.Context) -> None:
     """Clean build artifacts."""

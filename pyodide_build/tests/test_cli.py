@@ -1,9 +1,12 @@
 import shutil
 import sys
+import tomllib
 import zipfile
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -31,6 +34,19 @@ def assert_runner_succeeded(result):
 
         traceback.print_exception(result.exception)
     assert result.exit_code == 0
+
+
+def test_cli_entry_point_names_match_click_command_names():
+    pyproject = Path(__file__).parents[2] / "pyproject.toml"
+    entry_points = tomllib.loads(pyproject.read_text())["project"]["entry-points"][
+        "pyodide.cli"
+    ]
+
+    for entry_point_name, value in entry_points.items():
+        module_name, object_name = value.split(":")
+        command = getattr(import_module(module_name), object_name)
+        assert isinstance(command, click.Command)
+        assert command.name == entry_point_name
 
 
 def test_cli_import_does_not_resolve_xbuildenv_path(monkeypatch):
@@ -694,9 +710,8 @@ def test_build_cpython_module(tmp_path, dummy_xbuildenv, mock_emscripten):
     assert len(results) == 1
     result = results[0]
     pyver = f"cp{sys.version_info.major}{sys.version_info.minor}"
-    assert (
-        result.name == f"pydecimal-1.0.0-{pyver}-{pyver}-pyemscripten_2025_0_wasm32.whl"
-    )
+    platform = build_env.wheel_platform()
+    assert result.name == f"pydecimal-1.0.0-{pyver}-{pyver}-{platform}.whl"
 
 
 def test_wheel_download_version_mismatch(tmp_path, dummy_xbuildenv, mock_emscripten):
