@@ -50,6 +50,7 @@ It means that the Emscripten compiler doesn't support the option.
 
 ```python
 import os
+
 if not os.environ.get("PYODIDE"):
     extra_compile_args.append("-some-config")
 ```
