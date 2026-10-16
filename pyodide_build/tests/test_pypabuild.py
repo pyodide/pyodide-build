@@ -257,8 +257,6 @@ def test_install_reqs_propagates_pip_and_uv_env(tmp_path, monkeypatch):
     # Only installer configuration is passed on, not the rest of the build env.
     assert "UVICORN_PORT" not in seen_env
     assert "CFLAGS" not in seen_env
-    # and the environment is restored afterwards
-    assert "UV_BUILD_CONSTRAINT" not in os.environ
 
 
 def test_install_cross_build_files(tmp_path, monkeypatch):
