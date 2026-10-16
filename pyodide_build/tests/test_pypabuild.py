@@ -220,6 +220,45 @@ def test_install_reqs_skips_lazy_install_when_not_unisolated(tmp_path, monkeypat
     assert called["count"] == 0
 
 
+def test_install_reqs_propagates_pip_and_uv_env(tmp_path, monkeypatch):
+    monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: False)
+    monkeypatch.setattr(pypabuild, "get_unisolated_packages", lambda: {})
+    monkeypatch.setattr(pypabuild, "_install_cross_build_files", lambda *a, **kw: None)
+
+    build_env = {
+        "PIP_CONSTRAINT": "/path/to/constraints.txt",
+        "PIP_BUILD_CONSTRAINT": "/path/to/constraints.txt",
+        "UV_BUILD_CONSTRAINT": "/path/to/constraints.txt",
+        "UV_INDEX_URL": "https://example.com/simple",
+        "UVICORN_PORT": "8000",
+        "CFLAGS": "-O2",
+    }
+    for key in build_env:
+        monkeypatch.delenv(key, raising=False)
+
+    seen_env: dict[str, str] = {}
+
+    class EnvRecordingIsolatedEnv(MockIsolatedEnv):
+        def install(self, reqs):
+            seen_env.update(os.environ)
+            super().install(reqs)
+
+    env = EnvRecordingIsolatedEnv(tmp_path)
+    pypabuild.install_reqs(build_env, env, {"foo"})  # type: ignore[arg-type]
+
+    assert env.installed == {"foo"}
+    for key in (
+        "PIP_CONSTRAINT",
+        "PIP_BUILD_CONSTRAINT",
+        "UV_BUILD_CONSTRAINT",
+        "UV_INDEX_URL",
+    ):
+        assert seen_env.get(key) == build_env[key]
+    # Only installer configuration is passed on, not the rest of the build env.
+    assert "UVICORN_PORT" not in seen_env
+    assert "CFLAGS" not in seen_env
+
+
 def test_install_cross_build_files(tmp_path, monkeypatch):
     purelib = tmp_path / "venv" / "lib" / "site-packages"
     purelib.mkdir(parents=True)
