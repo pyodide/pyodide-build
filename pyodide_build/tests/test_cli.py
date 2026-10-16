@@ -118,6 +118,30 @@ def test_skeleton_pypi(tmp_path):
     assert isinstance(result.exception, SystemExit)
 
 
+@pytest.mark.parametrize(
+    "args,func,pre",
+    [
+        (["--pre"], "make_package", True),
+        (["--update", "--pre"], "update_package", True),
+        (["--update"], "update_package", False),
+    ],
+)
+def test_skeleton_pypi_pre(tmp_path, monkeypatch, args, func, pre):
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        f"pyodide_build.recipe.skeleton.{func}",
+        lambda *_, **kwargs: calls.append(kwargs),
+    )
+
+    result = runner.invoke(
+        skeleton.app, ["pypi", "fakepkg", "--recipe-dir", str(tmp_path), *args]
+    )
+
+    assert_runner_succeeded(result)
+    assert len(calls) == 1
+    assert calls[0]["pre"] is pre
+
+
 def test_build_recipe_plain(tmp_path, dummy_xbuildenv, mock_emscripten):
     output_dir = tmp_path / "dist"
 
