@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- `pyodide skeleton pypi` now accepts a `--pre` flag to include pre-release and
+  development versions when looking for the latest version, so that a recipe
+  can be created at or updated to an alpha, beta or release candidate, for
+  example from 1.2.4rc0 to 1.2.4rc2. Without `--pre`, the latest stable release
+  is used as before.
+  [#439](https://github.com/pyodide/pyodide-build/pull/439)
+
 ### Fixed
 
 - `UV_` variables in the build environment, such as the `UV_BUILD_CONSTRAINT`

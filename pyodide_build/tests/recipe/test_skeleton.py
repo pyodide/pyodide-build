@@ -600,6 +600,196 @@ def test_update_package_explicit_source_fmt_is_strict(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# --pre: consider pre-releases when choosing the latest version
+# ---------------------------------------------------------------------------
+
+
+def _fake_pypi(
+    name: str,
+    releases: list[str],
+    yanked: tuple[str, ...] = (),
+    no_files: tuple[str, ...] = (),
+    calls: list[str | None] | None = None,
+):
+    """Return a stand-in for _get_metadata for a project with these releases.
+
+    As on PyPI, ``info.version`` is the newest stable release that is not
+    yanked, or the newest pre-release if there is no stable release. Releases
+    in ``no_files`` are listed without files. If ``calls`` is given, the
+    requested version of each call is appended to it.
+    """
+    available = [version.Version(v) for v in releases if v not in yanked]
+    stable = [v for v in available if not v.is_prerelease]
+    latest = str(max(stable or available))
+
+    def get_metadata(package: str, ver: str | None = None) -> MetadataDict:
+        if calls is not None:
+            calls.append(ver)
+        metadata = _make_mock_metadata(name, ver or latest, has_wheel=False)
+        if ver is None:
+            metadata["releases"] = {
+                v: []
+                if v in no_files
+                else [{"filename": f"{name}-{v}.tar.gz", "yanked": v in yanked}]
+                for v in releases
+            }
+        return metadata
+
+    return get_metadata
+
+
+def _write_sdist_recipe(base_dir: Path, name: str, ver: str) -> Path:
+    url = f"https://example.com/{name}-{ver}.tar.gz"
+    return _write_recipe(base_dir, name, ver, url, f"sdist-sha256-{ver}")
+
+
+@pytest.mark.parametrize(
+    "local_ver,releases,yanked,expected",
+    [
+        # A stable recipe is updated to a newer pre-release
+        ("1.2.3", ["1.2.3", "1.2.4rc0"], (), "1.2.4rc0"),
+        # A pre-release is updated to the newest pre-release
+        ("1.2.4rc0", ["1.2.3", "1.2.4rc0", "1.2.4rc1", "1.2.4rc2"], (), "1.2.4rc2"),
+        # A stable release is used when it is the newest release
+        ("1.2.4rc0", ["1.2.4rc0", "1.2.4rc2", "1.2.5"], (), "1.2.5"),
+        # ... and the newest release is used even when it is a pre-release
+        # and a newer stable release than the recipe exists, as with pip
+        ("1.2.4rc0", ["1.2.4rc0", "1.2.4", "1.3.0rc1"], (), "1.3.0rc1"),
+        # Yanked releases are skipped
+        (
+            "1.2.4rc0",
+            ["1.2.3", "1.2.4rc0", "1.2.4rc1", "1.2.4rc2"],
+            ("1.2.4rc2",),
+            "1.2.4rc1",
+        ),
+        # Versions are compared as PEP 440 versions, not as strings
+        ("1.2.4rc2", ["1.2.3", "1.2.4rc2", "1.2.4rc9", "1.2.4rc10"], (), "1.2.4rc10"),
+        # Alpha, beta and dev releases are pre-releases too
+        ("2.0.0.dev1", ["1.9.0", "2.0.0.dev1", "2.0.0a1", "2.0.0b1"], (), "2.0.0b1"),
+        # Already on the newest release
+        ("1.2.4rc2", ["1.2.3", "1.2.4rc2"], (), "1.2.4rc2"),
+    ],
+)
+def test_update_package_pre(
+    tmp_path, monkeypatch, local_ver, releases, yanked, expected
+):
+    name = "fakepkg"
+    meta_path = _write_sdist_recipe(tmp_path, name, local_ver)
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata",
+        _fake_pypi(name, releases, yanked),
+    )
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    update_package(tmp_path, name, pre=True)
+
+    db = MetaConfig.from_yaml(meta_path)
+    assert db.package.version == expected
+    assert db.source.sha256 == f"sdist-sha256-{expected}"
+
+
+@pytest.mark.parametrize(
+    "releases,no_files",
+    [
+        # The newest release is info.version, so it is not fetched again
+        (["1.2.4rc0", "1.2.4rc1", "1.2.5"], ()),
+        # The info.version release lists no files, but an older pre-release
+        # is still not picked over it
+        (["1.2.4rc0", "1.2.4rc1", "1.2.5"], ("1.2.5",)),
+    ],
+)
+def test_update_package_pre_keeps_newer_info_version(
+    tmp_path, monkeypatch, releases, no_files
+):
+    name = "fakepkg"
+    meta_path = _write_sdist_recipe(tmp_path, name, "1.2.4rc0")
+    calls: list[str | None] = []
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata",
+        _fake_pypi(name, releases, no_files=no_files, calls=calls),
+    )
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    update_package(tmp_path, name, pre=True)
+
+    assert MetaConfig.from_yaml(meta_path).package.version == "1.2.5"
+    assert calls == [None]
+
+
+def test_update_package_without_pre_skips_prereleases(tmp_path, monkeypatch):
+    name = "fakepkg"
+    meta_path = _write_sdist_recipe(tmp_path, name, "1.2.3")
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata",
+        _fake_pypi(name, ["1.2.3", "1.2.4rc0"]),
+    )
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    update_package(tmp_path, name)
+
+    assert MetaConfig.from_yaml(meta_path).package.version == "1.2.3"
+
+
+def test_update_package_prerelease_without_pre_suggests_pre(tmp_path, monkeypatch):
+    name = "fakepkg"
+    _write_sdist_recipe(tmp_path, name, "1.2.4rc0")
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata",
+        _fake_pypi(name, ["1.2.3", "1.2.4rc0", "1.2.4rc2"]),
+    )
+
+    with pytest.raises(MkpkgFailedException, match="newer than PyPI.*--pre"):
+        update_package(tmp_path, name)
+
+
+def test_update_package_pre_explicit_version(tmp_path, monkeypatch):
+    """--pre does not change an explicitly requested version."""
+    name = "fakepkg"
+    meta_path = _write_sdist_recipe(tmp_path, name, "1.2.4rc0")
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata",
+        _fake_pypi(name, ["1.2.3", "1.2.4rc0", "1.2.4rc1", "1.2.4rc2"]),
+    )
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    update_package(tmp_path, name, version="1.2.4rc1", pre=True)
+
+    assert MetaConfig.from_yaml(meta_path).package.version == "1.2.4rc1"
+
+
+@pytest.mark.parametrize("pre,expected", [(False, "1.2.3"), (True, "1.2.4rc0")])
+def test_make_package_pre(tmp_path, monkeypatch, pre, expected):
+    name = "fakepkg"
+    monkeypatch.setattr(
+        "pyodide_build.recipe.skeleton._get_metadata",
+        _fake_pypi(name, ["1.2.3", "1.2.4rc0"]),
+    )
+    monkeypatch.setattr("pyodide_build.recipe.skeleton.run_prettier", lambda *_: None)
+
+    skeleton.make_package(tmp_path, name, pre=pre)
+
+    db = MetaConfig.from_yaml(tmp_path / name / "meta.yaml")
+    assert db.package.version == expected
+    assert db.source.sha256 == f"sdist-sha256-{expected}"
+
+
+def test_find_latest_version_skips_unusable_releases():
+    metadata = _make_mock_metadata("fakepkg", "1.2.3")
+    metadata["releases"] = {
+        "1.2.3": [{"yanked": False}],
+        # only one of the files is yanked
+        "1.2.4rc1": [{"yanked": True}, {"yanked": False}],
+        # no files
+        "1.2.4rc2": [],
+        # every file is yanked
+        "1.2.4rc3": [{"yanked": True}, {"yanked": True}],
+        "not-a-version": [{"yanked": False}],
+    }
+
+    assert skeleton._find_latest_version(metadata) == "1.2.4rc1"
+
+
+# ---------------------------------------------------------------------------
 # Bug 2 tests: _make_predictable_url uses actual filename for sdists
 # ---------------------------------------------------------------------------
 

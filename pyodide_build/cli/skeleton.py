@@ -167,6 +167,15 @@ def pin(names: tuple[str, ...], message: str, recipe_dir: str | None) -> int:
     help="The version of the package, if not specified, latest version will be used.",
 )
 @click.option(
+    "--pre",
+    is_flag=True,
+    default=False,
+    help=(
+        "Include pre-release and development versions when looking for the "
+        "latest version. Has no effect if --version is given."
+    ),
+)
+@click.option(
     "--source-format",
     default=None,
     type=click.Choice(["wheel", "sdist"]),
@@ -202,6 +211,7 @@ def new_recipe_pypi(
     update_patched: bool,
     update_pinned: bool,
     version: str | None,
+    pre: bool,
     source_format: Literal["wheel", "sdist"] | None,
     recipe_dir: str | None,
     maintainer: str | None,
@@ -236,6 +246,7 @@ def new_recipe_pypi(
                 source_fmt=source_format,
                 update_patched=update_patched,
                 update_pinned=update_pinned,
+                pre=pre,
             )
         else:
             if maintainer and gh_maintainer:
@@ -250,6 +261,7 @@ def new_recipe_pypi(
                 version,
                 source_fmt=source_format,
                 maintainer=maintainer,
+                pre=pre,
             )
 
     except skeleton.MkpkgFailedException as e:
