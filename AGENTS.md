@@ -163,6 +163,7 @@ Integration tests do NOT run on every PR. They run when:
 ```python
 import click
 
+
 @click.command()  # or @click.group(invoke_without_command=True)
 @click.argument("name")
 @click.option("--flag", "-f", default=..., help="...")

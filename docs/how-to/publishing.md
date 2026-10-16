@@ -37,6 +37,7 @@ Once published, Pyodide users can install your package in two ways:
 
 ```python
 import micropip
+
 await micropip.install("your-package")
 ```
 
