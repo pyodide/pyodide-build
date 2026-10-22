@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `pyodide skeleton pypi` now accepts a `--pre` flag to include pre-release and
+  development versions when looking for the latest version, so that a recipe
+  can be created at or updated to an alpha, beta or release candidate, for
+  example from 1.2.4rc0 to 1.2.4rc2. Without `--pre`, the latest stable release
+  is used as before.
+  [#439](https://github.com/pyodide/pyodide-build/pull/439)
+
+### Changed
+
+- Allowed `build` 1.6.
+
+### Fixed
+
+- `UV_` variables in the build environment, such as the `UV_BUILD_CONSTRAINT`
+  set for recipe builds, are now passed on when installing build requirements
+  into the isolated build environment, so they take effect when `uv` is the
+  installer. Previously only `PIP` variables were passed on.
+  [#438](https://github.com/pyodide/pyodide-build/pull/438)
+
 ## [0.39.1] - 2026/09/24
 
 ### Changed

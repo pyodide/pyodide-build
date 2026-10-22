@@ -264,9 +264,10 @@ def install_reqs(
             unisolated.items()
         )
 
-    # propagate PIP config from build_env to current environment
+    # propagate pip and uv config from build_env to current environment
     with common.replace_env(
-        os.environ | {k: v for k, v in build_env.items() if k.startswith("PIP")}
+        os.environ
+        | {k: v for k, v in build_env.items() if k.startswith(("PIP", "UV_"))}
     ):
         env.install(reqs)
 

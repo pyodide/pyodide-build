@@ -12,7 +12,7 @@ from textwrap import indent
 from typing import Any, Literal, TypedDict
 from urllib import request
 
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 from ruamel.yaml import YAML
 
 from pyodide_build.common import parse_top_level_import_name
@@ -212,6 +212,40 @@ def _get_metadata(package: str, version: str | None = None) -> MetadataDict:
     return pypi_metadata
 
 
+def _find_latest_version(pypi_metadata: MetadataDict) -> str | None:
+    """Find the newest release of a package, including pre-releases.
+
+    Releases without files, releases whose files are all yanked, and versions
+    that are not valid PEP 440 versions are skipped.
+    """
+    latest: tuple[Version, str] | None = None
+    for ver_str, files in pypi_metadata["releases"].items():
+        if all(f.get("yanked", False) for f in files):
+            continue
+        try:
+            ver = Version(ver_str)
+        except InvalidVersion:
+            continue
+        if latest is None or ver > latest[0]:
+            latest = (ver, ver_str)
+    return latest[1] if latest else None
+
+
+def _get_release_metadata(package: str, version: str | None, pre: bool) -> MetadataDict:
+    """Download metadata for the requested version, or for the latest version.
+
+    PyPI reports the latest stable release as ``info.version`` whenever there
+    is one. With ``pre``, a newer pre-release is used instead, if there is one.
+    """
+    pypi_metadata = _get_metadata(package, version)
+    if pre and version is None:
+        latest = _find_latest_version(pypi_metadata)
+        current = Version(pypi_metadata["info"]["version"])
+        if latest is not None and Version(latest) > current:
+            pypi_metadata = _get_metadata(package, latest)
+    return pypi_metadata
+
+
 @contextlib.contextmanager
 def _download_wheel(pypi_metadata: URLDict) -> Iterator[Path]:
     response = request.urlopen(pypi_metadata["url"])
@@ -252,6 +286,7 @@ def make_package(
     version: str | None = None,
     source_fmt: Literal["wheel", "sdist"] | None = None,
     maintainer: str | None = None,
+    pre: bool = False,
 ) -> None:
     """
     Creates a template that will work for most pure Python packages,
@@ -261,7 +296,7 @@ def make_package(
 
     yaml = YAML()
 
-    pypi_metadata = _get_metadata(package, version)
+    pypi_metadata = _get_release_metadata(package, version, pre)
 
     if source_fmt:
         sources = [source_fmt]
@@ -324,6 +359,7 @@ def update_package(
     update_patched: bool = False,
     update_pinned: bool = False,
     source_fmt: Literal["wheel", "sdist"] | None = None,
+    pre: bool = False,
 ) -> None:
     yaml = YAML()
 
@@ -346,7 +382,7 @@ def update_package(
     else:
         old_fmt = "sdist"
 
-    pypi_metadata = _get_metadata(package, version)
+    pypi_metadata = _get_release_metadata(package, version, pre)
 
     # Grab versions from metadata
     pypi_ver = Version(pypi_metadata["info"]["version"])
@@ -355,10 +391,13 @@ def update_package(
     # fail if local version is newer than PyPI version
     # since updating isn't possible in that case
     if pypi_ver < local_ver:
+        hint = ""
+        if local_ver.is_prerelease and not pre and version is None:
+            hint = " Use --pre to include pre-releases."
         raise MkpkgFailedException(
             f"Local version {local_ver} is newer than PyPI version {pypi_ver}, "
             f"cannot update {package}. Please verify in case the version was "
-            "updated manually and is correct."
+            f"updated manually and is correct.{hint}"
         )
 
     # Determine which source formats to try.
