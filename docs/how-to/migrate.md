@@ -113,13 +113,13 @@ Mark tests that require threads, networking, subprocesses, or platform-specific 
 import sys
 import pytest
 
+
 @pytest.mark.skipif(sys.platform == "emscripten", reason="No threads on Emscripten")
-def test_concurrent_access():
-    ...
+def test_concurrent_access(): ...
+
 
 @pytest.mark.skipif(sys.platform == "emscripten", reason="No sockets on Emscripten")
-def test_http_client():
-    ...
+def test_http_client(): ...
 ```
 
 ## Adding Pyodide to your CI
