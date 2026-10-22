@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is used as before.
   [#439](https://github.com/pyodide/pyodide-build/pull/439)
 
+### Changed
+
+- Allowed `build` 1.6.
+
 ### Fixed
 
 - `UV_` variables in the build environment, such as the `UV_BUILD_CONSTRAINT`
