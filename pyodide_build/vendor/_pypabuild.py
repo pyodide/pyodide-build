@@ -115,16 +115,8 @@ def _handle_build_error() -> Iterator[None]:
         if isinstance(e, BuildBackendException) and not isinstance(
             e.exception, subprocess.CalledProcessError
         ):
-            if e.exc_info:
-                tb_lines = traceback.format_exception(
-                    e.exc_info[0],
-                    e.exc_info[1],
-                    e.exc_info[2],
-                    limit=-1,
-                )
-                tb = "".join(tb_lines)
-            else:
-                tb = traceback.format_exc(-1)  # type: ignore[unreachable]
+            tb_lines = traceback.format_exception(e.exception, limit=-1)
+            tb = "".join(tb_lines)
             _cprint("\n{dim}{}{reset}\n", tb.strip("\n"))
         elif not isinstance(e, (BuildException, FailedProcessError)):
             tb = traceback.format_exc().strip("\n")

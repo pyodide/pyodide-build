@@ -397,6 +397,19 @@ class TestHandleBuildErrorSubprocessOutput:
         captured = capsys.readouterr()
         assert "pip resolution failed" in captured.out
 
+    def test_build_backend_exception_surfaces_inner_traceback(self, capsys):
+        with pytest.raises(SystemExit):
+            with _handle_build_error():
+                try:
+                    raise ValueError("backend hook failed")
+                except ValueError as exc:
+                    raise BuildBackendException(
+                        exc, "Backend operation failed"
+                    ) from None
+        captured = capsys.readouterr()
+        assert "ValueError: backend hook failed" in captured.out
+        assert "Backend operation failed" in captured.out + captured.err
+
     def test_build_backend_exception_with_cpe_surfaces_output(self, capsys):
         cpe = _make_cpe(stderr="backend install error\n")
         with pytest.raises(SystemExit):
