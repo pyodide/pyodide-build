@@ -92,19 +92,30 @@ tags._emscripten_platforms = _emscripten_platforms  # type: ignore[attr-defined]
 #
 # Since pip verifies TLS through truststore, it picks its backend from the platform.
 # However, we patch that to report "Emscripten", so truststore cannot use the macOS
-# or Windows system store and falls back to its OpenSSL backend, which reads OpenSSL's
-# default CA file. On a python.org or python-build-standalone interpreter, that file
-# is /etc/ssl/cert.pem, which the OS vendor does not keep up to date.
+# or Windows system store and falls back to its OpenSSL backend, which loads OpenSSL's
+# default CA file and CA directory. On a python.org or python-build-standalone
+# interpreter, that file is /etc/ssl/cert.pem, which the OS vendor does not keep up
+# to date, and on Debian-like Linux the directory is /etc/ssl/certs, the distro store.
 #
-# Setting SSL_CERT_FILE makes the OpenSSL backend load pip's vendored certifi bundle
-# instead. PIP_CERT covers pip without truststore, which ignores SSL_CERT_FILE. Values
-# already present in the environment are left alone so that users can point at their
-# own bundle if needed.
-#
-# This is a private import, but I don't think we can do any better than this.
-from pip._vendor.certifi import where as _certifi_where
+# Setting SSL_CERT_FILE makes the OpenSSL backend load a certifi bundle instead. The
+# host environment's certifi is preferred, since pyodide-build requires a version
+# without the compromised eMudhra root, whereas pip's vendored copy is only as fresh
+# as the pip version pinned for this venv. When we set the file, SSL_CERT_DIR is
+# pointed at an empty directory too, otherwise OpenSSL would still load the distro
+# directory next to it. PIP_CERT covers pip without truststore, which ignores
+# SSL_CERT_FILE. Values already present in the environment are left alone so that
+# users can point at their own bundle if needed.
+try:
+    from certifi import where as _certifi_where
+except ImportError:
+    # A private import, but I don't think we can do any better than this.
+    from pip._vendor.certifi import where as _certifi_where  # type: ignore[no-redef]
 
-os.environ.setdefault("SSL_CERT_FILE", _certifi_where())
+if "SSL_CERT_FILE" not in os.environ:
+    os.environ["SSL_CERT_FILE"] = _certifi_where()
+    _empty_ca_dir = os.path.join(os.path.dirname(__file__), "pyodide_empty_ca_dir")
+    os.makedirs(_empty_ca_dir, exist_ok=True)
+    os.environ.setdefault("SSL_CERT_DIR", _empty_ca_dir)
 os.environ.setdefault("PIP_CERT", _certifi_where())
 
 # Now patch sys, platform, os.environ, and sysconfig.

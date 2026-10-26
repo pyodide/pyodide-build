@@ -520,12 +520,13 @@ def test_host_python_wrapper_runs_with_spaces_in_paths(tmp_path, monkeypatch):
 
 
 def _run_pip_wrapper(tmp_path: Path, env: dict[str, str]) -> list[str]:
-    """Import ``pip_wrapper.py`` in a subprocess and return the CA bundle it set.
+    """Import ``pip_wrapper.py`` in a subprocess and return the CA settings it made.
 
     The wrapper patches ``sys`` and ``platform`` at import time, so it cannot be
     imported into the test process. It is run with the host's own platform data
     so that the sysconfigdata lookup resolves to the real host module. Returns
-    the values of SSL_CERT_FILE and PIP_CERT seen after the import.
+    the values of SSL_CERT_FILE, SSL_CERT_DIR, and PIP_CERT seen after the
+    import, with an empty string for a variable that is not set.
     """
     import sysconfig
 
@@ -562,6 +563,7 @@ def _run_pip_wrapper(tmp_path: Path, env: dict[str, str]) -> list[str]:
                 import os, runpy
                 runpy.run_path({str(wrapper)!r}, run_name="not_main")
                 print(os.environ.get("SSL_CERT_FILE", ""))
+                print(os.environ.get("SSL_CERT_DIR", ""))
                 print(os.environ.get("PIP_CERT", ""))
                 """
             ),
@@ -572,37 +574,47 @@ def _run_pip_wrapper(tmp_path: Path, env: dict[str, str]) -> list[str]:
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    return result.stdout.splitlines()[-2:]
+    return result.stdout.splitlines()[-3:]
+
+
+_CA_ENV_VARS = ("SSL_CERT_FILE", "SSL_CERT_DIR", "PIP_CERT")
 
 
 def _env_without_ca_bundle() -> dict[str, str]:
-    return {
-        k: v for k, v in os.environ.items() if k not in ("SSL_CERT_FILE", "PIP_CERT")
-    }
+    return {k: v for k, v in os.environ.items() if k not in _CA_ENV_VARS}
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only symlinks")
 def test_pip_wrapper_defaults_ca_bundle_to_certifi(tmp_path):
-    """The venv pip must verify TLS against certifi, not the host OpenSSL CA file.
+    """The venv pip must verify TLS against certifi, not the host OpenSSL store.
 
     truststore picks its backend from ``platform.system()``, which the wrapper
     patches to "Emscripten", so it ends up on the OpenSSL backend on every host
-    OS. That backend reads SSL_CERT_FILE, which the wrapper therefore points
-    at pip's vendored certifi bundle.
+    OS. That backend loads SSL_CERT_FILE and SSL_CERT_DIR, so the wrapper
+    points the file at the host certifi bundle and the directory at an empty
+    one, otherwise the distro directory would be loaded next to certifi.
     """
     pytest.importorskip("pip")
-    from pip._vendor.certifi import where
+    from certifi import where
 
-    ssl_cert_file, pip_cert = _run_pip_wrapper(tmp_path, _env_without_ca_bundle())
+    ssl_cert_file, ssl_cert_dir, pip_cert = _run_pip_wrapper(
+        tmp_path, _env_without_ca_bundle()
+    )
 
     assert ssl_cert_file == where()
     assert pip_cert == where()
     assert Path(ssl_cert_file).is_file()
+    assert Path(ssl_cert_dir) == tmp_path / "bin" / "pyodide_empty_ca_dir"
+    assert Path(ssl_cert_dir).is_dir()
+    assert list(Path(ssl_cert_dir).iterdir()) == []
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only symlinks")
 def test_pip_wrapper_keeps_user_ca_bundle(tmp_path):
-    """A bundle the user configured wins over the certifi default."""
+    """A bundle the user configured wins over the certifi default.
+
+    When the user set SSL_CERT_FILE, their CA directory is left alone too.
+    """
     pytest.importorskip("pip")
     custom = tmp_path / "my-bundle.pem"
     custom.write_text("")
@@ -611,7 +623,21 @@ def test_pip_wrapper_keeps_user_ca_bundle(tmp_path):
         "PIP_CERT": str(custom),
     }
 
-    assert _run_pip_wrapper(tmp_path, env) == [str(custom), str(custom)]
+    assert _run_pip_wrapper(tmp_path, env) == [str(custom), "", str(custom)]
+    assert not (tmp_path / "bin" / "pyodide_empty_ca_dir").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only symlinks")
+def test_pip_wrapper_keeps_user_ca_dir(tmp_path):
+    """A CA directory the user configured is not replaced by the empty one."""
+    pytest.importorskip("pip")
+    from certifi import where
+
+    custom_dir = tmp_path / "my-certs"
+    custom_dir.mkdir()
+    env = _env_without_ca_bundle() | {"SSL_CERT_DIR": str(custom_dir)}
+
+    assert _run_pip_wrapper(tmp_path, env) == [where(), str(custom_dir), where()]
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")
