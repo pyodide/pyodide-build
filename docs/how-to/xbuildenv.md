@@ -12,6 +12,10 @@ If you have a different Python version, the installation will fail.
 
 We recommend using `uv` or `pyenv` to manage your Python versions.
 
+Archives installed by version are checked against the sha256 checksum published
+in the release metadata before they are extracted. An archive installed from a
+custom `--url` has no published checksum, so it is not verified.
+
 ```bash
 # Install the latest compatible version
 pyodide xbuildenv install

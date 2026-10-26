@@ -233,6 +233,9 @@ class CrossBuildEnvManager:
         # In that case the "version" is a mangled URL string rather than a real
         # release version, so we must not bake it into the package index.
         installed_from_url = False
+        # Expected sha256 of the archive. Only release metadata carries one;
+        # an install from an explicit URL has nothing to check against.
+        expected_sha256: str | None = None
 
         if url:
             version = _url_to_version(url)
@@ -257,6 +260,16 @@ class CrossBuildEnvManager:
                 )
 
             download_url = release.url
+            expected_sha256 = release.sha256
+            if expected_sha256 is None:
+                # Note that every release in our official stable, nightly, and
+                # debug metadata has published sha256 checksums. This is only
+                # reachable through a user's custom file passed with --metadata.
+                logger.warning(
+                    "No sha256 checksum is published for cross-build environment "
+                    "version %s, so the download will not be verified",
+                    version,
+                )
 
         download_path = self._path_for_version(version)
 
@@ -271,7 +284,10 @@ class CrossBuildEnvManager:
             )
         else:
             download_and_unpack_archive(
-                download_url, download_path, "Pyodide cross-build environment"
+                download_url,
+                download_path,
+                "Pyodide cross-build environment",
+                sha256=expected_sha256,
             )
 
         try:
