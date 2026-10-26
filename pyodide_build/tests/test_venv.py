@@ -1,3 +1,4 @@
+import json
 import os
 import platform
 import shutil
@@ -516,6 +517,101 @@ def test_host_python_wrapper_runs_with_spaces_in_paths(tmp_path, monkeypatch):
         str(tmp_path / "Application Support" / "uv"),
         "-c pass",
     ]
+
+
+def _run_pip_wrapper(tmp_path: Path, env: dict[str, str]) -> list[str]:
+    """Import ``pip_wrapper.py`` in a subprocess and return the CA bundle it set.
+
+    The wrapper patches ``sys`` and ``platform`` at import time, so it cannot be
+    imported into the test process. It is run with the host's own platform data
+    so that the sysconfigdata lookup resolves to the real host module. Returns
+    the values of SSL_CERT_FILE and PIP_CERT seen after the import.
+    """
+    import sysconfig
+
+    venv_bin = tmp_path / "bin"
+    venv_bin.mkdir()
+    wrapper = venv_bin / "pip_wrapper.py"
+    shutil.copy(Path(venv.__file__).parent / "pip_wrapper.py", wrapper)
+    config = {
+        "executable_symlink_suffix": "-host",
+        "exe_suffix": "",
+        "pip_patched_name": "pip_patched",
+        "pip_wrapper_name": "pip_wrapper.py",
+        "platform_data": [
+            os.name,
+            sys.platform,
+            platform.system(),
+            sys.implementation._multiarch,
+            sysconfig.get_platform(),
+        ],
+        "pyodide_platform": "pyemscripten_2026_0_wasm32",
+        "sysconfigdata_dir": str(tmp_path),
+    }
+    (venv_bin / "pyodide_pip_config.json").write_text(json.dumps(config))
+    # The wrapper checks at exit that ``pip`` links to ``pip_patched``.
+    (venv_bin / "pip_patched").write_text("")
+    (venv_bin / "pip").symlink_to(venv_bin / "pip_patched")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            dedent(
+                f"""
+                import os, runpy
+                runpy.run_path({str(wrapper)!r}, run_name="not_main")
+                print(os.environ.get("SSL_CERT_FILE", ""))
+                print(os.environ.get("PIP_CERT", ""))
+                """
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.splitlines()[-2:]
+
+
+def _env_without_ca_bundle() -> dict[str, str]:
+    return {
+        k: v for k, v in os.environ.items() if k not in ("SSL_CERT_FILE", "PIP_CERT")
+    }
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only symlinks")
+def test_pip_wrapper_defaults_ca_bundle_to_certifi(tmp_path):
+    """The venv pip must verify TLS against certifi, not the host OpenSSL CA file.
+
+    truststore picks its backend from ``platform.system()``, which the wrapper
+    patches to "Emscripten", so it ends up on the OpenSSL backend on every host
+    OS. That backend reads SSL_CERT_FILE, which the wrapper therefore points
+    at pip's vendored certifi bundle.
+    """
+    pytest.importorskip("pip")
+    from pip._vendor.certifi import where
+
+    ssl_cert_file, pip_cert = _run_pip_wrapper(tmp_path, _env_without_ca_bundle())
+
+    assert ssl_cert_file == where()
+    assert pip_cert == where()
+    assert Path(ssl_cert_file).is_file()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only symlinks")
+def test_pip_wrapper_keeps_user_ca_bundle(tmp_path):
+    """A bundle the user configured wins over the certifi default."""
+    pytest.importorskip("pip")
+    custom = tmp_path / "my-bundle.pem"
+    custom.write_text("")
+    env = _env_without_ca_bundle() | {
+        "SSL_CERT_FILE": str(custom),
+        "PIP_CERT": str(custom),
+    }
+
+    assert _run_pip_wrapper(tmp_path, env) == [str(custom), str(custom)]
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shell wrappers")

@@ -88,6 +88,25 @@ from pip._vendor.packaging import tags
 
 tags._emscripten_platforms = _emscripten_platforms  # type: ignore[attr-defined]
 
+# Point pip at a known good CA bundle before it can open any connection.
+#
+# Since pip verifies TLS through truststore, it picks its backend from the platform.
+# However, we patch that to report "Emscripten", so truststore cannot use the macOS
+# or Windows system store and falls back to its OpenSSL backend, which reads OpenSSL's
+# default CA file. On a python.org or python-build-standalone interpreter, that file
+# is /etc/ssl/cert.pem, which the OS vendor does not keep up to date.
+#
+# Setting SSL_CERT_FILE makes the OpenSSL backend load pip's vendored certifi bundle
+# instead. PIP_CERT covers pip without truststore, which ignores SSL_CERT_FILE. Values
+# already present in the environment are left alone so that users can point at their
+# own bundle if needed.
+#
+# This is a private import, but I don't think we can do any better than this.
+from pip._vendor.certifi import where as _certifi_where
+
+os.environ.setdefault("SSL_CERT_FILE", _certifi_where())
+os.environ.setdefault("PIP_CERT", _certifi_where())
+
 # Now patch sys, platform, os.environ, and sysconfig.
 
 os_name, sys_platform, platform_system, multiarch, host_platform = CONFIG.platform_data
