@@ -25,6 +25,9 @@ dependencies = [
     "packaging",
     "virtualenv",
     "requests",
+    # guard ourselves against the compromised intermediate
+    # CA keys of the eMudhra emSign ECC Root CA - G3 root
+    "certifi>=2026.10.19",
     "click",
     "rich",
     "platformdirs",
