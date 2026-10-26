@@ -387,13 +387,20 @@ def get_emscripten_version_info() -> str:
     ).stderr
 
 
-# Env variables that are set by emsdk_env.sh
+# Env variables that are set by emsdk_env.sh and that we import into our own
+# environment after activating the SDK.
+#
+# emsdk_env.sh also exports SSL_CERT_FILE on macOS, pointing at the certifi
+# bundle inside emsdk's own bundled Python. That bundle is only as fresh as the
+# emsdk Python tarball, and it is meant for emsdk's downloader, not for us.
+# Importing it would make every OpenSSL-based client that pyodide-build spawns
+# (urllib, curl, git, uv, pip in a Pyodide venv) trust stale root stores and
+# would override a value the user set on purpose, so we should leave it out here.
 EMSDK_ENV_VARS = {
     "PATH",
     "EMSDK",
     "EMSDK_NODE",
     "EMSDK_PYTHON",
-    "SSL_CERT_FILE",
 }
 
 

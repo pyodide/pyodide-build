@@ -1,5 +1,7 @@
 import os
 import re
+import sys
+from textwrap import dedent
 
 import pytest
 
@@ -287,6 +289,37 @@ def test_wheel_paths(dummy_xbuildenv):
             f"{current_version}-none-any",
         ]
     )
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only emsdk_env.sh")
+def test_activate_emscripten_env_does_not_import_ssl_cert_file(tmp_path):
+    """SSL_CERT_FILE from emsdk_env.sh must not leak into our environment.
+
+    On macOS, emsdk exports SSL_CERT_FILE pointing at the certifi bundle inside
+    its bundled Python, which is only as fresh as that tarball. Importing it
+    would make every TLS client we spawn trust stale root stores.
+    """
+    emsdk_dir = tmp_path / "emsdk"
+    emsdk_dir.mkdir()
+    (emsdk_dir / "emsdk_env.sh").write_text(
+        dedent(
+            f"""
+            export EMSDK={emsdk_dir}
+            export EMSDK_NODE={emsdk_dir}/node/bin/node
+            export EMSDK_PYTHON={emsdk_dir}/python/bin/python3
+            export SSL_CERT_FILE={emsdk_dir}/python/site-packages/certifi/cacert.pem
+            export PATH={emsdk_dir}:$PATH
+            """
+        )
+    )
+
+    env_vars = build_env.activate_emscripten_env(emsdk_dir)
+
+    assert env_vars["EMSDK"] == str(emsdk_dir)
+    assert env_vars["EMSDK_NODE"] == f"{emsdk_dir}/node/bin/node"
+    assert env_vars["EMSDK_PYTHON"] == f"{emsdk_dir}/python/bin/python3"
+    assert env_vars["PATH"].startswith(str(emsdk_dir))
+    assert "SSL_CERT_FILE" not in env_vars
 
 
 def test_ensure_emscripten_auto_installs_when_missing(dummy_xbuildenv, monkeypatch):
