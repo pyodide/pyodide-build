@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import sys
@@ -41,6 +42,11 @@ def reset_cache():
     yield _reset
 
     _reset()
+
+
+def dummy_xbuildenv_sha256() -> str:
+    """Returns the sha256 hex digest of the dummy xbuildenv archive"""
+    return hashlib.sha256(test_xbuildenv_path().read_bytes()).hexdigest()
 
 
 def test_xbuildenv_path() -> Path:
@@ -178,19 +184,20 @@ def fake_xbuildenv_releases_compatible(tmp_path, dummy_xbuildenv_url):
     Create a fake metadata file with a single release that is compatible with the local environment.
     """
     local = build_env.local_versions()
+    sha256 = dummy_xbuildenv_sha256()
     fake_releases = {
         "releases": {
             "0.1.0": {
                 "version": "0.1.0",
                 "url": dummy_xbuildenv_url,
-                "sha256": "1234567890abcdef",
+                "sha256": sha256,
                 "python_version": f"{local['python']}.0",
                 "emscripten_version": "1.39.8",
             },
             "0.2.0": {
                 "version": "0.2.0",
                 "url": dummy_xbuildenv_url,
-                "sha256": "1234567890abcdef",
+                "sha256": sha256,
                 "python_version": f"{local['python']}.0",
                 "emscripten_version": "2.39.8",
             },
@@ -213,7 +220,7 @@ def fake_xbuildenv_releases_incompatible(tmp_path, dummy_xbuildenv_url):
             "0.1.0": {
                 "version": "0.1.0",
                 "url": dummy_xbuildenv_url,
-                "sha256": "1234567890abcdef",
+                "sha256": dummy_xbuildenv_sha256(),
                 "python_version": "4.5.6",
                 "emscripten_version": "1.39.8",
             },

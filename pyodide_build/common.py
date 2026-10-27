@@ -4,6 +4,7 @@
 
 import contextlib
 import hashlib
+import logging
 import os
 import re
 import shutil
@@ -22,10 +23,12 @@ from functools import cache
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, NoReturn
-from urllib.request import urlopen
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 from zipfile import ZipFile
 
 import platformdirs
+import requests
 from packaging.tags import Tag
 from packaging.utils import canonicalize_name as canonicalize_package_name
 from packaging.utils import parse_wheel_filename
@@ -599,8 +602,39 @@ def to_bool(value: str) -> bool:
     return value.lower() not in {"", "0", "false", "no", "off"}
 
 
+@contextmanager
+def _suppress_urllib3_logging() -> Iterator[None]:
+    """
+    Temporarily raise the urllib3 log level.
+
+    pyodide-build runs its own logger at DEBUG level, and urllib3 would log
+    every connection and redirect at that level, which is noise for a download.
+    See https://github.com/pyodide/pyodide/issues/4810
+    """
+    urllib3_logger = logging.getLogger("urllib3")
+    original_level = urllib3_logger.level
+    urllib3_logger.setLevel(logging.WARNING)
+    try:
+        yield
+    finally:
+        urllib3_logger.setLevel(original_level)
+
+
+def _write_chunks(chunks: Iterable[bytes], dest: Path, digest: "hashlib._Hash") -> None:
+    """Write ``chunks`` to ``dest`` while feeding them to ``digest``."""
+    with dest.open("wb") as f:
+        for chunk in chunks:
+            f.write(chunk)
+            digest.update(chunk)
+
+
 def download_and_unpack_archive(
-    url: str, path: Path, descr: str, *, exists_ok: bool = False
+    url: str,
+    path: Path,
+    descr: str,
+    *,
+    exists_ok: bool = False,
+    sha256: str | None = None,
 ) -> None:
     """
     Download the cross-build environment from the given URL and extract it to the given path.
@@ -612,32 +646,52 @@ def download_and_unpack_archive(
     path
         Path to extract the cross-build environment to.
         If the path already exists, raise an error.
+    descr
+        Human readable description of what is being downloaded, for log messages.
+    exists_ok
+        If True, do not fail when ``path`` already exists.
+    sha256
+        Expected sha256 hex digest of the archive. When given, the download is
+        checked against it before anything is extracted, and a mismatch raises
+        ``ValueError``. When None, no verification is done.
     """
     logger.info("Downloading %s from %s", descr, url)
 
     if not exists_ok and path.exists():
         raise FileExistsError(f"Path {path} already exists")
 
-    try:
-        resp = urlopen(url)
-    except Exception as e:
-        raise ValueError(f"Failed to download {descr} from {url}") from e
-
-    # FIXME: requests makes a verbose output (see: https://github.com/pyodide/pyodide/issues/4810)
-    # r = requests.get(url)
-
-    # if r.status_code != 200:
-    #     raise ValueError(
-    #         f"Failed to download cross-build environment from {url} (status code: {r.status_code})"
-    #     )
-
     with TemporaryDirectory() as temp_dir:
         f_path = Path(temp_dir) / "temp.tar"
+        digest = hashlib.sha256()
         try:
-            with f_path.open("wb") as f:
-                shutil.copyfileobj(resp, f)
+            if urlparse(url).scheme == "file":
+                # A local archive, for example one built with
+                # create_xbuildenv.py. requests does not handle file URLs.
+                with Path(url2pathname(urlparse(url).path)).open("rb") as src:
+                    chunks = iter(lambda: src.read(1 << 20), b"")
+                    _write_chunks(chunks, f_path, digest)
+            else:
+                # requests verifies TLS against certifi (or REQUESTS_CA_BUNDLE),
+                # the same way the release metadata is fetched, rather than
+                # against the host OpenSSL's default CA file like urllib does.
+                with (
+                    _suppress_urllib3_logging(),
+                    requests.get(url, stream=True) as resp,
+                ):
+                    resp.raise_for_status()
+                    _write_chunks(resp.iter_content(chunk_size=1 << 20), f_path, digest)
         except Exception as e:
             raise ValueError(f"Failed to download {descr} from {url}") from e
+
+        if sha256 is not None:
+            actual = digest.hexdigest()
+            if actual != sha256:
+                raise ValueError(
+                    f"Invalid sha256 checksum for {descr} downloaded from {url}: "
+                    f"{actual} != {sha256} (expected)"
+                )
+            logger.debug("Verified sha256 checksum of %s: %s", descr, actual)
+
         with warnings.catch_warnings():
             # Python 3.12-3.13 emits a DeprecationWarning when using shutil.unpack_archive without a filter,
             # but filter doesn't work well for zip files, so we suppress the warning until we find a better solution.

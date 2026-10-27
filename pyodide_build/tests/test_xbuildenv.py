@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import sys
@@ -8,6 +9,10 @@ import pytest
 
 from pyodide_build import build_env
 from pyodide_build.common import download_and_unpack_archive
+from pyodide_build.logger import logger
+
+# imported as module to avoid being collected as a test itself
+from pyodide_build.tests import conftest as test_conftest
 from pyodide_build.xbuildenv import (
     CrossBuildEnvManager,
     _same_version,
@@ -147,6 +152,44 @@ class TestCrossBuildEnvManager:
 
         assert download_path.exists()
         assert (download_path / "xbuildenv").exists()
+        assert (download_path / "xbuildenv" / "pyodide-root").exists()
+
+    def test_download_verifies_sha256(self, tmp_path, dummy_xbuildenv_url):
+        download_path = tmp_path / "test"
+        download_and_unpack_archive(
+            dummy_xbuildenv_url,
+            download_path,
+            "",
+            sha256=test_conftest.dummy_xbuildenv_sha256(),
+        )
+
+        assert (download_path / "xbuildenv" / "pyodide-root").exists()
+
+    def test_download_rejects_bad_sha256(self, tmp_path, dummy_xbuildenv_url):
+        download_path = tmp_path / "test"
+        bad = "0" * 64
+
+        with pytest.raises(ValueError, match="Invalid sha256 checksum") as excinfo:
+            download_and_unpack_archive(
+                dummy_xbuildenv_url, download_path, "", sha256=bad
+            )
+
+        # The message names both digests so a user can compare them.
+        assert test_conftest.dummy_xbuildenv_sha256() in str(excinfo.value)
+        assert bad in str(excinfo.value)
+        # Nothing is extracted from an archive that failed verification.
+        assert not download_path.exists()
+
+    def test_download_file_url(self, tmp_path):
+        """A local archive can be installed through a ``file://`` URL."""
+        download_path = tmp_path / "test"
+        download_and_unpack_archive(
+            test_conftest.test_xbuildenv_path().as_uri(),
+            download_path,
+            "",
+            sha256=test_conftest.dummy_xbuildenv_sha256(),
+        )
+
         assert (download_path / "xbuildenv" / "pyodide-root").exists()
 
     def test_download_path_exists(self, tmp_path):
@@ -427,6 +470,69 @@ class TestCrossBuildEnvManager:
         assert not manager.symlink_dir.exists()
 
         assert set(manager.list_versions()) == set(versions) - {"0.25.0", "0.25.1"}
+
+    def test_install_version_rejects_bad_sha256(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        """A release whose archive does not match its published sha256 is not installed."""
+        metadata = json.loads(fake_xbuildenv_releases_compatible.read_text())
+        metadata["releases"]["0.1.0"]["sha256"] = "0" * 64
+        fake_xbuildenv_releases_compatible.write_text(json.dumps(metadata))
+
+        manager = CrossBuildEnvManager(
+            tmp_path, str(fake_xbuildenv_releases_compatible)
+        )
+
+        with pytest.raises(ValueError, match="Invalid sha256 checksum"):
+            manager.install("0.1.0")
+
+        assert not (tmp_path / "0.1.0").exists()
+        assert manager.current_version is None
+
+    def test_install_version_without_published_sha256_warns(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch,
+        monkeypatch_subprocess_run_pip,
+        fake_xbuildenv_releases_compatible,
+    ):
+        """A release without a sha256 still installs, with a warning."""
+        metadata = json.loads(fake_xbuildenv_releases_compatible.read_text())
+        del metadata["releases"]["0.1.0"]["sha256"]
+        fake_xbuildenv_releases_compatible.write_text(json.dumps(metadata))
+
+        # The pyodide-build logger writes through Rich, not through the root
+        # logger, so record warnings directly instead of using caplog.
+        warnings: list[str] = []
+        monkeypatch.setattr(
+            logger, "warning", lambda msg, *args: warnings.append(msg % args)
+        )
+
+        manager = CrossBuildEnvManager(
+            tmp_path, str(fake_xbuildenv_releases_compatible)
+        )
+        manager.install("0.1.0")
+
+        assert any("No sha256 checksum is published" in w for w in warnings)
+        assert (tmp_path / "0.1.0" / ".installed").exists()
+
+    def test_install_url_does_not_verify(
+        self,
+        tmp_path,
+        dummy_xbuildenv_url,
+        monkeypatch_subprocess_run_pip,
+    ):
+        """An install from an explicit URL has no checksum to check against."""
+        manager = CrossBuildEnvManager(tmp_path)
+        manager.install(url=dummy_xbuildenv_url)
+
+        assert manager.current_version is not None
+        assert (manager.symlink_dir / ".installed").exists()
 
     def test_version_marker(
         self,

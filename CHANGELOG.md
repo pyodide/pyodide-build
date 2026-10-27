@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- `pyodide xbuildenv install` now verifies the downloaded archive against the
+  sha256 published in the release metadata before extracting it. Installs from
+  `--url` are not verified.
+- `pip` inside a `pyodide venv` now verifies TLS against the host `certifi`
+  bundle instead of the host OpenSSL's default CA file and directory, which,
+  on macOS (or on Linux with an outdated `ca-certificates` package), may still
+  trust the compromised eMudhra root. The venv wrapper sets `SSL_CERT_FILE`,
+  `SSL_CERT_DIR`, and `PIP_CERT`, unless they are already set.
+- `SSL_CERT_FILE` is no longer imported from `emsdk_env.sh` when Emscripten is
+  auto-installed. On macOS, emsdk points it at a stale `certifi` bundle, which
+  was then passed on to `pip`, `uv`, `git`, and `curl`.
+
+### Changed
+
+- `certifi>=2026.10.19`, which dropped the compromised emSign root, is now a
+  direct dependency.
+
 ## [0.39.2] - 2026/10/22
 
 ### Added
