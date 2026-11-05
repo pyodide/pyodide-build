@@ -150,6 +150,10 @@ class CrossBuildEnvConfigManager(ConfigManager):
             logger.debug("Using internal Makefile.envs parser on Windows system")
             return _parse_makefile_envs(env=env, makefile_path=makefile_path)
         else:
+            # When pyodide-build runs under make, MAKEFLAGS carries that make's
+            # flags. This make would inherit -n, -q or -t from it and then
+            # skip the .output_vars recipe instead of printing the variables.
+            env.pop("MAKEFLAGS", None)
             result = run_command(
                 ["make", "-f", str(makefile_path), ".output_vars"],
                 env=env,
