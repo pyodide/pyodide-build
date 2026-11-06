@@ -1,3 +1,5 @@
+import pytest
+
 from pyodide_build import common
 from pyodide_build.config import (
     BUILD_KEY_TO_VAR,
@@ -120,6 +122,20 @@ class TestCrossBuildEnvConfigManager_OutOfTree:
     def test_get_make_environment_vars(
         self, dummy_xbuildenv, reset_env_vars, reset_cache
     ):
+        xbuildenv_manager = CrossBuildEnvManager(
+            dummy_xbuildenv / common.xbuildenv_dirname()
+        )
+        config_manager = CrossBuildEnvConfigManager(
+            pyodide_root=xbuildenv_manager.pyodide_root
+        )
+        make_vars = config_manager._get_make_environment_vars()
+        assert make_vars["PYODIDE_ROOT"] == str(xbuildenv_manager.pyodide_root)
+
+    @pytest.mark.parametrize("makeflags", ["n", "q", "t"])
+    def test_get_make_environment_vars_ignores_makeflags(
+        self, dummy_xbuildenv, reset_env_vars, reset_cache, monkeypatch, makeflags
+    ):
+        monkeypatch.setenv("MAKEFLAGS", makeflags)
         xbuildenv_manager = CrossBuildEnvManager(
             dummy_xbuildenv / common.xbuildenv_dirname()
         )

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- `pyodide config get` and other commands that load `Makefile.envs` no longer
+  fail when they run inside a Makefile invoked as `make -n`, `make -q` or
+  `make -t`. The `make` call that loads `Makefile.envs` inherited those flags
+  through `MAKEFLAGS`, which GNU Make 4.4 and later also export to
+  `$(shell ...)`.
+  [#447](https://github.com/pyodide/pyodide-build/pull/447)
+
 ## [0.39.3]- 2026/10/27
 
 ### Fixed
