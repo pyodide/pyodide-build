@@ -22,7 +22,7 @@ Description: Build a C extension for Python
 Requires:
 Version: 3.14
 Libs.private: -ldl  -lpthread
-Libs: -L${libdir}
+Libs: -L${libdir}\x20
 Cflags: -I${includedir}/python3.14
 """
 
