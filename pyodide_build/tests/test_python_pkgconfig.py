@@ -8,8 +8,6 @@ import pytest
 
 from pyodide_build._python_pkgconfig import ensure_python_pkgconfig_files
 
-SYSCONFIG_NAME = "_sysconfigdata__emscripten_wasm32-emscripten"
-
 PYODIDE_PYTHON_3_14_PC = """\
 # See: man pkg-config
 prefix=${pcfiledir}/../..
@@ -43,34 +41,9 @@ Cflags: -I${includedir}/python3.14
 """
 
 
-def make_target_install_dir(
-    tmp_path: Path,
-    *,
-    version: str = "3.14",
-    abiflags: str = "",
-    sysconfigdata: str | None = None,
-) -> Path:
-    """
-    Lay out the parts of a target Python installation that a cross-build
-    environment ships, with a sysconfigdata module in the format Pyodide uses.
-    """
+def make_target_install_dir(tmp_path: Path, version: str = "3.14") -> Path:
     target_install_dir = tmp_path / "cpython" / "installs" / f"python-{version}.2"
-    (target_install_dir / "include" / f"python{version}{abiflags}").mkdir(parents=True)
-
-    if sysconfigdata is None:
-        libpc = f"{{PYODIDE_ROOT}}/cpython/installs/python-{version}.2/lib/pkgconfig"
-        sysconfigdata = (
-            "# system configuration generated and used by the sysconfig module\n"
-            "import os\n"
-            'PYODIDE_ROOT = os.environ.get("PYODIDE_ROOT", "/root/repo")\n'
-            f"build_time_vars = {{'ABIFLAGS': {abiflags!r}, 'LIBPC': f'{libpc}', "
-            f"'LIBPYTHON': '', 'LIBS': '-ldl  -lpthread', 'VERSION': {version!r}}}\n"
-        )
-
-    sysconfigdata_dir = target_install_dir / "sysconfigdata"
-    sysconfigdata_dir.mkdir()
-    (sysconfigdata_dir / f"{SYSCONFIG_NAME}.py").write_text(sysconfigdata)
-
+    (target_install_dir / "include" / f"python{version}").mkdir(parents=True)
     return target_install_dir
 
 
@@ -84,7 +57,7 @@ def pkgconfig_files(target_install_dir: Path) -> dict[str, str]:
 def test_files_match_pyodide_build(tmp_path):
     target_install_dir = make_target_install_dir(tmp_path)
 
-    pkgconfig_dir = ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME)
+    pkgconfig_dir = ensure_python_pkgconfig_files(target_install_dir, "3.14")
 
     assert pkgconfig_dir == target_install_dir / "lib" / "pkgconfig"
     assert pkgconfig_files(target_install_dir) == {
@@ -97,9 +70,9 @@ def test_files_match_pyodide_build(tmp_path):
 
 @pytest.mark.parametrize("version", ["3.12", "3.13", "3.15"])
 def test_other_python_versions(tmp_path, version):
-    target_install_dir = make_target_install_dir(tmp_path, version=version)
+    target_install_dir = make_target_install_dir(tmp_path, version)
 
-    ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME)
+    ensure_python_pkgconfig_files(target_install_dir, version)
 
     assert pkgconfig_files(target_install_dir) == {
         f"python-{version}.pc": PYODIDE_PYTHON_3_14_PC.replace("3.14", version),
@@ -111,83 +84,25 @@ def test_other_python_versions(tmp_path, version):
     }
 
 
-def test_abiflags(tmp_path):
-    target_install_dir = make_target_install_dir(tmp_path, abiflags="d")
-
-    ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME)
-
-    files = pkgconfig_files(target_install_dir)
-    assert set(files) == {
-        "python-3.14d.pc",
-        "python-3.14d-embed.pc",
-        "python-3.14.pc",
-        "python-3.14-embed.pc",
-        "python3.pc",
-        "python3-embed.pc",
-    }
-    assert files["python-3.14.pc"] == files["python3.pc"] == files["python-3.14d.pc"]
-    assert "Version: 3.14\n" in files["python-3.14d.pc"]
-    assert "Cflags: -I${includedir}/python3.14d\n" in files["python-3.14d.pc"]
-    assert "Libs: -L${libdir} -lpython3.14d\n" in files["python-3.14d-embed.pc"]
-
-
 def test_shipped_files_are_left_alone(tmp_path):
     target_install_dir = make_target_install_dir(tmp_path)
     pkgconfig_dir = target_install_dir / "lib" / "pkgconfig"
     pkgconfig_dir.mkdir(parents=True)
     (pkgconfig_dir / "python-3.14.pc").write_text("shipped\n")
 
-    assert (
-        ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME)
-        == pkgconfig_dir
-    )
+    assert ensure_python_pkgconfig_files(target_install_dir, "3.14") == pkgconfig_dir
     assert pkgconfig_files(target_install_dir) == {"python-3.14.pc": "shipped\n"}
 
 
 def test_second_call_changes_nothing(tmp_path):
     target_install_dir = make_target_install_dir(tmp_path)
-    pkgconfig_dir = ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME)
+    pkgconfig_dir = ensure_python_pkgconfig_files(target_install_dir, "3.14")
     mtimes = {path.name: path.stat().st_mtime_ns for path in pkgconfig_dir.iterdir()}
 
-    assert (
-        ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME)
-        == pkgconfig_dir
-    )
+    assert ensure_python_pkgconfig_files(target_install_dir, "3.14") == pkgconfig_dir
     assert {
         path.name: path.stat().st_mtime_ns for path in pkgconfig_dir.iterdir()
     } == mtimes
-
-
-@pytest.mark.parametrize(
-    "sysconfigdata",
-    [
-        "build_time_vars = {",
-        "build_time_vars = {'ABIFLAGS': '', 'LIBPYTHON': '', 'VERSION': '3.14'}\n",
-        "build_time_vars = {'ABIFLAGS': '', 'LIBPYTHON': '', 'LIBS': 0, 'VERSION': '3.14'}\n",
-        "",
-    ],
-    ids=["syntax error", "missing variable", "not a string", "empty"],
-)
-def test_unusable_sysconfigdata(tmp_path, sysconfigdata):
-    target_install_dir = make_target_install_dir(tmp_path, sysconfigdata=sysconfigdata)
-
-    assert ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME) is None
-    assert not (target_install_dir / "lib").exists()
-
-
-def test_missing_sysconfigdata(tmp_path):
-    target_install_dir = make_target_install_dir(tmp_path)
-
-    assert ensure_python_pkgconfig_files(target_install_dir, "_sysconfigdata") is None
-    assert not (target_install_dir / "lib").exists()
-
-
-def test_missing_include_dir(tmp_path):
-    target_install_dir = make_target_install_dir(tmp_path)
-    shutil.rmtree(target_install_dir / "include")
-
-    assert ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME) is None
-    assert not (target_install_dir / "lib").exists()
 
 
 @pytest.mark.skipif(
@@ -199,7 +114,7 @@ def test_read_only_install_dir(tmp_path):
     target_install_dir.chmod(0o555)
 
     try:
-        assert ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME) is None
+        assert ensure_python_pkgconfig_files(target_install_dir, "3.14") is None
     finally:
         target_install_dir.chmod(0o755)
 
@@ -211,7 +126,7 @@ def test_read_only_install_dir(tmp_path):
 )
 def test_pkg_config_finds_target_python_first(tmp_path):
     target_install_dir = make_target_install_dir(tmp_path)
-    pkgconfig_dir = ensure_python_pkgconfig_files(target_install_dir, SYSCONFIG_NAME)
+    pkgconfig_dir = ensure_python_pkgconfig_files(target_install_dir, "3.14")
 
     host_dir = tmp_path / "host"
     host_dir.mkdir()
