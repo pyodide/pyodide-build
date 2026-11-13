@@ -1,4 +1,3 @@
-import ast
 import os
 from pathlib import Path
 
@@ -38,45 +37,8 @@ Libs: -L${libdir} -lpython@VERSION@@ABIFLAGS@
 Cflags: -I${includedir}/python@VERSION@@ABIFLAGS@
 """
 
-_SYSCONFIG_VARS = ("VERSION", "ABIFLAGS", "LIBS", "LIBPYTHON")
 
-
-def _read_sysconfig_vars(sysconfigdata: Path) -> dict[str, str] | None:
-    """
-    Read the variables that the pkg-config files need from a sysconfigdata
-    module, without importing it. Returns None if any of them is missing.
-    """
-    try:
-        tree = ast.parse(sysconfigdata.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError, ValueError):
-        return None
-
-    for node in tree.body:
-        if not (isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict)):
-            continue
-        if not any(
-            isinstance(target, ast.Name) and target.id == "build_time_vars"
-            for target in node.targets
-        ):
-            continue
-
-        found = {}
-        for key, value in zip(node.value.keys, node.value.values, strict=True):
-            if (
-                isinstance(key, ast.Constant)
-                and key.value in _SYSCONFIG_VARS
-                and isinstance(value, ast.Constant)
-                and isinstance(value.value, str)
-            ):
-                found[key.value] = value.value
-
-        if len(found) == len(_SYSCONFIG_VARS):
-            return found
-
-    return None
-
-
-def _render(template: str, sysconfig_vars: dict[str, str]) -> str:
+def _render(template: str, python_version: str) -> str:
     substitutions = {
         # Relative to the .pc file, so that the cross-build environment can be
         # moved. The other three are what configure fills in by default.
@@ -84,7 +46,10 @@ def _render(template: str, sysconfig_vars: dict[str, str]) -> str:
         "@exec_prefix@": "${prefix}",
         "@libdir@": "${exec_prefix}/lib",
         "@includedir@": "${prefix}/include",
-        **{f"@{name}@": value for name, value in sysconfig_vars.items()},
+        "@VERSION@": python_version,
+        "@ABIFLAGS@": "",
+        "@LIBS@": "-ldl  -lpthread",
+        "@LIBPYTHON@": "",
     }
     for token, value in substitutions.items():
         template = template.replace(token, value)
@@ -104,7 +69,7 @@ def _write_if_missing(path: Path, content: str) -> None:
 
 
 def ensure_python_pkgconfig_files(
-    target_install_dir: Path, sysconfig_name: str
+    target_install_dir: Path, python_version: str
 ) -> Path | None:
     """
     Make sure that the target Python of a cross-build environment has its
@@ -120,8 +85,8 @@ def ensure_python_pkgconfig_files(
     ----------
     target_install_dir
         The path to the target Python installation.
-    sysconfig_name
-        The name of the sysconfigdata module of the target Python.
+    python_version
+        The major and minor version of the target Python, such as "3.14".
 
     Returns
     -------
@@ -130,34 +95,17 @@ def ensure_python_pkgconfig_files(
     """
     pkgconfig_dir = target_install_dir / "lib" / "pkgconfig"
 
-    sysconfig_vars = _read_sysconfig_vars(
-        target_install_dir / "sysconfigdata" / f"{sysconfig_name}.py"
-    )
-    if sysconfig_vars is None:
-        return None
-
-    version = sysconfig_vars["VERSION"]
-    abiflags = sysconfig_vars["ABIFLAGS"]
-    ldversion = f"{version}{abiflags}"
-
-    if (pkgconfig_dir / f"python-{ldversion}.pc").is_file():
+    if (pkgconfig_dir / f"python-{python_version}.pc").is_file():
         return pkgconfig_dir
 
-    if not (target_install_dir / "include" / f"python{ldversion}").is_dir():
-        return None
-
-    python_pc = _render(_PYTHON_PC_IN, sysconfig_vars)
-    python_embed_pc = _render(_PYTHON_EMBED_PC_IN, sysconfig_vars)
-
-    names = ["python3"]
-    if abiflags:
-        names.append(f"python-{version}")
-    # Written last, because its presence is what marks the files as complete
-    names.append(f"python-{ldversion}")
+    python_pc = _render(_PYTHON_PC_IN, python_version)
+    python_embed_pc = _render(_PYTHON_EMBED_PC_IN, python_version)
 
     try:
         pkgconfig_dir.mkdir(parents=True, exist_ok=True)
-        for name in names:
+        # python-3.x.pc is written last, because its presence is what marks the
+        # files as complete
+        for name in ("python3", f"python-{python_version}"):
             _write_if_missing(pkgconfig_dir / f"{name}-embed.pc", python_embed_pc)
             _write_if_missing(pkgconfig_dir / f"{name}.pc", python_pc)
     except OSError as e:

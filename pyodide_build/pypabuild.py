@@ -29,6 +29,7 @@ from pyodide_build.build_env import (
     get_current_xbuildenv_manager,
     get_host_build_flag,
     get_pyversion,
+    get_pyversion_major_minor,
     get_unisolated_packages,
     in_xbuildenv,
     platform,
@@ -505,7 +506,7 @@ def get_build_env(
 
     if in_xbuildenv():
         python_pkgconfig_dir = ensure_python_pkgconfig_files(
-            Path(get_build_flag("TARGETINSTALLDIR")), get_build_flag("SYSCONFIG_NAME")
+            Path(get_build_flag("TARGETINSTALLDIR")), get_pyversion_major_minor()
         )
         if python_pkgconfig_dir is not None:
             # Ahead of the existing entries, so that a python-3.x.pc of the host
