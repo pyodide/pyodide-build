@@ -76,6 +76,7 @@ When `pyodide build` runs:
 2. The `sysconfig` module is patched to return target-platform values instead of host values
 3. `PATH` is modified so compiler wrappers take priority over native compilers
 4. Environment variables (`CMAKE_TOOLCHAIN_FILE`, `MESON_CROSS_FILE`, etc.) are set
+5. The pkg-config files of the target Python are put first on `PKG_CONFIG_PATH`
 
 ## Build isolation
 
