@@ -1,6 +1,7 @@
 import os
 import subprocess
 from collections.abc import Sequence
+from pathlib import Path
 
 import pytest
 from build import BuildBackendException, BuildException, FailedProcessError
@@ -174,6 +175,62 @@ def test_get_build_env(tmp_path, dummy_xbuildenv):
         assert "cxxflags" in wasmcross_args
         assert "ldflags" in wasmcross_args
         assert "exports" in wasmcross_args
+
+
+@pytest.mark.parametrize("host_pkg_config_path", [None, "/host/lib/pkgconfig"])
+def test_get_build_env_python_pkgconfig(
+    tmp_path, dummy_xbuildenv, host_pkg_config_path
+):
+    from pyodide_build.build_env import get_build_flag, get_pyversion_major_minor
+
+    host_env = {"PATH": ""}
+    if host_pkg_config_path:
+        host_env["PKG_CONFIG_PATH"] = host_pkg_config_path
+
+    pkgconfig_dir = Path(get_build_flag("TARGETINSTALLDIR")) / "lib" / "pkgconfig"
+    assert not pkgconfig_dir.exists()
+
+    build_env_ctx = pypabuild.get_build_env(
+        env=host_env,
+        pkgname="",
+        cflags="",
+        cxxflags="",
+        ldflags="",
+        target_install_dir=str(tmp_path),
+        exports="pyinit",
+        build_dir=tmp_path,
+    )
+
+    with build_env_ctx as env:
+        assert (pkgconfig_dir / f"python-{get_pyversion_major_minor()}.pc").is_file()
+        assert env["PKG_CONFIG_PATH"].split(os.pathsep) == [
+            str(pkgconfig_dir),
+            *([host_pkg_config_path] if host_pkg_config_path else []),
+        ]
+
+    assert host_env.get("PKG_CONFIG_PATH") == host_pkg_config_path
+
+
+def test_get_build_env_python_pkgconfig_in_tree(tmp_path, dummy_xbuildenv, monkeypatch):
+    from pyodide_build.build_env import get_build_flag
+
+    monkeypatch.setattr(pypabuild, "in_xbuildenv", lambda: False)
+
+    build_env_ctx = pypabuild.get_build_env(
+        env={"PATH": "", "PKG_CONFIG_PATH": "/host/lib/pkgconfig"},
+        pkgname="",
+        cflags="",
+        cxxflags="",
+        ldflags="",
+        target_install_dir=str(tmp_path),
+        exports="pyinit",
+        build_dir=tmp_path,
+    )
+
+    with build_env_ctx as env:
+        assert env["PKG_CONFIG_PATH"] == "/host/lib/pkgconfig"
+
+    assert not (Path(get_build_flag("TARGETINSTALLDIR")) / "lib").exists()
 
 
 def test_install_reqs_triggers_lazy_install(tmp_path, monkeypatch):

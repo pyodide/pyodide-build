@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through `MAKEFLAGS`, which GNU Make 4.4 and later also export to
   `$(shell ...)`.
   [#447](https://github.com/pyodide/pyodide-build/pull/447)
+- `pyodide build` and `pyodide build-recipes` no longer find the pkg-config
+  file of a host Python that has the same minor version as the target Python.
+  Cross-build environments that do not ship a `python-3.x.pc` for the target
+  Python now get one written before a build.
+  [#449](https://github.com/pyodide/pyodide-build/pull/449)
 
 ## [0.39.3]- 2026/10/27
 

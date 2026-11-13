@@ -22,12 +22,14 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 from pyodide_build import _f2c_fixes, common, pywasmcross, uv_helper
+from pyodide_build._python_pkgconfig import ensure_python_pkgconfig_files
 from pyodide_build.build_env import (
     get_build_flag,
     get_cross_build_files_dir,
     get_current_xbuildenv_manager,
     get_host_build_flag,
     get_pyversion,
+    get_pyversion_major_minor,
     get_unisolated_packages,
     in_xbuildenv,
     platform,
@@ -501,6 +503,17 @@ def get_build_env(
     env["_PYTHON_SYSCONFIGDATA_NAME"] = get_build_flag("SYSCONFIG_NAME")
     env["PYTHONPATH"] = str(sysconfig_dir)
     env["COMPILER_WRAPPER_DIR"] = str(symlink_dir)
+
+    if in_xbuildenv():
+        python_pkgconfig_dir = ensure_python_pkgconfig_files(
+            Path(get_build_flag("TARGETINSTALLDIR")), get_pyversion_major_minor()
+        )
+        if python_pkgconfig_dir is not None:
+            # Ahead of the existing entries, so that a python-3.x.pc of the host
+            # Python cannot be found before the one of the target Python
+            env["PKG_CONFIG_PATH"] = os.pathsep.join(
+                filter(None, [str(python_pkgconfig_dir), env.get("PKG_CONFIG_PATH")])
+            )
 
     yield env
 
