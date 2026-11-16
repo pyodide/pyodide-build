@@ -258,9 +258,6 @@ jobs:
             export RECIPE_BUILD_TARGET="*,!boost-histogram"
           fi
 
-          if [[ "${{ matrix.task.installer }}" == "uv" ]]; then
-            export UV_RUN_PREFIX="uv run"
-          fi
           make ${{ matrix.task.name }}
 
       - name: Upload coverage for tests marked with integration
