@@ -1,76 +1,44 @@
-import os
 from pathlib import Path
 
 from pyodide_build.logger import logger
 
-# Misc/python.pc.in and Misc/python-embed.pc.in from CPython. They are the
-# same from Python 3.12 to 3.15.
-_PYTHON_PC_IN = """\
+# Misc/python.pc.in and Misc/python-embed.pc.in from CPython.
+_PYTHON_PC = """\
 # See: man pkg-config
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-includedir=@includedir@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
 
 Name: Python
 Description: Build a C extension for Python
 Requires:
 Version: @VERSION@
-Libs.private: @LIBS@
-Libs: -L${libdir} @LIBPYTHON@
-Cflags: -I${includedir}/python@VERSION@@ABIFLAGS@
+Libs.private: -ldl  -lpthread
+Libs: -L${libdir}\x20
+Cflags: -I${includedir}/python@VERSION@
 """
 
-_PYTHON_EMBED_PC_IN = """\
+_PYTHON_EMBED_PC = """\
 # See: man pkg-config
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-includedir=@includedir@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
 
 Name: Python
 Description: Embed Python into an application
 Requires:
 Version: @VERSION@
-Libs.private: @LIBS@
-Libs: -L${libdir} -lpython@VERSION@@ABIFLAGS@
-Cflags: -I${includedir}/python@VERSION@@ABIFLAGS@
+Libs.private: -ldl  -lpthread
+Libs: -L${libdir} -lpython@VERSION@
+Cflags: -I${includedir}/python@VERSION@
 """
-
-
-def _render(template: str, python_version: str) -> str:
-    substitutions = {
-        # Relative to the .pc file, so that the cross-build environment can be
-        # moved. The other three are what configure fills in by default.
-        "@prefix@": "${pcfiledir}/../..",
-        "@exec_prefix@": "${prefix}",
-        "@libdir@": "${exec_prefix}/lib",
-        "@includedir@": "${prefix}/include",
-        "@VERSION@": python_version,
-        "@ABIFLAGS@": "",
-        "@LIBS@": "-ldl  -lpthread",
-        "@LIBPYTHON@": "",
-    }
-    for token, value in substitutions.items():
-        template = template.replace(token, value)
-    return template
-
-
-def _write_if_missing(path: Path, content: str) -> None:
-    if path.exists():
-        return
-
-    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    try:
-        tmp_path.write_text(content, encoding="utf-8", newline="\n")
-        os.replace(tmp_path, path)
-    finally:
-        tmp_path.unlink(missing_ok=True)
 
 
 def ensure_python_pkgconfig_files(
     target_install_dir: Path, python_version: str
-) -> Path | None:
+) -> Path:
     """
     Make sure that the target Python of a cross-build environment has its
     pkg-config files, and return the directory that holds them.
@@ -90,29 +58,26 @@ def ensure_python_pkgconfig_files(
 
     Returns
     -------
-    The directory with the pkg-config files, or None if they are missing and
-    could not be written.
+    The directory with the pkg-config files.
     """
     pkgconfig_dir = target_install_dir / "lib" / "pkgconfig"
 
     if (pkgconfig_dir / f"python-{python_version}.pc").is_file():
         return pkgconfig_dir
 
-    python_pc = _render(_PYTHON_PC_IN, python_version)
-    python_embed_pc = _render(_PYTHON_EMBED_PC_IN, python_version)
+    python_pc = _PYTHON_PC.replace("@VERSION@", python_version)
+    python_embed_pc = _PYTHON_EMBED_PC.replace("@VERSION@", python_version)
 
-    try:
-        pkgconfig_dir.mkdir(parents=True, exist_ok=True)
-        # python-3.x.pc is written last, because its presence is what marks the
-        # files as complete
-        for name in ("python3", f"python-{python_version}"):
-            _write_if_missing(pkgconfig_dir / f"{name}-embed.pc", python_embed_pc)
-            _write_if_missing(pkgconfig_dir / f"{name}.pc", python_pc)
-    except OSError as e:
-        logger.warning(
-            "Could not write the Python pkg-config files to %s: %s", pkgconfig_dir, e
+    pkgconfig_dir.mkdir(parents=True, exist_ok=True)
+    # python-3.x.pc is written last, because its presence is what marks the
+    # files as complete
+    for name in ("python3", f"python-{python_version}"):
+        (pkgconfig_dir / f"{name}-embed.pc").write_text(
+            python_embed_pc, encoding="utf-8", newline="\n"
         )
-        return None
+        (pkgconfig_dir / f"{name}.pc").write_text(
+            python_pc, encoding="utf-8", newline="\n"
+        )
 
     logger.info("Wrote the Python pkg-config files to %s", pkgconfig_dir)
     return pkgconfig_dir
