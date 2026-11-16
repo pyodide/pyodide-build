@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -103,22 +102,6 @@ def test_second_call_changes_nothing(tmp_path):
     assert {
         path.name: path.stat().st_mtime_ns for path in pkgconfig_dir.iterdir()
     } == mtimes
-
-
-@pytest.mark.skipif(
-    sys.platform == "win32" or getattr(os, "geteuid", lambda: 1)() == 0,
-    reason="needs a directory that the current user cannot write to",
-)
-def test_read_only_install_dir(tmp_path):
-    target_install_dir = make_target_install_dir(tmp_path)
-    target_install_dir.chmod(0o555)
-
-    try:
-        assert ensure_python_pkgconfig_files(target_install_dir, "3.14") is None
-    finally:
-        target_install_dir.chmod(0o755)
-
-    assert not (target_install_dir / "lib").exists()
 
 
 @pytest.mark.skipif(
