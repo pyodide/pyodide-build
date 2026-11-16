@@ -508,12 +508,13 @@ def get_build_env(
         python_pkgconfig_dir = ensure_python_pkgconfig_files(
             Path(get_build_flag("TARGETINSTALLDIR")), get_pyversion_major_minor()
         )
-        if python_pkgconfig_dir is not None:
-            # Ahead of the existing entries, so that a python-3.x.pc of the host
-            # Python cannot be found before the one of the target Python
-            env["PKG_CONFIG_PATH"] = os.pathsep.join(
-                filter(None, [str(python_pkgconfig_dir), env.get("PKG_CONFIG_PATH")])
-            )
+        # Ahead of the existing entries, so that a python-3.x.pc of the host
+        # Python cannot be found before the one of the target Python
+        pkg_config_path = str(python_pkgconfig_dir)
+        existing_pkg_config_path = env.get("PKG_CONFIG_PATH")
+        if existing_pkg_config_path:
+            pkg_config_path += os.pathsep + existing_pkg_config_path
+        env["PKG_CONFIG_PATH"] = pkg_config_path
 
     yield env
 
