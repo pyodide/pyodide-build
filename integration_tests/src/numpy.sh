@@ -10,8 +10,14 @@ wget $URL
 tar -xf numpy-${VERSION}.tar.gz
 cd numpy-${VERSION}
 
-# A pkg-config file for a host Python with the same version as the target
-# Python, which the build must not find
+# A pkg-config file for a host Python
+#
+# This is used as a regression test for https://github.com/pyodide/pyodide-build/pull/449.
+# We should use the pkg-config file from the xbuildenv (which either is available in it
+# or is retroactively added) and not this one below.
+# See also:
+# - https://github.com/pypa/cibuildwheel/issues/2950
+# - https://github.com/pypa/cibuildwheel/issues/2566
 PYTHON_VERSION=$(pyodide config get python_version | cut -d. -f1,2)
 HOST_PKGCONFIG_DIR=$(mktemp -d)
 cat > "${HOST_PKGCONFIG_DIR}/python-${PYTHON_VERSION}.pc" << EOF
