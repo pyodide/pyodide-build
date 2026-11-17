@@ -17,7 +17,7 @@ cd numpy-${VERSION}
 MESON_CROSS_FILE=$(pyodide config get meson_cross_file)
 
 # Build in a persistent build directory
-uv run --no-project pyodide build \
+${UV_RUN_PREFIX} pyodide build \
     -Csetup-args=-Dallow-noblas=true \
     -Csetup-args=--cross-file="${MESON_CROSS_FILE}" \
     -Cinstall-args=--tags=runtime,python-runtime,devel \
@@ -26,7 +26,7 @@ uv run --no-project pyodide build \
 
 sed -i 's/numpy/numpy-tests/g' pyproject.toml
 
-uv run --no-project pyodide build \
+${UV_RUN_PREFIX} pyodide build \
     -Csetup-args=-Dallow-noblas=true \
     -Csetup-args=--cross-file="${MESON_CROSS_FILE}" \
     -Cinstall-args=--tags=tests \

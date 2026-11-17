@@ -11,7 +11,7 @@ test-recipe: check
 	else \
 		RECIPE_TARGET='$(RECIPE_BUILD_TARGET)'; \
 	fi; \
-	uv run --no-project pyodide build-recipes --recipe-dir=recipes --install --force-rebuild --clean "$${RECIPE_TARGET}"
+	$(UV_RUN_PREFIX) pyodide build-recipes --recipe-dir=recipes --install --force-rebuild --clean "$${RECIPE_TARGET}"
 
 	@echo "... Verifying build directories are cleaned"
 	@for dir in recipes/*/build; do \

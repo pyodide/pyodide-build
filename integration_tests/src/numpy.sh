@@ -23,4 +23,4 @@ EOF
 export PKG_CONFIG_PATH="${HOST_PKGCONFIG_DIR}${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 
 MESON_CROSS_FILE=$(pyodide config get meson_cross_file)
-uv run --no-project pyodide build -vv -Csetup-args=-Dallow-noblas=true -Csetup-args=--cross-file="${MESON_CROSS_FILE}"
+${UV_RUN_PREFIX} pyodide build -vv -Csetup-args=-Dallow-noblas=true -Csetup-args=--cross-file="${MESON_CROSS_FILE}"
