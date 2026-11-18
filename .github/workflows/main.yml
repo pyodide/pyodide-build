@@ -259,7 +259,7 @@ jobs:
           fi
 
           if [[ "${{ matrix.task.installer }}" == "uv" ]]; then
-            export UV_RUN_PREFIX="uv run"
+            export UV_RUN_PREFIX="uv run --no-project"
           fi
           make ${{ matrix.task.name }}
 
